@@ -1,0 +1,30 @@
+{
+	"id": "ProJote",
+	"name": "Plugin Pronote",
+	"pluginVersion": "0.1",
+	"description": {
+		"fr_FR": "Plugin destinée à récupérer les inforamtions de Pronote"
+	},
+	"licence": "AGPL",
+	"author": "Aldarande",
+	"require": "4.3",
+	"category": "organization",
+	"hasDependency": true,
+	"hasOwnDeamon": true,
+	"maxDependancyInstallTime": 10,
+	"changelog": "../docs/fr_FR/changelog.md",
+	"changelog_beta": "../plugins/ProJote/docs/FR_fr/changelog_beta.md",
+	"documentation": "../docs/fr_FR/index.md",
+	"language": [
+		"fr_FR"
+	],
+	"compatibility": [
+		"smart",
+		"luna",
+		"atlas",
+		"rpi",
+		"docker",
+		"diy",
+		"mobile"
+	]
+}

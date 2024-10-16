@@ -1,0 +1,15 @@
+{
+  "pre-install": {},
+  "apt": {},
+  "pip3": {
+    "pronotepy": {},
+    "cryptography": {},
+    "pycryptodome": {},
+    "requests": {},
+    "beautifulsoup4": {}
+  },
+  "npm": {},
+  "yarn": {},
+  "plugin": {},
+  "post-install": {}
+}
