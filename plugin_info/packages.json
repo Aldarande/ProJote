@@ -4,7 +4,7 @@
   "pip3": {
     "pronotepy": {},
     "cryptography": {},
-    "pycryptodome": {},
+    "pycryptodome": {"version": "3.10.1"},
     "requests": {},
     "beautifulsoup4": {}
   },
