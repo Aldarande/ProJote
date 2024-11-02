@@ -1,1 +1,3 @@
-Version Alpha : Premiére diffusion pour test
+- Version Alpha : Premiére diffusion pour test
+    - 0.0.1 : Mise en ligne de la prémiére version
+    - 0.0.2 : Mise à jour de la documentation et du change log
