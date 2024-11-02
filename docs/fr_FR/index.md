@@ -1,17 +1,16 @@
-// The text is providing an introduction to the plugin and explaining its purpose, which is to retrieve
-// information about a student published on PRONOTE using the PronotePy API Wrapper available at
-// https://github.com/bain3/pronotepy.
 
-##Béta
+
+## Béta
+
 
 Ce plugin est en cours de dévelloppement aussi de nombreux bug peuvent apparaitre
 
-##Présentation
+## Présentation
 
 Le rôle du plugin est de récupérer les informations de l'élève publié sur PRONOTE.
 Pour cela nous utilisons l'API Wrapper [PronotePy](https://github.com/bain3/pronotepy "Lien vers Pronote")
 
-##Usage 
+## Usage 
 
 Dans le menu Plugins / Organisations / Plugin Pronote
 Cliquez sur ajouter
