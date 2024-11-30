@@ -12,12 +12,6 @@ try:
     Password = str(sys.argv[3])
     Ent = str(sys.argv[4])
 
-    """
-    Pronote_url = "https://0912109y.index-education.net/pronote/parent.html"
-    Username = "antoine.thiebault"
-    Password = "BEE1220F3D3B6B89A4C47109C91BD741"
-    Ent = "ent_essonne"
-    """
 
     if not Pronote_url.endswith("?login=true"):
         Pronote_url = Pronote_url + "?login=true"
