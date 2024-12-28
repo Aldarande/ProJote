@@ -348,6 +348,9 @@ class ProJote extends eqLogic
   public function UpdateInfoPronote($command = "Test")
   {
     $apikey = jeedom::getApiKey(__CLASS__);
+    $tokenurl = $this->getConfiguration("Token_Url", "");
+    $tokenusername = $this->getConfiguration("Token_Username", "");
+    $tokenpassword = $this->getConfiguration("Token_Password", "");
     $Cpttype = $this->getConfiguration("Cpttype", "");
     $login = $this->getConfiguration("login", "");
     $CAS = $this->getConfiguration("CasEnt", "ViaUrl");
@@ -361,7 +364,7 @@ class ProJote extends eqLogic
     $qrpin = $this->getConfiguration("qrpin", "");
     $qrurl = $this->getConfiguration("qrurl", "");
     $enfant = $this->getConfiguration("enfant", "");
-    $values = array('command' => $command, 'cpttype' => $Cpttype, 'apikey' => $apikey, 'cas' => $CAS, 'CptParent' => $CptParent, 'login' => $login, 'password' => $password, 'url' => $url, 'enfant' => $enfant, 'CmdId' => $CmdId, 'qrjeton' => $qrjeton, 'qrlogin' => $qrlogin, 'qrpin' => $qrpin, 'qrurl' => $qrurl);
+    $values = array('command' => $command, 'cpttype' => $Cpttype, 'apikey' => $apikey, 'cas' => $CAS, 'CptParent' => $CptParent, 'login' => $login, 'password' => $password, 'url' => $url, 'enfant' => $enfant, 'CmdId' => $CmdId, 'qrjeton' => $qrjeton, 'qrlogin' => $qrlogin, 'qrpin' => $qrpin, 'qrurl' => $qrurl, 'tokenurl' => $tokenurl, 'tokenusernamen' => $tokenusername, 'tokenpassword' => $tokenpassword,);
     $values = json_encode($values);
     if (log::convertLogLevel(log::getLogLevel(__CLASS__)) == "debug") {
       log::add(__CLASS__, 'debug', $value);
