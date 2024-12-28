@@ -14,7 +14,28 @@
 * along with Jeedom. If not, see <http://www.gnu.org/licenses/>.
 */
 
-// Ajout de l'événement de clic sur le bouton Valider
+/*********************************************************************
+* Ajoutez un gestionnaire d'événements change pour le champ "AUTH"
+*********************************************************************/
+$('[data-l1key="configuration"][data-l2key="AUTH"]').on('change', function () {
+  // Récupère la valeur sélectionnée
+  var selectedAuth = $(this).val();
+  // Masque tous les divs
+  $('.form-group.Login, .form-group.QRCode').hide();
+  // Affiche le div correspondant à la valeur sélectionnée
+  if (selectedAuth === 'Login') {
+    $('.form-group.Login').show();
+  } else if (selectedAuth === 'QRCode') {
+    $('.form-group.QRCode').show();
+  }
+});
+// Trigger le changement pour afficher le div correspondant à la valeur par défaut
+$('[data-l1key="configuration"][data-l2key="AUTH"]').trigger('change');
+
+
+/*******************************************************
+* Ajout de l'événement de clic sur le bouton Valider
+*******************************************************/
 $('#bt_Validate').on('click', function () {
   // Récupération des données
   // Récupérer les valeurs des éléments
@@ -22,6 +43,8 @@ $('#bt_Validate').on('click', function () {
   let Login = document.querySelector('[data-l2key="login"]').value;
   let Password = document.querySelector('[data-l2key="password"]').value;
   let CasEnt = document.querySelector('[data-l2key="CasEnt"]').value;
+  let NomEleve = document.querySelector('[data-l2key="enfant"]').value;
+
 
   // Transformer en un tableau d'objets
   let dataLogin = [
@@ -30,8 +53,6 @@ $('#bt_Validate').on('click', function () {
     { 'password': Password },
     { 'ent': CasEnt }
   ];
-  //A supprimer ....
-  console.log("AJAX Log DataLogin : ", dataLogin);
   // Exécution de la requête AJAX
   $.ajax({
     type: "POST", // Méthode de transmission des données au fichier php
@@ -41,13 +62,15 @@ $('#bt_Validate').on('click', function () {
       url: Url,
       login: Login,
       password: Password,
-      ent: CasEnt
+      ent: CasEnt,
+      nomeleve: NomEleve, //|| "Inconnu"
+      eqlogic: $('.eqLogicAttr[data-l1key=id]').value(),
     },
     dataType: 'json',
     global: false,
     error: function (request, status, error) {
       // Gestion des erreurs
-      console.error("AJAX Error:", error);
+      console.error("AJAX Error:", request, status, error);
       $('#bt_Validate').next('.fa-check-circle').remove();
       // Affichage de la croix rouge à droite du bouton
       $('#bt_Validate').after('<i class="fas fa-times-circle" style="color:red;margin-left:5px;"></i>');
@@ -71,7 +94,6 @@ $('#bt_Validate').on('click', function () {
         } else {
           entSelect.value = "Aucun"; // Sélectionner "Aucun" si "ent" est "null"
         }
-
         // Cocher la case "Compte Parent" si nécessaire (exemple de condition)
         let parentCheckbox = document.getElementById('Parent');
         parentCheckbox.checked = true; // ou false selon votre logique
@@ -93,6 +115,9 @@ $('#bt_Validate').on('click', function () {
   });
 });
 
+/***********************************
+ * Récupération des infos de l'élève
+ *************************************/
 function prePrintEqLogic(_eqlogicId) {
   $.ajax({
     type: "POST",
@@ -127,119 +152,9 @@ function prePrintEqLogic(_eqlogicId) {
   });
 }
 
-
-function resizeImage(imageData, width, height) {
-  return new Promise((resolve, reject) => {
-    var img = new Image();
-    img.onload = function () {
-      var canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      var ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, width, height);
-      var resizedImageData = canvas.toDataURL('image/png');
-      resolve(resizedImageData);
-    };
-    img.onerror = function () {
-      reject(new Error('Failed to load image'));
-    };
-    img.src = imageData;
-  });
-}
-
-function displayImage(imageData) {
-  var img = document.createElement('img');
-  img.src = imageData;
-  img.style.border = '5px solid #90EE90'; // Couleur du cadre en vert clair
-
-  var rectangle = document.querySelector('.rectangle');
-  if (rectangle) {
-    rectangle.innerHTML = '';
-
-    // Créez un élément div pour contenir l'image et le texte
-    var container = document.createElement('div');
-    container.style.position = 'relative';
-    rectangle.appendChild(container);
-
-    // Ajoutez l'image à l'élément div
-    container.appendChild(img);
-
-    // Ajoutez ce message "Cliquez pour valider" en vert gras, centré verticalement et horizontalement
-    /*     var message = document.createElement('div');
-        message.textContent = 'Cliquez pour valider';
-        message.style.color = '#90EE90'; // Couleur du texte en vert clair
-        message.style.fontWeight = 'bold'; // Texte en gras
-        message.style.position = 'absolute';
-        message.style.top = '50%';
-        message.style.left = '50%';
-        message.style.transform = 'translate(-50%, -50%)';
-        container.appendChild(message); */
-
-    // Ajoutez ce gestionnaire d'événements pour afficher une fenêtre de demande de code PIN
-    /* img.addEventListener('click', function () {
-      var pin = prompt('Veuillez entrer votre code PIN de 4 chiffres :');
-      // Vérifiez le code PIN ici
-      var pinRegex = /^\d{4}$/;
-      if (pinRegex.test(pin)) {
-        // Le code PIN est valide
-        console.log('Code PIN valide :', pin);
-      } else {
-        // Le code PIN est invalide
-        alert('Code PIN invalide. Veuillez entrer un code PIN de 4 chiffres.');
-      }
-    }); */
-  } else {
-    console.error('Element with class "rectangle" not found');
-  }
-}
-
-function handleImage(imageData) {
-  // Demande le code PIN à l'utilisateur
-  var pin = prompt('Veuillez entrer votre code PIN de 4 chiffres :');
-
-  // Vérifie que le code PIN saisi par l'utilisateur contient exactement 4 chiffres
-  var pinRegex = /^\d{4}$/;
-  if (!pinRegex.test(pin)) {
-    alert('Code PIN invalide. Veuillez entrer un code PIN de 4 chiffres.');
-    return;
-  }
-
-  // Si le code PIN est valide, continue le traitement de l'image
-  resizeImage(imageData, 200, 200).then(function (resizedImageData) {
-    var img = new Image();
-    img.onload = function () {
-      // Décoder le code QR à partir de l'image
-      var canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
-      var ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0);
-      var imageData = ctx.getImageData(0, 0, img.width, img.height);
-      var code = jsQR(imageData.data, imageData.width, imageData.height);
-
-
-      // Si le code QR est décodé avec succès, afficher les données
-      if (code) {
-        console.log('Données du code QR :', code.data);
-      } else {
-        console.log('Impossible de décoder le code QR');
-        document.getElementById('error-message').textContent = 'Impossible de décoder le code QR';
-      }
-
-      displayImage(resizedImageData);
-      sendImageToServer(code.data, pin);
-
-
-    };
-    img.onerror = function () {
-      alert('Erreur lors du chargement de l\'image.');
-      document.querySelector('.rectangle').innerHTML = '';
-    };
-    img.src = resizedImageData;
-  });
-}
-
-
+/**************************************
+ * Tratement de la réception du QR CODE
+ ***************************************/
 
 document.querySelector('.rectangle').addEventListener('paste', function (e) {
   var items = e.clipboardData.items;
@@ -269,7 +184,6 @@ document.getElementById('fileInput').addEventListener('change', function (e) {
 document.querySelector('.rectangle').addEventListener('drop', function (e) {
   e.preventDefault();
   e.stopPropagation();
-
   var file = e.dataTransfer.files[0];
   var reader = new FileReader();
   reader.onload = function (event) {
@@ -278,8 +192,6 @@ document.querySelector('.rectangle').addEventListener('drop', function (e) {
   };
   reader.readAsDataURL(file);
 });
-
-
 
 function sendImageToServer(code, pin) {
   // Fonction for send QRcode data to AJAX and python script
@@ -303,11 +215,9 @@ function sendImageToServer(code, pin) {
     },
     success: function (data) {
       document.querySelector('.fa-hourglass-half').classList.add('hidden');
-
       if (data.state === 'ok') {
         document.querySelector('.fa-check').classList.remove('hidden');
         console.log('résultat du QR code : ', JSON.stringify(data.result[0]));
-
         if (data.result[0].indexOf('An error occurred:') === 0) {
           document.getElementById('error-message').textContent = data.result;
           document.getElementById('error-message').style.color = 'red';
@@ -316,7 +226,6 @@ function sendImageToServer(code, pin) {
           console.log(`Token Username : ${data.result.Token_username}`);
           console.log(`Password : ${data.result.Token_Password}`);
           console.log(`URL : ${data.result.Token_URL}`);
-
           // Sélectionner la valeur du champ "ENT / CAS"
           let entSelect = document.querySelector('[data-l2key="CasEnt"]');
           if (obj.ent !== null) {
@@ -324,7 +233,6 @@ function sendImageToServer(code, pin) {
           } else {
             entSelect.value = "Aucun"; // Sélectionner "Aucun" si "ent" est "null"
           }
-
           // Cocher la case "Compte Parent" si nécessaire (exemple de condition)
           let parentCheckbox = document.getElementById('Parent');
           parentCheckbox.checked = true; // ou false selon votre logique
@@ -338,9 +246,99 @@ function sendImageToServer(code, pin) {
   });
 }
 
+function resizeImage(imageData, width, height) {
+  return new Promise((resolve, reject) => {
+    var img = new Image();
+    img.onload = function () {
+      var canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      var ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+      var resizedImageData = canvas.toDataURL('image/png');
+      resolve(resizedImageData);
+    };
+    img.onerror = function () {
+      reject(new Error('Failed to load image'));
+    };
+    img.src = imageData;
+  });
+}
+
+function displayImage(imageData) {
+  var img = document.createElement('img');
+  img.src = imageData;
+  img.style.border = '5px solid #90EE90'; // Couleur du cadre en vert clair
+  var rectangle = document.querySelector('.rectangle');
+  if (rectangle) {
+    rectangle.innerHTML = '';
+    // Créez un élément div pour contenir l'image et le texte
+    var container = document.createElement('div');
+    container.style.position = 'relative';
+    rectangle.appendChild(container);
+    // Ajoutez l'image à l'élément div
+    container.appendChild(img);
+    // Ajoutez ce gestionnaire d'événements pour afficher une fenêtre de demande de code PIN
+    img.addEventListener('click', function () {
+      var pin = prompt('Veuillez entrer votre code PIN de 4 chiffres :');
+      // Vérifiez le code PIN ici
+      var pinRegex = /^\d{4}$/;
+      if (pinRegex.test(pin)) {
+        // Le code PIN est valide
+        console.log('Code PIN valide :', pin);
+      } else {
+        // Le code PIN est invalide
+        alert('Code PIN invalide. Veuillez entrer un code PIN de 4 chiffres.');
+      }
+    });
+  } else {
+    console.error('Element with class "rectangle" not found');
+  }
+}
+
+function handleImage(imageData) {
+  // Demande le code PIN à l'utilisateur
+  var pin = prompt('Veuillez entrer votre code PIN de 4 chiffres :');
+  // Vérifie que le code PIN saisi par l'utilisateur contient exactement 4 chiffres
+  var pinRegex = /^\d{4}$/;
+  if (!pinRegex.test(pin)) {
+    alert('Code PIN invalide. Veuillez entrer un code PIN de 4 chiffres.');
+    return;
+  }
+  // Si le code PIN est valide, continue le traitement de l'image
+  resizeImage(imageData, 200, 200).then(function (resizedImageData) {
+    var img = new Image();
+    img.onload = function () {
+      // Décoder le code QR à partir de l'image
+      var canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      var ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      var imageData = ctx.getImageData(0, 0, img.width, img.height);
+      var code = jsQR(imageData.data, imageData.width, imageData.height);
+      // Si le code QR est décodé avec succès, afficher les données
+      if (code) {
+        console.log('Données du code QR :', code.data);
+      } else {
+        console.log('Impossible de décoder le code QR');
+        document.getElementById('error-message').textContent = 'Impossible de décoder le code QR';
+      }
+      displayImage(resizedImageData);
+      sendImageToServer(code.data, pin);
+    };
+    img.onerror = function () {
+      alert('Erreur lors du chargement de l\'image.');
+      document.querySelector('.rectangle').innerHTML = '';
+    };
+    img.src = resizedImageData;
+  });
+}
 
 
-/* Permet la réorganisation des commandes dans l'équipement */
+/********************************************************* 
+*Permet la réorganisation des commandes dans l'équipement 
+**********************************************************/
 $("#table_cmd").sortable({
   axis: "y",
   cursor: "move",
@@ -354,7 +352,9 @@ function prePrintEqLogic(_eqlogicId) {
   document.getElementById('div_pageContainer')?.querySelector('.eqLogicAttr[data-l1key="configuration"][data-l2key="enfant"]').jeeValue(0)
 }
 
-// Fonction pour trier les lignes de la table par ID croissant
+/***************************************************************
+ *  Fonction pour trier les lignes de la table par ID croissant
+ **************************************************************/
 function sortTableById(_cmd) {
   var table = document.getElementById('table_cmd').getElementsByTagName('tbody')[0];
   var rows = table.getElementsByTagName('tr');
@@ -363,18 +363,18 @@ function sortTableById(_cmd) {
     var idB = parseInt(b.getAttribute('data-cmd_id'));
     return idA - idB;
   });
-
   // Supprimer les lignes existantes de la table
   while (table.firstChild) {
     table.removeChild(table.firstChild);
   }
-
   // Ajouter les lignes triées à la table
   sortedRows.forEach(row => {
     table.appendChild(row);
   });
 }
-/* Fonction permettant l'affichage des commandes dans l'équipement */
+/* ****************************************************************
+*Fonction permettant l'affichage des commandes dans l'équipement 
+******************************************************************=*/
 function addCmdToTable(_cmd) {
   if (!isset(_cmd)) {
     var _cmd = { configuration: {} }

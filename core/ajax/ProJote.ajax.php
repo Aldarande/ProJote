@@ -15,6 +15,7 @@
  * along with Jeedom. If not, see <http://www.gnu.org/licenses/>.
  */
 
+
 try {
   require_once dirname(__FILE__) . '/../../../../core/php/core.inc.php';
   include_file('core', 'authentification', 'php');
@@ -26,31 +27,41 @@ try {
   // Initialisation de la requête AJAX
   ajax::init();
   $action = init('action');
-  log::add('ProJote', 'debug', 'Je reçois la demande AJAX : ' . $action);
   // Gestion des actions possibles
   //Récupèration des infos du comptes pour validation
   //
-  $eqId = init('id');
-  $eqLogic = ProJote::byId($eqId);
+
   if ($action == "Validate") {
     $password = init('password');
     $login = init('login');
     $url = init('url');
     $ent = init('ent');
+    $nomenfant = init('nomeleve');
+    $eqId = init('eqlogic');
+
     // Le but est d'éxécuter le script pour récupérer les tokens
-    log::add('ProJote', 'debug', 'Ajax::Validation de info LOGIN.' . $ent . '' . $login . ' ' . $url);
-    $command = 'python3 ../../resources/ProJoted/LoginConnect.py';
+    log::add('ProJote', 'debug', 'Ajax::Validation de login ' . $ent . ' ' . $login . ' ' . $url);
+    $command = system::getCmdPython3('ProJote') .  '/var/www/html/plugins/ProJote/resources/ProJoted/LoginConnect.py';
     $command .= ' ' . escapeshellarg($url);
     $command .= ' ' . escapeshellarg($login);
     $command .= ' ' . escapeshellarg($password);
     $command .= ' ' . escapeshellarg($ent);
-    log::add('ProJote', 'debug', 'Ajax::commande.' . $command);
-    exec($command, $output, $return);
-    log::add('ProJote', 'debug', 'Ajax::retour LOGIN ' . $return);
-    if ($return === 0 && $output !== null) {
-      log::add('ProJote', 'debug', 'Ajax::Résultat LoginToken :' . $output);
+    $command .= ' ' . escapeshellarg($nomenfant);
+    $command .= ' ' . escapeshellarg($eqId);
+    $command .= ' ' . escapeshellarg(log::convertLogLevel(log::getLogLevel("ProJote")));
+    $command .= ' >> ' . log::getPathToLog("ProJote");
+    log::add('ProJote', 'debug', 'Ajax::commande : ' . $command . ' 2>&1');
+    exec($command . ' 2>&1', $output, $return_var);
+    log::add('ProJote', 'debug', 'Ajax::retour commande Validation ' . $return_var);
+    if ($return_var === 0) {
+      log::add('ProJote', 'debug', 'Ajax::Résultat LoginToken : ' . $output);
       ajax::success($output);
-      // transférer les donnée reçu dans logs
+      //
+      // Demander de rafraichir la page pour afficher les informations
+      // Si parent renvoyer la liste d'enfant et commencant par le selctionné
+      //
+    } else {
+      ajax::error('Erreur lors de l\'exécution de la commande Python : ' . implode("\n", $output));
     }
   } elseif ($action == "ValidateQRCode") {
     log::add('ProJote', 'debug', 'Ajax::Validation de info QRCODE.');
@@ -68,7 +79,7 @@ try {
 
     log::add('ProJote', 'debug', 'Ajax::info QRCODE ' . $jeton . ' ' . $login . ' ' . $url . ' ' . $pin);
 
-    $command = 'python3 ../../resources/ProJoted/QRConnect.py';
+    $command = system::getCmdPython3(__CLASS__) . ' ../../resources/ProJoted/QRConnect.py';
     $command .= ' ' . escapeshellarg($jeton);
     $command .= ' ' . escapeshellarg($login);
     $command .= ' ' . escapeshellarg($url);
