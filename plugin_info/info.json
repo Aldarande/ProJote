@@ -12,9 +12,9 @@
 	"hasDependency": true,
 	"hasOwnDeamon": true,
 	"maxDependancyInstallTime": 10,
-	"changelog": "../docs/fr_FR/changelog.md",
-	"changelog_beta": "../plugins/ProJote/docs/FR_fr/changelog_beta.md",
-	"documentation": "../docs/fr_FR/index.md",
+	"changelog": "/plugins/ProJote//docs/fr_FR/changelog.md",
+	"changelog_beta": "/plugins/ProJote/docs/FR_fr/changelog_beta.md",
+	"documentation": "/plugins/ProJote/docs/fr_FR/index.md",
 	"language": [
 		"fr_FR"
 	],

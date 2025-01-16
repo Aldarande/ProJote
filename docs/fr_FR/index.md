@@ -2,6 +2,7 @@
 // information about a student published on PRONOTE using the PronotePy API Wrapper available at
 // https://github.com/bain3/pronotepy.
 Présentation
+
 Le rôle du plugin est de récupérer les informations de l'élève publié sur PRONOTE.
 Pour cela nous utilisons l'API Wrapper PronotePy (https://github.com/bain3/pronotepy)
 

@@ -1,12 +1,23 @@
 {
   "pre-install": {},
-  "apt": {},
+  "apt": {
+    "python3-pyudev": {},
+    "python3-requests": {},
+    "python3-dev": {}
+  },
   "pip3": {
-    "pronotepy": {},
+    "pronotepy": {
+      "reinstall": true
+    },
+    "autoslot": {},
     "cryptography": {},
-    "pycryptodome": {},
+    "pycryptodome": {
+      "version": "3.20.0"
+    },
     "requests": {},
-    "beautifulsoup4": {}
+    "beautifulsoup4": {},
+    "serial": {},
+    "pyudev": {}
   },
   "npm": {},
   "yarn": {},
