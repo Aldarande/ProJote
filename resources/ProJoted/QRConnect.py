@@ -63,21 +63,18 @@ try:
         # Tentative de connexion via le QR code
 
         if "parent" not in QRUrl:
-            # Test de connection en tant que Parent
+            # Test de connection en tant que Elève
             Account = pronotepy.Client.qrcode_login(
                 qr_code=Qrcode_data, pin=Pin, uuid="ProJote"
             )
-
         else:
-
+            logging.debug(f"QRConnect.py :: Compte parent")
             Account = pronotepy.ParentClient.qrcode_login(
                 qr_code=Qrcode_data, pin=Pin, uuid="ProJote"
             )
             logging.debug(f"QRConnect.py :: {Account}")
-
         if Account.logged_in:
             logging.info("Client connecté")
-
             # Je crée le fichier pou le Token.
             writedataPronotepy(Account, "/var/www/html/plugins/ProJote/data", EqID)
 
