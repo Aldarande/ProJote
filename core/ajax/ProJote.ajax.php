@@ -37,24 +37,32 @@ try {
     $url = init('url');
     $ent = init('ent');
     $nomenfant = init('nomeleve');
-    $eqId = init('eqlogic');
+    $eqLogicId = init('eqlogic');
 
     // Le but est d'éxécuter le script pour récupérer les tokens
-    log::add('ProJote', 'debug', 'Ajax::Validation de login ' . $ent . ' ' . $login . ' ' . $url);
+    log::add('ProJote', 'debug', 'Ajax:: Validation de login : ' . $ent . ' ' . $login . ' ' . $url);
     $command = system::getCmdPython3('ProJote') .  '/var/www/html/plugins/ProJote/resources/ProJoted/LoginConnect.py';
-    $command .= ' ' . escapeshellarg($url);
-    $command .= ' ' . escapeshellarg($login);
-    $command .= ' ' . escapeshellarg($password);
-    $command .= ' ' . escapeshellarg($ent);
-    $command .= ' ' . escapeshellarg($nomenfant);
-    $command .= ' ' . escapeshellarg($eqId);
-    $command .= ' ' . escapeshellarg(log::convertLogLevel(log::getLogLevel("ProJote")));
-    $command .= ' >> ' . log::getPathToLog("ProJote");
-    log::add('ProJote', 'debug', 'Ajax::commande : ' . $command . ' 2>&1');
-    exec($command . ' 2>&1', $output, $return_var);
+    $command .= ' --URL ' . $url;
+    $command .= ' --Login ' . $login;
+    $command .= ' --Password ' . $password;
+    if ($ent != null) {
+      $command .= ' --Ent ' . $ent;
+    }
+    if ($nomenfant != null) {
+      $command .= ' --Enfant "' . $nomenfant . '"';
+    }
+    $command .= ' --Eqid ' . $eqLogicId;
+    $command .= ' --Loglevel ' . (log::convertLogLevel(log::getLogLevel("ProJote")));
+    $command .= ' >> ' . log::getPathToLog('ProJote') . ' 2>&1 ';
+    log::add('ProJote', 'debug', 'Ajax:: Commande de validation : ' . $command);
+    exec($command, $output, $return_var);
     log::add('ProJote', 'debug', 'Ajax::retour commande Validation ' . $return_var);
     if ($return_var === 0) {
-      log::add('ProJote', 'debug', 'Ajax::Résultat LoginToken : ' . $output);
+      // Mise à jour des informations collectées depuis le fichier
+      $eqLogic = eqLogic::byId($eqLogicId);
+      log::add('ProJote', 'debug', 'Ajax:: eqLogicId = ' . $eqLogicId);
+      // Appeler la fonction ReadEnfantToken pour lire et décoder le fichier JSON
+      $data = $eqLogic->ReadEnfantToken();
       ajax::success($output);
       //
       // Demander de rafraichir la page pour afficher les informations
@@ -72,56 +80,45 @@ try {
       ajax::error('Invalid JSON data.');
       return;
     }
-
     $jeton = $data['jeton'];
     $login = $data['login'];
     $url = $data['url'];
+    $eqLogicId = init('eqlogic');
+    log::add('ProJote', 'debug', 'Ajax::info QRCODE ' . $jeton . ' ' . $login . ' ' . $url . ' ' . $pin . ' pour eqid : ' . $eqLogicId);
 
-    log::add('ProJote', 'debug', 'Ajax::info QRCODE ' . $jeton . ' ' . $login . ' ' . $url . ' ' . $pin);
-
-    $command = system::getCmdPython3(__CLASS__) . ' ../../resources/ProJoted/QRConnect.py';
-    $command .= ' ' . escapeshellarg($jeton);
-    $command .= ' ' . escapeshellarg($login);
-    $command .= ' ' . escapeshellarg($url);
-    $command .= ' ' . escapeshellarg($pin);
+    $command = system::getCmdPython3('ProJote') .  '/var/www/html/plugins/ProJote/resources/ProJoted/QRConnect.py';
+    $command .= ' --Jeton ' . escapeshellarg($jeton);
+    $command .= ' --QRLogin ' . escapeshellarg($login);
+    $command .= ' --QRUrl ' . escapeshellarg($url);
+    $command .= ' --Pin ' . escapeshellarg($pin);
+    $command .= ' --Eqid ' . $eqLogicId;
+    $command .= ' --Loglevel ' . (log::convertLogLevel(log::getLogLevel("ProJote")));
+    $command .= ' >> ' . log::getPathToLog('ProJote') . ' 2>&1 ';
 
     log::add('ProJote', 'debug', 'Ajax::info QRCODE cmd ' . $command);
-    exec($command, $output, $return);
+    exec($command, $output, $return_var);
     //$output = implode("\n", $output); // Convertir l'output en chaîne
 
     //$output = json_decode($output, true);
     log::add('ProJote', 'debug', 'Ajax::retour QRCODE ' . $return);
-    if ($return === 0 && $output !== null) {
-      log::add('ProJote', 'debug', 'Ajax::Résultat Token :' . $output);
-      ajax::success($output);
-      // transférer les donnée reçu dans logs
+    if ($return_var === 0) {
 
+      // Mise à jour des informations collectées depuis le fichier
+      $eqLogic = eqLogic::byId($eqLogicId);
+      log::add('ProJote', 'debug', 'Ajax:: eqLogicId = ' . $eqLogicId);
+      // Appeler la fonction ReadEnfantToken pour lire et décoder le fichier JSON
+      $data = $eqLogic->ReadEnfantToken();
+      ajax::success($output);
+      //
+      // Demander de rafraichir la page pour afficher les informations
+      // Si parent renvoyer la liste d'enfant et commencant par le selctionné
+      //
     } else {
-      ajax::error('Erreur lors de l\'exécution du script Python. code résultat : ', $output);
+      ajax::error('Erreur lors de l\'exécution du script Python. Vérifiez les logs.');
     }
     //
     // Affichage des infos du compte
     //
-  } elseif ($action == "GetEquipmentInfo") {
-    log::add('ProJote', 'debug', 'Ajax::Je recherche le fichier avec la liste d\'enfant');
-    //$eqId = init('id');
-    //$eqLogic = ProJote::byId(init('id'));
-
-    $filePath = "/tmp/jeedom/ProJote/{$eqId}/listenfant.ProJote";
-    log::add('ProJote', 'debug', 'Ajax::Je recherche le fichier ' . $filePath);
-    if (file_exists($filePath) && filesize($filePath) > 0) {
-      $fileContent = file_get_contents($filePath);
-      // Convertir le contenu en un tableau en utilisant explode
-      $fileContentArray = explode("\n", $fileContent);
-      // Stocker le contenu dans une variable de session
-      // $_SESSION['equipment_info'] = $fileContentArray;
-      ajax::success($fileContentArray);
-    } else {
-      ajax::error('Le fichier n\'existe pas ou est vide.');
-    }
-  } elseif ($action == "validate2") {
-    //  FAire un script python pourr valider la connection
-
   } else {
     // Si aucune action correspondante n'a été trouvée
     throw new Exception(__('Aucune méthode correspondante à', __FILE__) . ' : ' . init('action'));
