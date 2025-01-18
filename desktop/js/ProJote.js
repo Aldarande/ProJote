@@ -27,6 +27,26 @@ function getParameterByName(name, url) {
   return decodeURIComponent(results[2].replace(/\+/g, ' '));
 }
 
+// Gestion de l'affichage du champ listenfant en fonction de la case à cocher Parent
+$('#Parent').change(function () {
+  if ($(this).is(':checked')) {
+    $('.form-group.listenfant').show(); // Affiche la liste des enfants
+    populateEnfantList(); // Met à jour la liste si nécessaire
+  } else {
+    $('.form-group.listenfant').hide(); // Cache la liste des enfants
+    $('#enfantList').empty(); // Vide la liste des enfants
+  }
+});
+
+// Initialiser l'état du champ listenfant au chargement de la page
+if ($('#Parent').is(':checked')) {
+  $('.form-group.listenfant').show(); // Affiche la liste au démarrage si Parent est coché
+  populateEnfantList(); // Remplit la liste si nécessaire
+} else {
+  $('.form-group.listenfant').hide(); // Cache la liste au démarrage
+  $('#enfantList').empty(); // Vide la liste au démarrage
+}
+
 function loadProJoteData(eqLogicId) {
   if (eqLogicId) {
     var filePath = '/plugins/ProJote/data/' + eqLogicId + '/enfant.ProJote.json.txt';
@@ -126,11 +146,15 @@ function resetFields() {
 }
 
 function populateEnfantList(eqLogicId) {
-  var filePath = '/plugins/ProJote/data/' + eqLogicId + '/enfant.ProJote.json.txt';
+  if (!$('.form-group.listenfant').is(':visible')) {
+    console.log('ProJote.js:: Liste des enfants non affichée, aucune action.');
+    return;
+  }
 
+  var filePath = '/plugins/ProJote/data/' + eqLogicId + '/enfant.ProJote.json.txt';
   $.getJSON(filePath, function (data) {
     if (data && data.Liste_Enfant) {
-      var enfants = JSON.parse(data.Liste_Enfant); // Diviser la chaîne en un tableau
+      var enfants = JSON.parse(data.Liste_Enfant); // Transformer la chaîne en tableau
       var $enfantList = $('#enfantList');
       $enfantList.empty(); // Vider la liste existante
 
@@ -151,6 +175,7 @@ function populateEnfantList(eqLogicId) {
     $('#enfantList').empty();
   });
 }
+
 
 function htmlspecialchars(str) {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
