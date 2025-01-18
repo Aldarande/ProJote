@@ -207,7 +207,7 @@ function generateFormGroup($label, $input, $tooltip = '')
 								</div>
 								<div class="form-group">
 									<label class="col-sm-4 control-label">{{Mot de passe}}<i class="fas fa-question-circle tooltips" title="{{Renseignez le mot de passe}}"></i></label>
-									<input type="text" class=" col-sm-6 eqLogicAttr form-control inputPassword" data-l1key="configuration" data-l2key="password">
+									<input type="password" class=" col-sm-6 eqLogicAttr form-control inputPassword" data-l1key="configuration" data-l2key="password">
 								</div>
 								<div class="form-group">
 									<label class="col-sm-4 control-label">{{Url }}<i class="fas fa-question-circle tooltips" title="{{Renseignez l'adresse web pour vous connecter à Pronote}}"></i></label>
@@ -290,8 +290,8 @@ function generateFormGroup($label, $input, $tooltip = '')
 										</style>
 									</div>
 								</div>
-								<div id="error-message" style="color: red; font-weight: bold;"></div>
 							</div>
+							<div class="error_message hidden" id="error-message" style="color: red; font-weight: bold;"></div>
 						</div>
 						<!-- Partie droite de l'onglet "Équipement" -->
 						<!-- Affiche un champ de commentaire par défaut mais vous pouvez y mettre ce que vous voulez -->

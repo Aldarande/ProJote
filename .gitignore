@@ -1,0 +1,9 @@
+# Ignore data directory
+data/
+
+# Ignore Python virtual environment directory
+resources/python_venv
+.vscode/
+.venv/
+.cspell/
+
