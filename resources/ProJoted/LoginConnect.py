@@ -375,6 +375,8 @@ try:
             # Je crée le fichier pou le Token.
             writedataPronotepy(Account, "/var/www/html/plugins/ProJote/data", EqID)
 
+
 except Exception as e:
     line_number = e.__traceback__.tb_lineno
     logging.error("An error occurred: lig.", line_number, e)
+    sys.exit(1)

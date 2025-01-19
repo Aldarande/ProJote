@@ -81,3 +81,4 @@ try:
 except Exception as e:
     line_number = e.__traceback__.tb_lineno
     print("An error occurred: line ", line_number, e)
+    sys.exit(1)

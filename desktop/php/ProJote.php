@@ -147,7 +147,11 @@ function generateFormGroup($label, $input, $tooltip = '')
 								</div>
 							</div>
 							<div class="form-group Login" style="display:none;">
-								<legend><i class="fa fa-user"></i> {{Login}}</legend>
+								<legend><i class="fa fa-user"></i> {{Login}}
+									<i class="fas fa-hourglass-half fa-spin hidden"></i>
+									<i class="fas fa-check hidden"></i>
+									<i class="fas fa-times hidden"></i>
+								</legend>
 								<div class="form-group ENT">
 									<label class="col-sm-4 control-label">{{ENT / CAS}}<i class="fas fa-question-circle tooltips" title="{{Renseignez le CAS ENT qui correspond à ce compte}}"></i></label>
 									<select type="text" class="col-sm-6 eqLogicAttr form-control" data-l1key="configuration" data-l2key="CasEnt">
@@ -239,60 +243,60 @@ function generateFormGroup($label, $input, $tooltip = '')
 											<input type="file" id="fileInput" style="display:none;">
 											<label for="fileInput" class="button">Parcourir</label>
 										</div>
-										<style>
-											.rectangle {
-												width: 200px;
-												height: 200px;
-												background-color: lightgray;
-												display: flex;
-												justify-content: center;
-												align-items: center;
-												cursor: pointer;
-											}
-
-											#error-message {
-												color: red;
-												font-weight: bold;
-												text-align: center;
-											}
-
-											.button {
-												padding: 10px;
-												/* background-color: white; */
-												cursor: pointer;
-											}
-
-											.fa-spin {
-												animation: fa-spin 2s infinite linear;
-											}
-
-											.fa-check {
-												color: green;
-											}
-
-											.fa-times {
-												color: red;
-											}
-
-											.hidden {
-												display: none;
-											}
-
-											@keyframes fa-spin {
-												0% {
-													transform: rotate(0deg);
-												}
-
-												100% {
-													transform: rotate(360deg);
-												}
-											}
-										</style>
 									</div>
 								</div>
 							</div>
-							<div class="error_message hidden" id="error-message" style="color: red; font-weight: bold;"></div>
+							<div class="form-group text-center" id="error-message" style="color: red; font-weight: bold;text-align: center; margin: 0 auto;"></div>
 						</div>
+						<style>
+							.rectangle {
+								width: 200px;
+								height: 200px;
+								background-color: lightgray;
+								display: flex;
+								justify-content: center;
+								align-items: center;
+								cursor: pointer;
+							}
+
+							#error-message {
+								color: red;
+								font-weight: bold;
+								text-align: center;
+							}
+
+							.button {
+								padding: 10px;
+								/* background-color: white; */
+								cursor: pointer;
+							}
+
+							.fa-spin {
+								animation: fa-spin 2s infinite linear;
+							}
+
+							.fa-check {
+								color: green;
+							}
+
+							.fa-times {
+								color: red;
+							}
+
+							.hidden {
+								display: none;
+							}
+
+							@keyframes fa-spin {
+								0% {
+									transform: rotate(0deg);
+								}
+
+								100% {
+									transform: rotate(360deg);
+								}
+							}
+						</style>
 						<!-- Partie droite de l'onglet "Équipement" -->
 						<!-- Affiche un champ de commentaire par défaut mais vous pouvez y mettre ce que vous voulez -->
 						<div class="col-lg-6">
@@ -385,7 +389,7 @@ function generateFormGroup($label, $input, $tooltip = '')
 </div><!-- /.row row-overflow -->
 <!-- Inclusion du fichier javascript du plugin (dossier, nom_du_fichier, extension_du_fichier, id_du_plugin) -->
 <?php include_file('desktop', 'ProJote', 'js', 'ProJote'); ?>
-<?php include_file('desktop', 'jsQR', 'js', 'ProJote'); ?>
+<?php include_file('3rdparty', 'jsQR', 'js', 'ProJote'); ?>
 <!-- Inclusion du fichier javascript du core - NE PAS MODIFIER NI SUPPRIMER -->
 <?php include_file('core', 'plugin.template', 'js'); ?>
 

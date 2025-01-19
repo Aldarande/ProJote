@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Documentation ProJote</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+        }
+
+        .sidebar {
+            width: 250px;
+            background-color: #d8f3dc;
+            padding: 20px;
+            box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+            position: fixed;
+            height: 100%;
+            overflow-y: auto;
+        }
+
+        .sidebar a {
+            display: block;
+            color: #2d6a4f;
+            text-decoration: none;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+
+        .sidebar a:hover {
+            text-decoration: underline;
+        }
+
+        .content {
+            margin-left: 270px;
+            padding: 20px;
+            width: calc(100% - 270px);
+        }
+
+        h1,
+        h2 {
+            color: #1b4332;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="sidebar">
+        <h2>Sommaire</h2>
+        <a href="#presentation">Présentation</a>
+        <a href="#usage">Usage</a>
+        <a href="#connexion">Connexion</a>
+        <a href="#login">Méthode Login</a>
+        <a href="#qrcode">Méthode QR Code</a>
+        <a href="#transmission">Transmission sur Jeedom</a>
+        <a href="#utilisation">Utilisation</a>
+    </div>
+
+    <div class="content">
+        <h1 id="presentation">Présentation</h1>
+        <p>Le rôle du plugin est de récupérer les informations de l'élève publiées sur PRONOTE.</p>
+        <p>Pour cela nous utilisons l'API Wrapper PronotePy (<a href="https://github.com/bain3/pronotepy"
+                target="_blank">https://github.com/bain3/pronotepy</a>).</p>
+
+        <h1 id="usage">Usage</h1>
+        <p>Dans le menu Plugins / Organisations / Plugin Pronote, cliquez sur <strong>Ajouter</strong>. Choisissez un
+            nom identifiant l’équipement.</p>
+
+        <h1 id="connexion">Connexion</h1>
+        <p>Il existe deux méthodes de connexion : par Login ou par QR code. La méthode par QR code est recommandée.</p>
+
+        <h2 id="login">Login</h2>
+        <p>Le but de cette méthode est de vous connecter avec les informations de connexion. Parcourez la liste des
+            ENT/CAS pour trouver celle qui vous correspond. Si vous ne trouvez pas de correspondance, essayez "Aucun".
+            Si vous utilisez un compte parent, cochez la case.</p>
+        <p>Ensuite, saisissez le login et le mot de passe de votre compte, puis l’URL de Pronote que vous utilisez (par
+            exemple, <code>https://demo.index-education.net/pronote/eleve.html</code>).</p>
+
+        <h2 id="qrcode">QR Code</h2>
+        <p>D’abord, connectez-vous au site Pronote et générez un QR Code avec un code PIN à 4 chiffres de votre choix.
+            Récupérez le QR Code sur Pronote.</p>
+        <p>Utilisez l’outil de capture d’écran Windows pour copier le QR Code dans le presse-papier.</p>
+
+        <h1 id="transmission">Transmission sur Jeedom</h1>
+        <p>Créez un nouvel équipement ProJote. Sélectionnez le paramètre d’authentification QR Code, puis collez le QR
+            Code dans le carré gris ou importez l’image enregistrée.</p>
+        <p>Le code PIN sera requis pour finaliser la configuration. Si tout se passe bien, les informations de l’élève
+            apparaîtront.</p>
+
+        <h1 id="utilisation">Utilisation</h1>
+        <p>Le plugin récupère les informations contenues dans Pronote. Si elles ne sont pas présentes sur le site, elles
+            ne remonteront pas.</p>
+    </div>
+</body>
+
+</html>
