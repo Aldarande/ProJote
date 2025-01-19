@@ -12,9 +12,9 @@
 	"hasDependency": true,
 	"hasOwnDeamon": true,
 	"maxDependancyInstallTime": 10,
-	"changelog": "https://aldarande.github.io/ProJote/#language#/changelog",
-	"changelog_beta": "https://aldarande.github.io/ProJote/#language#/changelog_beta",
-	"documentation": "https://aldarande.github.io/ProJote/#language#/",
+	"changelog": "https://aldarande.github.io/ProJote/#language#/index.html#Version",
+	// "changelog_beta": "https://aldarande.github.io/ProJote/#language#/changelog_beta",
+	"documentation": "https://aldarande.github.io/ProJote/#language#/index.html",
 	"language": [
 		"fr_FR"
 	],

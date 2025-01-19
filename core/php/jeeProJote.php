@@ -12,10 +12,9 @@ try {
         die();
     }
 
-    $json_result = file_get_contents("php://input");
+    $result = json_decode(file_get_contents("php://input"), true);
 
-    $result = json_decode($json_result, true);
-    if (log::convertLogLevel(log::getLogLevel(__CLASS__)) == "debug") {
+    if (log::convertLogLevel(log::getLogLevel('ProJote')) == "debug") {
         $result_json = json_encode($result, JSON_PRETTY_PRINT);
         log::add('ProJote', 'debug', 'Résultat reçu : ' . $result_json);
     }
@@ -100,15 +99,17 @@ try {
     }
 
     // Vérifie les entrés des Menus
-    if (is_array($result["Menus"])) {
+    if (is_array($result["Menu"])) {
         // Parcourt toutes les clés possibles
-        foreach ($result["Menus"] as $key => $value) {
+        foreach ($result["Menu"] as $key => $value) {
             // Vérifie si la clé existe et met à jour la commande correspondante
             if (isset($value) && $eqLogic->getCmd(null, $key)) {
                 log::add('ProJote', 'debug', 'Champ reçu : ' . $key . ' - Valeur reçue : ' . print_r($value, true));
                 $eqLogic->checkAndUpdateCmd($key, $value);
             }
         }
+    } else {
+        log::add('ProJote', 'debug', 'Menus non reçu');
     }
 
     // Vérifie les entrés des Notifications
@@ -121,6 +122,29 @@ try {
                 $eqLogic->checkAndUpdateCmd($key, $value);
             }
         }
+    } else {
+        log::add('ProJote', 'debug', 'Notifications non reçu');
+    }
+
+    if (is_array($result["Token"])) {
+        // Correspondance des clés JSON avec les commandes Jeedom
+        $cmdMapping = [
+            'pronote_url' => 'TokenUrl',
+            'username' => 'TokenUsername',
+            'password' => 'TokenPassword',
+            'client_identifier' => 'TokenId'
+        ];
+        // Parcourt toutes les clés possibles
+        foreach ($cmdMapping as $jsonKey => $cmdName) {
+            // Vérifie si la clé existe et met à jour la commande correspondante
+            if (isset($result["Token"][$jsonKey]) && $eqLogic->getCmd(null, $cmdName)) {
+                $value = $result["Token"][$jsonKey];
+                log::add('ProJote', 'debug', 'Champ reçu : ' . $cmdName . ' - Valeur reçue : ' . print_r($value, true));
+                $eqLogic->checkAndUpdateCmd($cmdName, $value);
+            }
+        }
+    } else {
+        log::add('ProJote', 'debug', 'Token non reçu');
     }
 } catch (Exception $e) {
     log::add('ProJote', 'error', displayException($e));
