@@ -51,34 +51,57 @@ class ProJote extends eqLogic
       throw new Exception(__('Veuillez vérifier la configuration', __FILE__));
     }
 
-    $path = realpath(dirname(__FILE__) . '/../../resources/ProJoted'); // répertoire du démon 
-    $cmd = 'python3 ' . $path . '/ProJoted.py'; // nom du démon. C'est là que j'éxécute le programme Python
-    $cmd .= ' --loglevel ' . log::convertLogLevel(log::getLogLevel(__CLASS__));
-    $cmd .= ' --socketport ' . config::byKey('socketport', __CLASS__, '55369'); // port par défaut 
-    $cmd .= ' --callback ' . network::getNetworkAccess('internal', 'http:127.0.0.1:port:comp') . '/plugins/ProJote/core/php/jeeProJote.php'; // chemin de la callback url 
-    $cmd .= ' --apikey ' . jeedom::getApiKey(__CLASS__); // l'apikey pour authentifier les échanges suivants
+    $path = realpath(dirname(__FILE__) . '/../../resources/ProJoted');
+    if (!$path) {
+      throw new Exception(__('Chemin vers le démon introuvable.', __FILE__));
+    }
+
+    $socketport = config::byKey('socketport', __CLASS__, '55369');
+    if (!is_string($socketport)) {
+      throw new Exception(__('Le socketport doit être une chaîne valide.', __FILE__));
+    }
+
+    $callback = network::getNetworkAccess('internal', 'http:127.0.0.1:port:comp');
+    if (!is_string($callback)) {
+      throw new Exception(__('Le callback doit être une URL valide.', __FILE__));
+    }
+
+    $loglevel = log::convertLogLevel(log::getLogLevel(__CLASS__));
+    if (!is_string($loglevel)) {
+      throw new Exception(__('Le niveau de log est invalide.', __FILE__));
+    }
+
+    $cmd = system::getCmdPython3(__CLASS__) . " {$path}/ProJoted.py";
+    $cmd .= ' --loglevel ' . $loglevel;
+    $cmd .= ' --socketport ' . $socketport;
+    $cmd .= ' --callback ' . $callback . '/plugins/ProJote/core/php/jeeProJote.php';
+    $cmd .= ' --apikey ' . jeedom::getApiKey(__CLASS__);
     $cmd .= ' --cycle 3';
-    $cmd .= ' --pid ' . jeedom::getTmpFolder(__CLASS__) . '/deamon.pid'; // et on précise le chemin vers le pid file (ne pas modifier)
+    $cmd .= ' --pid ' . jeedom::getTmpFolder(__CLASS__) . '/deamon.pid';
+
     log::add(__CLASS__, 'info', 'Lancement démon ' . __CLASS__);
-    log::add(__CLASS__, 'debug', ' execution demon : ' . $cmd);
+    log::add(__CLASS__, 'debug', 'Execution demon : ' . $cmd);
     exec($cmd . ' >> ' . log::getPathToLog(__CLASS__) . ' 2>&1 &');
+
     $i = 0;
     while ($i < 20) {
       $deamon_info = self::deamon_info();
-      log::add(__CLASS__, 'debug', $deamon_info);
       if ($deamon_info['state'] == 'ok') {
         break;
       }
       sleep(1);
       $i++;
     }
-    if ($i >= 30) {
+
+    if ($i >= 20) {
       log::add(__CLASS__, 'error', __('Impossible de lancer le démon, vérifiez le log', __FILE__), 'unableStartDeamon');
       return false;
     }
+
     message::removeAll(__CLASS__, 'unableStartDeamon');
     return true;
   }
+
 
   /* Aldarande : 16/02/2024 : arrete du deamon  */
   public static function deamon_stop()
@@ -229,9 +252,10 @@ class ProJote extends eqLogic
       //$id = > array($name, $type, $subtype, $unit, $hist, $visible, $generic_type, $template_dashboard, $template_mobile),
       "refresh" => array('Rafraichir', 'action', 'other', "", 0, 1, "GENERIC_ACTION", 'core::badge', 'core::badge'),
       "LastLogin" => array('Derniére Mise à Jour', 'info', 'string', "", 0, 1, "GENERIC_INFO", 'core::badge', 'core::badge'),
-      "TokenUsername" => array('Username', 'info', 'string', "", 0, 0, "GENERIC_INFO", 'core::badge', 'core::badge'),
-      "TokenPassword" => array('Token', 'info', 'string', "", 0, 0, "GENERIC_INFO", 'core::badge', 'core::badge'),
-      "TokenUrl" => array('TokenUrl', 'info', 'string', "", 0, 0, "GENERIC_INFO", 'core::badge', 'core::badge'),
+      "TokenUsername" => array('Token Username', 'info', 'string', "", 0, 0, "GENERIC_INFO", 'core::badge', 'core::badge'),
+      "TokenPassword" => array('Token Password', 'info', 'string', "", 0, 0, "GENERIC_INFO", 'core::badge', 'core::badge'),
+      "TokenUrl" => array('Token_Url', 'info', 'string', "", 0, 0, "GENERIC_INFO", 'core::badge', 'core::badge'),
+      "TokenId" => array('Token_Id', 'info', 'string', "", 0, 0, "GENERIC_INFO", 'core::badge', 'core::badge'),
       "Nom_Eleve" => array("Nom de l'éleve", 'info', 'string', "", 0, 1, "GENERIC_INFO", 'core::badge', 'core::badge'),
       "Nom_Classe" => array('Nom de la classe', 'info', 'string', "", 0, 1, "GENERIC_INFO", 'core::badge', 'core::badge'),
       "Etablissement" => array('Etablissement', 'info', 'string', "", 0, 1, "GENERIC_INFO", 'core::badge', 'core::badge'),
@@ -289,7 +313,42 @@ class ProJote extends eqLogic
   public function preRemove() {}
 
   // Fonction exécutée automatiquement après la suppression de l'équipement
-  public function postRemove() {}
+  public function postRemove()
+  {
+    $eqId = $this->getId();
+    $dataDir = '/var/www/html/plugins/ProJote/data/' . $eqId;
+
+    // Fonction récursive pour supprimer un dossier et tous ses fichiers et sous-dossiers
+    function deleteDirectory($dir)
+    {
+      if (!file_exists($dir)) {
+        return true;
+      }
+
+      if (!is_dir($dir)) {
+        return unlink($dir);
+      }
+
+      foreach (scandir($dir) as $item) {
+        if ($item == '.' || $item == '..') {
+          continue;
+        }
+
+        if (!deleteDirectory($dir . DIRECTORY_SEPARATOR . $item)) {
+          return false;
+        }
+      }
+
+      return rmdir($dir);
+    }
+
+    // Supprimer le dossier correspondant à l'EqID
+    if (deleteDirectory($dataDir)) {
+      log::add('ProJote', 'info', 'Le dossier ' . $dataDir . ' a été supprimé avec succès.');
+    } else {
+      log::add('ProJote', 'error', 'Erreur lors de la suppression du dossier ' . $dataDir);
+    }
+  }
 
 
   /* Permet de crypter/décrypter automatiquement des champs de configuration des équipements
@@ -354,14 +413,14 @@ class ProJote extends eqLogic
     $url = $this->getConfiguration("url", "NC");
     $CptParent = $this->getConfiguration("CptParent", "0");
     $password = $this->getConfiguration("password", "");
-    $password = $this->my_encrypt($password, "084781141BD01304180B9B58120E4E058C1434394DDED646BF4ECC95380B9442");
+    //$password = $this->my_encrypt($password, "084781141BD01304180B9B58120E4E058C1434394DDED646BF4ECC95380B9442");
     $CmdId = $this->getId();
-    $qrjeton = $this->getConfiguration("qrjeton", "");
-    $qrlogin = $this->getConfiguration("qrlogin", "");
-    $qrpin = $this->getConfiguration("qrpin", "");
-    $qrurl = $this->getConfiguration("qrurl", "");
+    $TokenId = (is_object($cmdTokenId = $this->getCmd(null, 'TokenId'))) ? $cmdTokenId->execCmd() : '';
+    $TokenUsername = (is_object($cmdTokenUsername = $this->getCmd(null, 'TokenUsername'))) ? $cmdTokenUsername->execCmd() : '';
+    $TokenPassword = (is_object($cmdTokenPassword = $this->getCmd(null, 'TokenPassword'))) ? $cmdTokenPassword->execCmd() : '';
+    $TokenUrl = (is_object($cmdTokenUrl = $this->getCmd(null, 'TokenUrl'))) ? $cmdTokenUrl->execCmd() : '';
     $enfant = $this->getConfiguration("enfant", "");
-    $values = array('command' => $command, 'cpttype' => $Cpttype, 'apikey' => $apikey, 'cas' => $CAS, 'CptParent' => $CptParent, 'login' => $login, 'password' => $password, 'url' => $url, 'enfant' => $enfant, 'CmdId' => $CmdId, 'qrjeton' => $qrjeton, 'qrlogin' => $qrlogin, 'qrpin' => $qrpin, 'qrurl' => $qrurl);
+    $values = array('command' => $command, 'cpttype' => $Cpttype, 'apikey' => $apikey, 'cas' => $CAS, 'CptParent' => $CptParent, 'login' => $login, 'password' => $password, 'url' => $url, 'enfant' => $enfant, 'CmdId' => $CmdId, 'TokenId' => $TokenId, 'TokenUsername' => $TokenUsername, 'TokenPassword' => $TokenPassword, 'TokenUrl' => $TokenUrl);
     $values = json_encode($values);
     if (log::convertLogLevel(log::getLogLevel(__CLASS__)) == "debug") {
       log::add(__CLASS__, 'debug', $value);
@@ -371,6 +430,63 @@ class ProJote extends eqLogic
     log::add(__CLASS__, 'debug', 'Envoie au demon Python des infos Pronotes');
     socket_write($socket, $values, strlen($values));
     socket_close($socket);
+  }
+
+  //Aldarande : 04/01/2025
+
+  public function ReadEnfantToken()
+  {
+    $eqLogicId = $this->getId();
+    $filePath = '/var/www/html/plugins/ProJote/data/' . $eqLogicId . '/enfant.ProJote.json.txt';
+
+    if (!file_exists($filePath)) {
+      throw new Exception('Fichier JSON introuvable : ' . $filePath);
+    }
+
+    $jsonContent = file_get_contents($filePath);
+    if ($jsonContent === false) {
+      throw new Exception('Erreur lors de la lecture du fichier JSON : ' . $filePath);
+    }
+
+    $data = json_decode($jsonContent, true);
+    if ($data === null) {
+      throw new Exception('Erreur lors du décodage du fichier JSON : ' . $filePath);
+    }
+    $TokenData = isset($data['Token']) ? $data['Token'] : [];
+    // Mise à jour des commandes avec les données du fichier JSON
+    // foreach ($data as $key => $value) {
+    //$eqLogic->checkAndUpdateCmd($key, $value);
+    //}
+    log::add('ProJote', 'debug', 'Class ReadEnfantToken::Résultat LoginToken : ' . json_encode($TokenData));
+    $eqLogic = eqLogic::byId($eqLogicId);
+    // Correspondance des clés JSON avec les commandes Jeedom
+    log::add('ProJote', 'debug', 'Class ReadEnfantToken:: Clé JSON : ' . $TokenData['pronote_url']);
+    if (isset($TokenData['pronote_url']) && $eqLogic->getCmd(null, 'TokenUrl')) {
+      $eqLogic->checkAndUpdateCmd('TokenUrl', $TokenData['pronote_url']);
+    } else {
+      log::add('ProJote', 'debug', 'Class ReadEnfantToken:: Clé JSON non trouvée : pronote_url');
+    }
+    log::add('ProJote', 'debug', 'Class ReadEnfantToken:: Clé TokenUsername : ' . $TokenData['username']);
+    if (isset($TokenData['username']) && $eqLogic->getCmd(null, 'TokenUsername')) {
+      $eqLogic->checkAndUpdateCmd('TokenUsername', $TokenData['username']);
+    } else {
+      log::add('ProJote', 'debug', 'Class ReadEnfantToken:: Clé JSON non trouvée : username');
+    }
+    log::add('ProJote', 'debug', 'Class ReadEnfantToken:: Clé TokenPassword : ' . $TokenData['password']);
+    if (isset($TokenData['password']) && $eqLogic->getCmd(null, 'TokenPassword')) {
+
+      $eqLogic->checkAndUpdateCmd('TokenPassword', $TokenData['password']);
+    } else {
+      log::add('ProJote', 'debug', 'Class ReadEnfantToken:: Clé JSON non trouvée : password');
+    }
+    log::add('ProJote', 'debug', 'Class ReadEnfantToken:: Clé TokenPassword : ' . $TokenData['client_identifier']);
+    if (isset($TokenData['client_identifier']) && $eqLogic->getCmd(null, 'TokenId')) {
+      $eqLogic->checkAndUpdateCmd('TokenId', $TokenData['client_identifier']);
+    } else {
+      log::add('ProJote', 'debug', 'Class ReadEnfantToken:: Clé JSON non trouvée : client_identifier');
+    }
+    $output = True;
+    return $output;
   }
 }
 
@@ -410,10 +526,5 @@ class ProJoteCmd extends cmd
         break;
     }
   }
-
-
-
-
-
   /*     * **********************Getteur Setteur*************************** */
 }
