@@ -6,4 +6,5 @@ resources/python_venv
 .vscode/
 .venv/
 .cspell/
+plugin_info/ProJote_icon.png
 
