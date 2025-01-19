@@ -117,10 +117,12 @@ function loadProJoteData(eqLogicId) {
           });
 
         populateEnfantList(eqLogicId); // Appeler la fonction pour peupler la liste des enfants
+
       })
       .fail(function () {
         // Le fichier n'existe pas, afficher un message d'erreur et réinitialiser les champs
-        $('#error-message').text('Erreur : Le fichier enfant.ProJote.json.txt n\'existe pas.');
+        //$('#error-message').text('Erreur : Le fichier enfant.ProJote.json.txt n\'existe pas.');
+
         resetFields();
         $('.form-group.Token').hide(); // Masquer la section TOKEN
         $('.form-group.Eleve').hide(); // Masquer la section Elève
@@ -245,7 +247,10 @@ $('#bt_Validate').on('click', function () {
   let Password = document.querySelector('[data-l2key="password"]').value;
   let CasEnt = document.querySelector('[data-l2key="CasEnt"]').value;
   let NomEleve = document.querySelector('[data-l2key="enfant"]').value;
-
+  // Afficher le sablier
+  document.querySelector('.form-group.Login .fa-hourglass-half').classList.remove('hidden');
+  document.querySelector('.form-group.Login .fa-check').classList.add('hidden');
+  document.querySelector('.form-group.Login .fa-times').classList.add('hidden');
 
   // Transformer en un tableau d'objets
 
@@ -269,45 +274,40 @@ $('#bt_Validate').on('click', function () {
     error: function (request, status, error) {
       // Gestion des erreurs
       console.error("AJAX Error:", request, status, error);
-      $('#bt_Validate').next('.fa-check-circle').remove();
-      // Affichage de la croix rouge à droite du bouton
-      $('#bt_Validate').after('<i class="fas fa-times" style="color:red;margin-left:5px;"></i>');
     },
     success: function (data) {
       // Traitement de la réponse JSON
       console.log("AJAX Success:", data);
-      /* if (data.result[0].indexOf('An error occurred:') === 0) {
-        document.getElementById('error-message').textContent = data.result;
-        document.getElementById('error-message').style.color = 'red';
-      } else {
-        // Compléter les champs du formulaire
-        console.log(`Token Username : ${data.result.Token_username}`);
-        console.log(`Password : ${data.result.Token_Password}`);
-        console.log(`URL : ${data.result.Token_URL}`);
 
-        // Sélectionner la valeur du champ "ENT / CAS"
-        let entSelect = document.querySelector('[data-l2key="CasEnt"]');
-        if (obj.ent !== null) {
-          entSelect.value = obj.ent;
-        } else {
-          entSelect.value = "Aucun"; // Sélectionner "Aucun" si "ent" est "null"
-        }
-        // Cocher la case "Compte Parent" si nécessaire (exemple de condition)
-        let parentCheckbox = document.getElementById('Parent');
-        parentCheckbox.checked = true; // ou false selon votre logique
-      } */
       if (data.state === 'ok') {
         // Si la réponse est True
-        // Suppression des icônes précédentes
-        $('#bt_Validate').next('.fa-check-circle').remove();
-        // Affichage de la coche verte à droite du bouton
-        $('#bt_Validate').after('<i class="fas fa-check-circle" style="color:green;margin-left:5px;"></i>');
+        // Masquer le sablier et afficher la coche
+        document.querySelector('.form-group.Login .fa-hourglass-half').classList.add('hidden');
+        document.querySelector('.form-group.Login .fa-check').classList.remove('hidden');
+        //je fais disparataire la coche au bout de 10 secondes
+        setTimeout(function () {
+          document.querySelector('.form-group.Login .fa-check').classList.add('hidden');
+        }, 10000); // 10000 millisecondes = 10 secondes
+        if (typeof saveEqLogic === 'function') {
+          saveEqLogic();
+        } else {
+          console.error("La fonction saveEqLogic n'est pas définie. Vérifier dans la fichier PHP que la fonction plugin tempalte est bien incluse");
+        }
+
+        if (typeof saveEqLogic === 'function') {
+          saveEqLogic();
+        } else {
+          console.error("La fonction saveEqLogic n'est pas définie. Vérifier dans la fichier PHP que la fonction plugin tempalte est bien incluse");
+        }
+
       } else {
-        // Si la réponse est False
-        // Suppression des icônes précédentes
-        $('#bt_Validate').next('.fa-times-circle').remove();
-        // Affichage de la croix rouge à droite du bouton
-        $('#bt_Validate').after('<i class="fas fa-times-circle" style="color:red;margin-left:5px;"></i>');
+        // Masquer le sablier et afficher la croix
+        document.querySelector('.form-group.Login .fa-hourglass-half').classList.add('hidden');
+        document.querySelector('.form-group.Login .fa-times').classList.remove('hidden');
+        //je fais disparataire la coche au bout de 10 secondes
+        setTimeout(function () {
+          document.querySelector('.form-group.Login .fa-times').classList.add('hidden');
+        }, 10000); // 10000 millisecondes = 10 secondes
       }
     }
   });
@@ -355,7 +355,7 @@ document.querySelector('.rectangle').addEventListener('drop', function (e) {
 
 function sendImageToServer(code, pin) {
   // Fonction for send QRcode data to AJAX and python script
-  document.querySelector('.fa-hourglass-half').classList.remove('hidden');
+  document.querySelector('.form-group.QRCode .fa-hourglass-half').classList.remove('hidden');
   $.ajax({
     type: "POST",
     url: "/plugins/ProJote/core/ajax/ProJote.ajax.php",
@@ -369,40 +369,30 @@ function sendImageToServer(code, pin) {
     global: false,
     error: function (request, status, error) {
       console.error("AJAX Error:", error);
-      document.querySelector('.fa-hourglass-half').classList.add('hidden');
-      document.querySelector('.fa-times').classList.remove('hidden');
+      document.querySelector('.form-group.QRCode .fa-hourglass-half').classList.add('hidden');
+      document.querySelector('.form-group.QRCode .fa-times').classList.remove('hidden');
       document.getElementById('error-message').textContent = 'Une erreur s\'est produite lors de la validation du code QR.';
       document.getElementById('error-message').style.color = 'red';
     },
     success: function (data) {
-      document.querySelector('.fa-hourglass-half').classList.add('hidden');
+      document.querySelector('.form-group.QRCode .fa-hourglass-half').classList.add('hidden');
       if (data.state === 'ok') {
-        document.querySelector('.fa-check').classList.remove('hidden');
-        console.log('résultat du QR code : ', JSON.stringify(data.result[0]));
-        if (data.result[0].indexOf('An error occurred:') === 0) {
-          document.getElementById('error-message').textContent = data.result;
-          document.getElementById('error-message').style.color = 'red';
-        } else {
-          // Compléter les champs du formulaire
-          console.log(`Token Username : ${data.result.Token_username}`);
-          console.log(`Password : ${data.result.Token_Password}`);
-          console.log(`URL : ${data.result.Token_URL}`);
-          // Sélectionner la valeur du champ "ENT / CAS"
-          let entSelect = document.querySelector('[data-l2key="CasEnt"]');
-
-          if (obj.ent !== null) {
-            entSelect.value = obj.ent;
-          } else {
-            entSelect.value = "Aucun"; // Sélectionner "Aucun" si "ent" est "null"
-          }
-          // Cocher la case "Compte Parent" si nécessaire (exemple de condition)
-          let parentCheckbox = document.getElementById('Parent');
-          parentCheckbox.checked = true; // ou false selon votre logique
-        }
+        document.querySelector('.form-group.QRCode .fa-hourglass-half').classList.add('hidden');
+        document.querySelector('.form-group.QRCode .fa-check').classList.remove('hidden');
+        //je fais disparataire la coche au bout de 10 secondes
+        setTimeout(function () {
+          document.querySelector('.form-group.QRCode .fa-check').classList.add('hidden');
+        }, 10000); // 10000 millisecondes = 10 secondes
       } else {
         console.error(data.result);
         document.getElementById('error-message').textContent = data.result;
         document.getElementById('error-message').style.color = 'red';
+        document.querySelector('.form-group.QRCode .fa-hourglass-half').classList.add('hidden');
+        document.querySelector('.form-group.QRCode .fa-times').classList.remove('hidden');
+        //je fais disparataire la coche au bout de 10 secondes
+        setTimeout(function () {
+          document.querySelector('.form-group.QRCode .fa-times').classList.add('hidden');
+        }, 10000); // 10000 millisecondes = 10 secondes
       }
       // Exécuter la fonction saveEqLogic après la validation du QR code
       if (typeof saveEqLogic === 'function') {
@@ -410,7 +400,6 @@ function sendImageToServer(code, pin) {
       } else {
         console.error("La fonction saveEqLogic n'est pas définie. Vérifier dans la fichier PHP que la fonction plugin tempalte est bien incluse");
       }
-
     }
   });
 }
@@ -488,14 +477,16 @@ function handleImage(imageData) {
       var code = jsQR(imageData.data, imageData.width, imageData.height);
       // Si le code QR est décodé avec succès, afficher les données
       if (code) {
-        console.log('Données du code QR :', code.data);
+        console.log('Données du QR code :', code.data);
+        sendImageToServer(code.data, pin);
       } else {
         console.log('Impossible de décoder le code QR');
-        document.getElementById('error-message').textContent = 'Impossible de décoder le code QR';
+        $('#error-message').text('Erreur : Impossible de décoder le QRcode ');
+
       }
       displayImage(resizedImageData);
 
-      sendImageToServer(code.data, pin);
+
     };
     img.onerror = function () {
       alert('Erreur lors du chargement de l\'image.');

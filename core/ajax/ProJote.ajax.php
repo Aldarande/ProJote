@@ -39,7 +39,7 @@ try {
     $nomenfant = init('nomeleve');
     $eqLogicId = init('eqlogic');
 
-    // Le but est d'éxécuter le script pour récupérer les tokens
+    // Le but est d'exécuter le script pour récupérer les tokens
     log::add('ProJote', 'debug', 'Ajax:: Validation de login : ' . $ent . ' ' . $login . ' ' . $url);
     $command = system::getCmdPython3('ProJote') .  '/var/www/html/plugins/ProJote/resources/ProJoted/LoginConnect.py';
     $command .= ' --URL ' . $url;
@@ -63,11 +63,7 @@ try {
       log::add('ProJote', 'debug', 'Ajax:: eqLogicId = ' . $eqLogicId);
       // Appeler la fonction ReadEnfantToken pour lire et décoder le fichier JSON
       $data = $eqLogic->ReadEnfantToken();
-      ajax::success($output);
-      //
-      // Demander de rafraichir la page pour afficher les informations
-      // Si parent renvoyer la liste d'enfant et commencant par le selctionné
-      //
+      ajax::success($data); // Renvoie les données JSON en cas de succès
     } else {
       ajax::error('Erreur lors de l\'exécution de la commande Python : ' . implode("\n", $output));
     }
@@ -97,22 +93,15 @@ try {
 
     log::add('ProJote', 'debug', 'Ajax::info QRCODE cmd ' . $command);
     exec($command, $output, $return_var);
-    //$output = implode("\n", $output); // Convertir l'output en chaîne
 
-    //$output = json_decode($output, true);
-    log::add('ProJote', 'debug', 'Ajax::retour QRCODE ' . $return);
+
     if ($return_var === 0) {
-
       // Mise à jour des informations collectées depuis le fichier
       $eqLogic = eqLogic::byId($eqLogicId);
       log::add('ProJote', 'debug', 'Ajax:: eqLogicId = ' . $eqLogicId);
       // Appeler la fonction ReadEnfantToken pour lire et décoder le fichier JSON
       $data = $eqLogic->ReadEnfantToken();
       ajax::success($output);
-      //
-      // Demander de rafraichir la page pour afficher les informations
-      // Si parent renvoyer la liste d'enfant et commencant par le selctionné
-      //
     } else {
       ajax::error('Erreur lors de l\'exécution du script Python. Vérifiez les logs.');
     }
