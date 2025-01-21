@@ -18,6 +18,24 @@
 require_once dirname(__FILE__) . '/../../../core/php/core.inc.php';
 
 // Fonction exécutée automatiquement après l'installation du plugin
+<<<<<<< Updated upstream
+function ProJote_install() {}
+=======
+<<<<<<< HEAD
+function ProJote_install() {
+}
+>>>>>>> Stashed changes
+
+// Fonction exécutée automatiquement après la mise à jour du plugin
+function ProJote_update() {}
+
+// Fonction exécutée automatiquement après la suppression du plugin
+<<<<<<< Updated upstream
+function ProJote_remove() {}
+=======
+function ProJote_remove() {
+}
+=======
 function ProJote_install() {}
 
 // Fonction exécutée automatiquement après la mise à jour du plugin
@@ -25,3 +43,5 @@ function ProJote_update() {}
 
 // Fonction exécutée automatiquement après la suppression du plugin
 function ProJote_remove() {}
+>>>>>>> dev
+>>>>>>> Stashed changes

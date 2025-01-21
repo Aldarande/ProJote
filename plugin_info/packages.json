@@ -9,7 +9,14 @@
     "pronotepy": {
       "reinstall": true
     },
+<<<<<<< Updated upstream
     "autoslot": {},
+=======
+<<<<<<< HEAD
+=======
+    "autoslot": {},
+>>>>>>> dev
+>>>>>>> Stashed changes
     "cryptography": {},
     "pycryptodome": {
       "version": "3.20.0"

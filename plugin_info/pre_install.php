@@ -19,4 +19,13 @@
 require_once dirname(__FILE__) . '/../../../core/php/core.inc.php';
 
 // Fonction exécutée automatiquement avant la mise à jour du plugin
+<<<<<<< Updated upstream
 function ProJote_pre_update() {}
+=======
+<<<<<<< HEAD
+function ProJote_pre_update() {
+}
+=======
+function ProJote_pre_update() {}
+>>>>>>> dev
+>>>>>>> Stashed changes
