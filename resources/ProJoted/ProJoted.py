@@ -30,8 +30,16 @@ try:
     import pronotepy
     from pronotepy.ent import *
 
+<<<<<<< Updated upstream
     from LoginConnect import writedataPronotepy
 
+=======
+<<<<<<< HEAD
+=======
+    from LoginConnect import writedataPronotepy
+
+>>>>>>> dev
+>>>>>>> Stashed changes
     # Chiffrement du password
     from Crypto.Cipher import AES
 
@@ -94,12 +102,27 @@ def my_decrypt(data, passphrase):
         cipher = AES.new(key, AES.MODE_CBC, iv)
         decrypted = cipher.decrypt(encrypted_data)
         clean = unpad(decrypted).decode("ascii").rstrip()
+<<<<<<< Updated upstream
         return clean
 
+=======
+<<<<<<< HEAD
+=======
+        return clean
+
+>>>>>>> dev
+>>>>>>> Stashed changes
     except Exception as e:
         logging.error("Cannot decrypt datas...")
         logging.error(e)
         exit(1)
+<<<<<<< Updated upstream
+=======
+<<<<<<< HEAD
+    return clean
+=======
+>>>>>>> dev
+>>>>>>> Stashed changes
 
 
 def verifdossier(chemin_dossier):
@@ -205,6 +228,69 @@ def write_listenfant_to_file(listenfant, filename):
         )
 
 
+<<<<<<< Updated upstream
+=======
+<<<<<<< HEAD
+def writedataPronotepy(client, dossier):
+    try:
+        # nom_fichier = f"{client.name}.ProJote"
+        nom_fichier = "enfant.Projote"
+        nom_fichier = nom_fichier.replace(" ", "")
+        chemin_fichier = os.path.join(dossier, nom_fichier)
+        logging.debug("voici les informations d'écriture : %s", chemin_fichier)
+
+        # Lire le fichier pour récupérer les données existantes
+        existing_data = {}
+        if os.path.exists(chemin_fichier):
+            with open(chemin_fichier, "r") as fichier:
+                lines = fichier.readlines()
+                for line in lines:
+                    key, value = line.strip().split(": ", 1)
+                    existing_data[key.lower().replace(" ", "_")] = value.strip()
+
+        # Ouvrir le fichier en mode écriture, ou créer s'il n'existe pas
+        with open(chemin_fichier, "w") as fichier:
+            # Écrire les informations dans le fichier
+            fichier.write(f"Name: {client.name}\n")
+            fichier.write(f"Class_Name: {client.class_name}\n")
+            fichier.write(f"establishment: {client.establishment}\n")
+
+            if (
+                hasattr(client, "profile_picture")
+                and client.profile_picture
+                and client.profile_picture.url
+            ):
+                # Télécharger l'image localement
+                image_filename = client.name.replace(" ", "") + "_profile_picture.jpg"
+                image_filepath = os.path.join(dossier, image_filename)
+                if (
+                    "profile_picture" in existing_data
+                    and existing_data["profile_picture"] != image_filepath
+                ):
+                    logging.warning(
+                        "La valeur écrite pour 'Profile Picture' est différente de celle reçue."
+                    )
+                else:
+                    if download_image(client.profile_picture.url, image_filepath):
+                        fichier.write(f"Profile Picture: {image_filepath}\n")
+                    else:
+                        fichier.write(
+                            "Profile Picture: [Erreur lors du téléchargement de l'image]\n"
+                        )
+                        logging.error("Erreur lors du téléchargement de l'image")
+
+            if jeedom_utils.set_log_level(_log_level) == "debug":
+                logging.debug("Je dumps les infos RAW dans %s", fichier)
+                if client.raw_resource:
+                    formatted_data = json.dumps(client.raw_resource, indent=4)
+                    fichier.write(f"raw_resource:\n: {formatted_data}\n")
+
+    except Exception as e:
+        line_number = e.__traceback__.tb_lineno
+        logging.error("Ecriture du fichier échoué : lig.%s - %s", line_number, e)
+
+
+>>>>>>> Stashed changes
 def Emploidutemps(client):
     try:
         data = {}
@@ -212,6 +298,19 @@ def Emploidutemps(client):
         # Récupération  emploi du temps du jour
         lessons_today = client.lessons(datetime.date.today())
         lessons_today = sorted(lessons_today, key=lambda lesson: lesson.start)
+<<<<<<< Updated upstream
+=======
+
+=======
+def Emploidutemps(client):
+    try:
+        data = {}
+        # Transformation Json des emplois du temps (J,J+1 et next)
+        # Récupération  emploi du temps du jour
+        lessons_today = client.lessons(datetime.date.today())
+        lessons_today = sorted(lessons_today, key=lambda lesson: lesson.start)
+>>>>>>> dev
+>>>>>>> Stashed changes
         data["edt_aujourdhui"] = []
         data["edt_aujourdhui_debut"] = ""
         data["edt_aujourdhui_fin"] = ""
@@ -342,7 +441,15 @@ def menus(client):
                     "Dessert": (menu.dessert),
                 }
             )
+<<<<<<< Updated upstream
             return data["Menu"]
+=======
+<<<<<<< HEAD
+            return data["Menus"]
+=======
+            return data["Menu"]
+>>>>>>> dev
+>>>>>>> Stashed changes
     except Exception as e:
         logging.error("Un erreur est retourné sur le traitement des Menus: %s", e)
 
@@ -639,6 +746,11 @@ def identites(clientinfo):
         )
 
 
+<<<<<<< Updated upstream
+=======
+<<<<<<< HEAD
+=======
+>>>>>>> Stashed changes
 def GetTokenFromLogin(Account):
     qrcode_data = Account.request_qr_code_data("4321")
     # Étape 1 : Extraire la partie de l'URL jusqu'à `/pronote/`
@@ -671,6 +783,10 @@ def RenewToken(client):
         logging.error("Un erreur est retourné sur le traitement des tokens: %s", e)
 
 
+<<<<<<< Updated upstream
+=======
+>>>>>>> dev
+>>>>>>> Stashed changes
 def Connectparent(pronote_url, login, password, ent, enfant):
     # Je valide que j'ai les bonnes informations pour me connecter en tant que Parent
     try:
@@ -687,18 +803,42 @@ def Connectparent(pronote_url, login, password, ent, enfant):
             elif pronote_url.endswith(".index-education.net/pronote/parent.html"):
                 pronote_url += "?login=true"
                 logging.info("URL  modifiée : %s", pronote_url)
+<<<<<<< Updated upstream
         logging.debug("password chiffré : %s", password)
         """ if password != "":
+=======
+<<<<<<< HEAD
+        if password != "":
+=======
+        logging.debug("password chiffré : %s", password)
+        """ if password != "":
+>>>>>>> dev
+>>>>>>> Stashed changes
             if isinstance(password, str):
                 password = my_decrypt(
                     password,
                     "084781141BD01304180B9B58120E4E058C1434394DDED646BF4ECC95380B9442",
                 )
+<<<<<<< Updated upstream
                 logging.debug("password déchiffré : %s", password)
             else:
                 logging.error("Le password n'est pas un string")
         else:
             logging.error("pas de password reçu sur le deamon") """
+=======
+<<<<<<< HEAD
+            else:
+                logging.error("Le password n'est pas un string")
+        else:
+            logging.error("pas de password reçu sur le deamon")
+=======
+                logging.debug("password déchiffré : %s", password)
+            else:
+                logging.error("Le password n'est pas un string")
+        else:
+            logging.error("pas de password reçu sur le deamon") """
+>>>>>>> dev
+>>>>>>> Stashed changes
         # Maintenant j'essaye de me connecter
         client = pronotepy.ParentClient(pronote_url, login, password, ent)
         logging.info("Je suis connecté en tant que parent")
@@ -767,6 +907,13 @@ def read_socket():
             raw_message = JEEDOM_SOCKET_MESSAGE.get()
             decoded_message = raw_message.decode("utf-8")
             logging.debug("Decoded message: %s", decoded_message)
+<<<<<<< Updated upstream
+=======
+<<<<<<< HEAD
+
+=======
+>>>>>>> dev
+>>>>>>> Stashed changes
             if (
                 not decoded_message.strip()
             ):  # Vérifier si la chaîne est vide après suppression des espaces
@@ -783,6 +930,7 @@ def read_socket():
             if message["apikey"] != _apikey:
                 logging.error("Invalid apikey from socket: %s", message)
             # d'abord je me connecte
+<<<<<<< Updated upstream
             # Procédure de connection
             # On test que l'on a bien les information de TOKEN
 
@@ -834,6 +982,74 @@ def read_socket():
                 if message["CptParent"] == "1":
                     logging.info("Je me connecte en tant que parent")
                     ## connection en tant que parent
+=======
+<<<<<<< HEAD
+            if message["cas"] != "":
+                ent = class_for_name("pronotepy.ent", message["cas"])
+            else:
+                ent = ""
+            # temp en attendant de revalider le champs$response dans PRojote.PHP et docn de finir QRCODE
+            if message["cpttype"] == "":
+                message["cpttype"] = "compte"
+            if message["cpttype"] == "compte":
+                if message["CptParent"] == "1":
+                    logging.info("Je me connecte en tant que parent")
+                    ## connection en tant que parent
+
+=======
+            # Procédure de connection
+            # On test que l'on a bien les information de TOKEN
+
+            # Vérifier que les informations de Token sont présentes et non vides
+
+            required_keys = ["TokenId", "TokenUsername", "TokenPassword", "TokenUrl"]
+            all_keys_present = True
+            for key in required_keys:
+                if key not in message or not message[key].strip():
+                    logging.error("Information de Token manquante ou vide : %s", key)
+                    all_keys_present = False
+
+            if all_keys_present:
+                logging.debug(
+                    "Toutes les informations de Token sont présentes et non vides. JE me connecte avec le Token"
+                )
+                if "parent.html" in message["TokenUrl"]:
+                    client = pronotepy.ParentClient.token_login(
+                        pronote_url=message["TokenUrl"],
+                        username=message["TokenUsername"],
+                        password=message["TokenPassword"],
+                        client_identifier=message["TokenId"],
+                        uuid="ProJote",
+                    )
+                else:
+                    client = pronotepy.Client.token_login(
+                        pronote_url=message["TokenUrl"],
+                        username=message["TokenUsername"],
+                        password=message["TokenPassword"],
+                        client_identifier=message["TokenId"],
+                        uuid="ProJote",
+                    )
+
+                ### 05/01/2025 : A revalider si je dois doubler
+                credentials = client.export_credentials()
+                # client = pronotepy.Client.token_login(**credentials)
+
+                tokenconnected = "true"
+            # Si il manque des informations de Token, ou que l'on n'a pas réussi à se connecter avec le Token, on se connecte avec les informations de compte
+            if not all_keys_present:
+                logging.info("Je me connecte via la compte et le mot de passe")
+                if message["cas"] != "":
+                    logging.debug("Cas/Ent reçu : %s", message["cas"])
+                    ent = class_for_name("pronotepy.ent", message["cas"])
+                else:
+                    ent = ""
+                # temp en attendant de revalider le champs$response dans PRojote.PHP et docn de finir QRCODE
+
+                if message["CptParent"] == "1":
+                    logging.info("Je me connecte en tant que parent")
+                    ## connection en tant que parent
+>>>>>>> dev
+>>>>>>> Stashed changes
                     client, listenfant = Connectparent(
                         pronote_url=message["url"],
                         login=message["login"],
@@ -841,6 +1057,13 @@ def read_socket():
                         ent=ent,
                         enfant=message["enfant"],
                     )
+<<<<<<< Updated upstream
+=======
+<<<<<<< HEAD
+
+=======
+>>>>>>> dev
+>>>>>>> Stashed changes
                 else:
                     logging.info("Je me connecte en tant qu'élève")
                     client = Connect(
@@ -849,6 +1072,30 @@ def read_socket():
                         password=message["password"],
                         ent=ent,
                     )
+<<<<<<< Updated upstream
+                # Maintenant que connecté je vais chercher les informations de Token pour la prochaine fois
+=======
+<<<<<<< HEAD
+            else:
+                logging.info(
+                    "Aucun Type de connexion n'est sélectionné dans l'équipement"
+                )
+>>>>>>> Stashed changes
+
+                client = GetTokenFromLogin(client)
+
+                # J'écris le fichier avec les infos de base
+                logging.debug("Je vais tester si nous sommes loggué")
+            if client is not None and client.logged_in:
+                # J'écris le token pour la prochaine fois
+                writedataPronotepy(
+                    client, "/var/www/html/plugins/ProJote/data", message["CmdId"]
+                )
+                logging.debug("Nous sommes loggué")
+<<<<<<< Updated upstream
+                # Je vais chercher les informations
+=======
+=======
                 # Maintenant que connecté je vais chercher les informations de Token pour la prochaine fois
 
                 client = GetTokenFromLogin(client)
@@ -862,12 +1109,23 @@ def read_socket():
                 )
                 logging.debug("Nous sommes loggué")
                 # Je vais chercher les informations
+>>>>>>> dev
+>>>>>>> Stashed changes
                 jsondata = {}
                 jsondata["CmdId"] = message["CmdId"]
                 # Liste enfant s'applique que au compte parent
                 ### A supprimer
                 if message["command"] == "Validate":
+<<<<<<< Updated upstream
                     logging.debug("Je valide que nous sommes connecté")
+=======
+<<<<<<< HEAD
+                    echo = "Je valide que nous sommes connecté"
+                    logging.debug(echo)
+=======
+                    logging.debug("Je valide que nous sommes connecté")
+>>>>>>> dev
+>>>>>>> Stashed changes
                     ##Neutralisationdu champs cptype car qrcode non fonctionnel
                     if message["cpttype"] == "compte" or message["cpttype"] == "":
                         dossier = "/tmp/jeedom/ProJote/" + str(message["CmdId"]) + "/"
@@ -883,21 +1141,47 @@ def read_socket():
                                     "listenfant.ProJote",
                                 )
                                 write_listenfant_to_file(listenfant, chemin_fichier)
+<<<<<<< Updated upstream
                                 writedataPronotepy(
                                     client._selected_child, dossier, message["CmdId"]
                                 )
+=======
+<<<<<<< HEAD
+                                writedataPronotepy(client._selected_child, dossier)
+=======
+                                writedataPronotepy(
+                                    client._selected_child, dossier, message["CmdId"]
+                                )
+>>>>>>> dev
+>>>>>>> Stashed changes
                                 logging.debug(
                                     "Je viens de mettre à jours le fichier pour un compte parent : %s",
                                     chemin_fichier,
                                 )
                             else:
                                 # J'écris le fichier avec les infos de base
+<<<<<<< Updated upstream
                                 writedataPronotepy(
                                     client.info, dossier, message["CmdId"]
                                 )
 
                         else:
                             writedataPronotepy(client.info, dossier, message["CmdId"])
+=======
+<<<<<<< HEAD
+                                writedataPronotepy(client.info, dossier)
+
+                        else:
+                            writedataPronotepy(client.info, dossier)
+=======
+                                writedataPronotepy(
+                                    client.info, dossier, message["CmdId"]
+                                )
+
+                        else:
+                            writedataPronotepy(client.info, dossier, message["CmdId"])
+>>>>>>> dev
+>>>>>>> Stashed changes
                             logging.debug(
                                 "Je viens de mettre à jours le fichier : %s",
                                 dossier,
@@ -905,8 +1189,17 @@ def read_socket():
                 else:
                     # là nous sommes vraiment en train de chercher les données du comptes
                     # Maintenant que je suis connecté je vais collecter les infos d'identités
+<<<<<<< Updated upstream
 
                     if (tokenconnected != "true") and (message["CptParent"] == "1"):
+=======
+<<<<<<< HEAD
+                    if message["CptParent"] == "1":
+=======
+
+                    if (tokenconnected != "true") and (message["CptParent"] == "1"):
+>>>>>>> dev
+>>>>>>> Stashed changes
                         logging.debug(
                             "Le nom de l'élève %s", client._selected_child.name
                         )
@@ -953,12 +1246,26 @@ def read_socket():
                     # J'ajoutes l'ICAL
                     logging.info("Je récupére l'ICAL")
                     jsondata["Ical"] = ical(client)
+<<<<<<< Updated upstream
                     logging.info("Je renew le Token")
                     jsondata["Token"] = RenewToken(client)
                     # J'envoie les données à Jeedom
                     logging.debug("Données à envoyer : %s", json.dumps(jsondata))
                     jeedom_com.send_change_immediate(jsondata)
                     logging.info("Fin de récupération d'info depuis Projoted.py")
+=======
+<<<<<<< HEAD
+                    # J'envoie les données à Jeedom
+                    print(jsondata)
+=======
+                    logging.info("Je renew le Token")
+                    jsondata["Token"] = RenewToken(client)
+                    # J'envoie les données à Jeedom
+                    logging.debug("Données à envoyer : %s", json.dumps(jsondata))
+                    jeedom_com.send_change_immediate(jsondata)
+                    logging.info("Fin de récupération d'info depuis Projoted.py")
+>>>>>>> dev
+>>>>>>> Stashed changes
 
             else:
                 echo = "Le compte n'est pas loggué"
@@ -1053,13 +1360,30 @@ signal.signal(signal.SIGTERM, handler)
 
 try:
     jeedom_utils.write_pid(str(_pidfile))
+<<<<<<< Updated upstream
     jeedom_com = jeedom_com(apikey=_apikey, url=_callback, cycle=_cycle)
     if not jeedom_com.test():
+=======
+<<<<<<< HEAD
+    jeedomcom = jeedom_com(apikey=_apikey, url=_callback, cycle=_cycle)
+    if not jeedomcom.test():
+=======
+    jeedom_com = jeedom_com(apikey=_apikey, url=_callback, cycle=_cycle)
+    if not jeedom_com.test():
+>>>>>>> dev
+>>>>>>> Stashed changes
         logging.error(
             "Network communication issues. Please fixe your Jeedom network configuration."
         )
         shutdown()
+<<<<<<< Updated upstream
 
+=======
+<<<<<<< HEAD
+=======
+
+>>>>>>> dev
+>>>>>>> Stashed changes
     logging.info("j'écris " + str(_pidfile))
     jeedom_socket = jeedom_socket(port=_socket_port, address=_socket_host)
     listen()

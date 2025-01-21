@@ -120,7 +120,15 @@ class jeedom_com:
         threading.Thread(target=self.thread_change, args=(change,)).start()
 
     def thread_change(self, change):
+<<<<<<< Updated upstream
         logging.debug("Send to jeedom : %s", change)
+=======
+<<<<<<< HEAD
+        logging.info("Send to jeedom : %s", change)
+=======
+        logging.debug("Send to jeedom : %s", change)
+>>>>>>> dev
+>>>>>>> Stashed changes
         i = 0
         while i < self.retry:
             try:
@@ -161,8 +169,18 @@ class jeedom_com:
             if response.status_code != requests.codes.ok:
                 logging.error(
                     "Callback error: %s %s. Please check your network configuration page",
+<<<<<<< Updated upstream
                     response.status.code,
                     response.status.message,
+=======
+<<<<<<< HEAD
+                    response.status_code,
+                    response.reason,
+=======
+                    response.status.code,
+                    response.status.message,
+>>>>>>> dev
+>>>>>>> Stashed changes
                 )
                 return False
         except Exception as e:

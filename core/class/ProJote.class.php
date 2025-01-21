@@ -252,10 +252,22 @@ class ProJote extends eqLogic
       //$id = > array($name, $type, $subtype, $unit, $hist, $visible, $generic_type, $template_dashboard, $template_mobile),
       "refresh" => array('Rafraichir', 'action', 'other', "", 0, 1, "GENERIC_ACTION", 'core::badge', 'core::badge'),
       "LastLogin" => array('Derniére Mise à Jour', 'info', 'string', "", 0, 1, "GENERIC_INFO", 'core::badge', 'core::badge'),
+<<<<<<< Updated upstream
+=======
+<<<<<<< HEAD
+      "TokenUsername" => array('Username', 'info', 'string', "", 0, 0, "GENERIC_INFO", 'core::badge', 'core::badge'),
+      "TokenPassword" => array('Token', 'info', 'string', "", 0, 0, "GENERIC_INFO", 'core::badge', 'core::badge'),
+      "TokenUrl" => array('TokenUrl', 'info', 'string', "", 0, 0, "GENERIC_INFO", 'core::badge', 'core::badge'),
+=======
+>>>>>>> Stashed changes
       "TokenUsername" => array('Token Username', 'info', 'string', "", 0, 0, "GENERIC_INFO", 'core::badge', 'core::badge'),
       "TokenPassword" => array('Token Password', 'info', 'string', "", 0, 0, "GENERIC_INFO", 'core::badge', 'core::badge'),
       "TokenUrl" => array('Token_Url', 'info', 'string', "", 0, 0, "GENERIC_INFO", 'core::badge', 'core::badge'),
       "TokenId" => array('Token_Id', 'info', 'string', "", 0, 0, "GENERIC_INFO", 'core::badge', 'core::badge'),
+<<<<<<< Updated upstream
+=======
+>>>>>>> dev
+>>>>>>> Stashed changes
       "Nom_Eleve" => array("Nom de l'éleve", 'info', 'string', "", 0, 1, "GENERIC_INFO", 'core::badge', 'core::badge'),
       "Nom_Classe" => array('Nom de la classe', 'info', 'string', "", 0, 1, "GENERIC_INFO", 'core::badge', 'core::badge'),
       "Etablissement" => array('Etablissement', 'info', 'string', "", 0, 1, "GENERIC_INFO", 'core::badge', 'core::badge'),
@@ -313,6 +325,12 @@ class ProJote extends eqLogic
   public function preRemove() {}
 
   // Fonction exécutée automatiquement après la suppression de l'équipement
+<<<<<<< Updated upstream
+=======
+<<<<<<< HEAD
+  public function postRemove() {}
+=======
+>>>>>>> Stashed changes
   public function postRemove()
   {
     $eqId = $this->getId();
@@ -349,6 +367,10 @@ class ProJote extends eqLogic
       log::add('ProJote', 'error', 'Erreur lors de la suppression du dossier ' . $dataDir);
     }
   }
+<<<<<<< Updated upstream
+=======
+>>>>>>> dev
+>>>>>>> Stashed changes
 
 
   /* Permet de crypter/décrypter automatiquement des champs de configuration des équipements
@@ -413,6 +435,23 @@ class ProJote extends eqLogic
     $url = $this->getConfiguration("url", "NC");
     $CptParent = $this->getConfiguration("CptParent", "0");
     $password = $this->getConfiguration("password", "");
+<<<<<<< Updated upstream
+    //$password = $this->my_encrypt($password, "084781141BD01304180B9B58120E4E058C1434394DDED646BF4ECC95380B9442");
+=======
+<<<<<<< HEAD
+    $password = $this->my_encrypt($password, "084781141BD01304180B9B58120E4E058C1434394DDED646BF4ECC95380B9442");
+>>>>>>> Stashed changes
+    $CmdId = $this->getId();
+    $TokenId = (is_object($cmdTokenId = $this->getCmd(null, 'TokenId'))) ? $cmdTokenId->execCmd() : '';
+    $TokenUsername = (is_object($cmdTokenUsername = $this->getCmd(null, 'TokenUsername'))) ? $cmdTokenUsername->execCmd() : '';
+    $TokenPassword = (is_object($cmdTokenPassword = $this->getCmd(null, 'TokenPassword'))) ? $cmdTokenPassword->execCmd() : '';
+    $TokenUrl = (is_object($cmdTokenUrl = $this->getCmd(null, 'TokenUrl'))) ? $cmdTokenUrl->execCmd() : '';
+    $enfant = $this->getConfiguration("enfant", "");
+<<<<<<< Updated upstream
+    $values = array('command' => $command, 'cpttype' => $Cpttype, 'apikey' => $apikey, 'cas' => $CAS, 'CptParent' => $CptParent, 'login' => $login, 'password' => $password, 'url' => $url, 'enfant' => $enfant, 'CmdId' => $CmdId, 'TokenId' => $TokenId, 'TokenUsername' => $TokenUsername, 'TokenPassword' => $TokenPassword, 'TokenUrl' => $TokenUrl);
+=======
+    $values = array('command' => $command, 'cpttype' => $Cpttype, 'apikey' => $apikey, 'cas' => $CAS, 'CptParent' => $CptParent, 'login' => $login, 'password' => $password, 'url' => $url, 'enfant' => $enfant, 'CmdId' => $CmdId, 'qrjeton' => $qrjeton, 'qrlogin' => $qrlogin, 'qrpin' => $qrpin, 'qrurl' => $qrurl);
+=======
     //$password = $this->my_encrypt($password, "084781141BD01304180B9B58120E4E058C1434394DDED646BF4ECC95380B9442");
     $CmdId = $this->getId();
     $TokenId = (is_object($cmdTokenId = $this->getCmd(null, 'TokenId'))) ? $cmdTokenId->execCmd() : '';
@@ -421,6 +460,8 @@ class ProJote extends eqLogic
     $TokenUrl = (is_object($cmdTokenUrl = $this->getCmd(null, 'TokenUrl'))) ? $cmdTokenUrl->execCmd() : '';
     $enfant = $this->getConfiguration("enfant", "");
     $values = array('command' => $command, 'cpttype' => $Cpttype, 'apikey' => $apikey, 'cas' => $CAS, 'CptParent' => $CptParent, 'login' => $login, 'password' => $password, 'url' => $url, 'enfant' => $enfant, 'CmdId' => $CmdId, 'TokenId' => $TokenId, 'TokenUsername' => $TokenUsername, 'TokenPassword' => $TokenPassword, 'TokenUrl' => $TokenUrl);
+>>>>>>> dev
+>>>>>>> Stashed changes
     $values = json_encode($values);
     if (log::convertLogLevel(log::getLogLevel(__CLASS__)) == "debug") {
       log::add(__CLASS__, 'debug', $value);
@@ -431,6 +472,11 @@ class ProJote extends eqLogic
     socket_write($socket, $values, strlen($values));
     socket_close($socket);
   }
+<<<<<<< Updated upstream
+=======
+<<<<<<< HEAD
+=======
+>>>>>>> Stashed changes
 
   //Aldarande : 04/01/2025
 
@@ -488,6 +534,10 @@ class ProJote extends eqLogic
     $output = True;
     return $output;
   }
+<<<<<<< Updated upstream
+=======
+>>>>>>> dev
+>>>>>>> Stashed changes
 }
 
 
@@ -526,5 +576,16 @@ class ProJoteCmd extends cmd
         break;
     }
   }
+<<<<<<< Updated upstream
+=======
+<<<<<<< HEAD
+
+
+
+
+
+=======
+>>>>>>> dev
+>>>>>>> Stashed changes
   /*     * **********************Getteur Setteur*************************** */
 }

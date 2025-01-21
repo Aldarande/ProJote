@@ -18,9 +18,21 @@
 require_once dirname(__FILE__) . '/../../../core/php/core.inc.php';
 include_file('core', 'authentification', 'php');
 if (!isConnect()) {
+<<<<<<< Updated upstream
   include_file('desktop', '404', 'php');
   die();
 }
+=======
+<<<<<<< HEAD
+ include_file('desktop', '404', 'php');
+ die();
+} 
+=======
+  include_file('desktop', '404', 'php');
+  die();
+}
+>>>>>>> dev
+>>>>>>> Stashed changes
 ?>
 <!--
 /* The code you provided is a PHP code snippet that generates an HTML form. */
@@ -32,7 +44,15 @@ if (!isConnect()) {
         <sup><i class="fas fa-question-circle tooltips" title="{{Le port proposé est celui par défault, vous pouvez le modifier en cas de conflit}}"></i></sup>
       </label>
       <div class="col-md-4">
+<<<<<<< Updated upstream
         <input class="configKey form-control" data-l1key="socketport" placeholder="55369" />
+=======
+<<<<<<< HEAD
+        <input class="configKey form-control" data-l1key="socketport" placeholder="55369"/>
+=======
+        <input class="configKey form-control" data-l1key="socketport" placeholder="55369" />
+>>>>>>> dev
+>>>>>>> Stashed changes
       </div>
     </div>
     <!--
@@ -59,4 +79,12 @@ if (!isConnect()) {
     </div>
     -->
   </fieldset>
+<<<<<<< Updated upstream
 </form>
+=======
+<<<<<<< HEAD
+</form>
+=======
+</form>
+>>>>>>> dev
+>>>>>>> Stashed changes

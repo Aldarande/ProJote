@@ -9,7 +9,14 @@ try:
     import os
     import datetime
     import requests
+<<<<<<< Updated upstream
     import argparse
+=======
+<<<<<<< HEAD
+=======
+    import argparse
+>>>>>>> dev
+>>>>>>> Stashed changes
 
     try:
         from jeedom.jeedom import *
@@ -36,9 +43,21 @@ try:
         # Je valide que j'ai les bonnes informations pour me connecter en tant que Parent
         try:
             if login == "":
+<<<<<<< Updated upstream
                 logging.error("Pas de login reçu ")
                 if pronote_url == "":
                     logging.error("pas d'URL reçu")
+=======
+<<<<<<< HEAD
+                logging.error("Pas de login reçu sur le deamon")
+                if pronote_url == "":
+                    logging.error("pas d'URL reçu sur le deamon")
+=======
+                logging.error("Pas de login reçu ")
+                if pronote_url == "":
+                    logging.error("pas d'URL reçu")
+>>>>>>> dev
+>>>>>>> Stashed changes
                 elif ent == "":
                     if pronote_url.endswith(
                         ".index-education.net/pronote/parent.html?login=true"
@@ -60,7 +79,14 @@ try:
             else:
                 logging.error("pas de password reçu sur le deamon")
             # Maintenant j'essaye de me connecter
+<<<<<<< Updated upstream
             logging.debug("Tentative de connection en tant que parent")
+=======
+<<<<<<< HEAD
+=======
+            logging.debug("Tentative de connection en tant que parent")
+>>>>>>> dev
+>>>>>>> Stashed changes
             client = pronotepy.ParentClient(pronote_url, login, password, ent)
             logging.info("Je suis connecté en tant que parent")
             client.parent = 1
@@ -203,10 +229,23 @@ try:
     def writedataPronotepy(client, dossier, eqid):
         try:
             # nom_fichier = f"{client.name}.ProJote"
+<<<<<<< Updated upstream
             nom_fichier = "enfant.ProJote.json.txt"
             # nom_fichier = nom_fichier.replace(" ", "")
             chemin_fichier = dossier + "/" + eqid
             verifdossier(chemin_fichier)
+=======
+<<<<<<< HEAD
+            nom_fichier = "enfant.ProJote"
+            # nom_fichier = nom_fichier.replace(" ", "")
+            verifdossier(dossier + "/" + eqid)
+=======
+            nom_fichier = "enfant.ProJote.json.txt"
+            # nom_fichier = nom_fichier.replace(" ", "")
+            chemin_fichier = dossier + "/" + eqid
+            verifdossier(chemin_fichier)
+>>>>>>> dev
+>>>>>>> Stashed changes
             chemin_fichier = os.path.join(dossier + "/" + eqid, nom_fichier)
             logging.debug("voici les informations d'écriture : %s", chemin_fichier)
 
@@ -225,7 +264,15 @@ try:
             data = {
                 "Date": str(datetime.datetime.now()),
                 "Name": client.info.name,
+<<<<<<< Updated upstream
                 "Token": client.export_credentials(),
+=======
+<<<<<<< HEAD
+                "Token": TokenLogin(client),
+=======
+                "Token": client.export_credentials(),
+>>>>>>> dev
+>>>>>>> Stashed changes
                 # "Raw_login": client.info.raw_resource,
             }
             if client._selected_child:
@@ -238,9 +285,19 @@ try:
                     )
                     client.listenfant.append(child.name)
                 data["Parent"] = "1"
+<<<<<<< Updated upstream
                 data["Liste_Enfant"] = json.dumps(
                     client.listenfant, separators=(",", ":")
                 )
+=======
+<<<<<<< HEAD
+                data["Liste_Enfant"] = json.dumps(client.listenfant)
+=======
+                data["Liste_Enfant"] = json.dumps(
+                    client.listenfant, separators=(",", ":")
+                )
+>>>>>>> dev
+>>>>>>> Stashed changes
                 data["Eleve"] = client._selected_child.name
                 data["Classe"] = client._selected_child.class_name
                 data["Etablissement"] = client._selected_child.establishment
@@ -272,13 +329,152 @@ try:
                     )
                 else:
                     logging.error("Erreur lors du téléchargement de l'image")
+<<<<<<< Updated upstream
             # Écrire les données au format JSON dans un fichier
+=======
+<<<<<<< HEAD
+                    # Écrire les données au format JSON dans un fichier
+=======
+            # Écrire les données au format JSON dans un fichier
+>>>>>>> dev
+>>>>>>> Stashed changes
             with open(chemin_fichier, "w") as fichier:
                 json.dump(data, fichier, indent=4)
         except Exception as e:
             line_number = e.__traceback__.tb_lineno
             logging.error("Ecriture du fichier échoué : lig.%s - %s", line_number, e)
 
+<<<<<<< Updated upstream
+    if __name__ == "__main__":
+        # Définition du niveau de log par défaut
+        _log_level = "INFO"
+
+        # type de commande python3 ../../resources/ProJoted/LoginConnect.py 'E2A24D72F39BA48F2E400CA838E5CCB5F5F6733C64FA762F8FEF473AA7D5BBAD05F641FFE8C6CFE9486564470BB8FCD0F9E4EAE77338B2B45B9A28DB85EC79AE0729E20FF4D0D60D79A7E0CA0380364CB05DC4C1FC3D71E2575423FECF4A0BDD74ADE24A020B222916617B30B189C724' '4C0B20E070291B38E256452F80138CBE' 'https://0912109y.index-education.net/pronote/parent.html?identifiant=7tTQmnp4Qyu7ZR58#/mobile.parent.html' '1234'
+        # get Arguments in right order : Jeton, Login, Url, Pin, Loglevel
+        parser = argparse.ArgumentParser(
+            description="Script de conexion à Pronote avec Login"
+=======
+<<<<<<< HEAD
+    # type de commande python3 ../../resources/ProJoted/LoginConnect.py 'E2A24D72F39BA48F2E400CA838E5CCB5F5F6733C64FA762F8FEF473AA7D5BBAD05F641FFE8C6CFE9486564470BB8FCD0F9E4EAE77338B2B45B9A28DB85EC79AE0729E20FF4D0D60D79A7E0CA0380364CB05DC4C1FC3D71E2575423FECF4A0BDD74ADE24A020B222916617B30B189C724' '4C0B20E070291B38E256452F80138CBE' 'https://0912109y.index-education.net/pronote/parent.html?identifiant=7tTQmnp4Qyu7ZR58#/mobile.parent.html' '1234'
+    # get Arguments in right order : Jeton, Login, Url, Pin, Loglevel
+    Pronote_url = str(sys.argv[1])
+    Username = str(sys.argv[2])
+    Password = str(sys.argv[3])
+    Ent = str(sys.argv[4])
+    NomEnfant = str(sys.argv[5])
+    EqID = str(sys.argv[6])
+    Log_level = str(sys.argv[7])
+
+    # Je qualifie l'ENT
+    if Ent != "Inconnu":
+        ClassEnt = class_for_name("pronotepy.ent", Ent)
+    else:
+        ClassEnt = ""
+
+    # Identification d'un compte parent
+    if not Pronote_url.endswith("?login=true"):
+        Pronote_url = Pronote_url + "?login=true"
+
+    if "parent.html" in Pronote_url:
+        Account = Connectparent(
+            pronote_url=Pronote_url,
+            login=Username,
+            password=Password,
+            ent=ClassEnt,
+            enfant=NomEnfant,
+>>>>>>> Stashed changes
+        )
+        parser.add_argument("--URL", help="URL de connexion à Projote", type=str)
+        parser.add_argument("--Login", help="Login de connexion à Projote", type=str)
+        parser.add_argument(
+            "--Password", help="Mot de passe de connexion à Projote", type=str
+        )
+        parser.add_argument("--Ent", help="Nom de l'ENT", type=str)
+        parser.add_argument("--Enfant", help="Nom de l'enfant", type=str)
+        parser.add_argument("--Eqid", help="ID de l'équipement", type=str)
+        parser.add_argument("--Loglevel", help="Niveau de log", type=str)
+        args = parser.parse_args()
+
+        if args.URL:
+            Pronote_url = args.URL
+        if args.Login:
+            Username = args.Login
+        if args.Password:
+            Password = args.Password
+        if args.Ent:
+            Ent = args.Ent
+        if args.Enfant:
+            NomEnfant = args.Enfant
+        else:
+            NomEnfant = ""
+        if args.Eqid:
+            EqID = args.Eqid
+        if args.Loglevel:
+            _log_level = args.Loglevel
+
+        jeedom_utils.set_log_level(_log_level)
+
+        # Je qualifie l'ENT
+        if Ent != "Inconnu":
+            ClassEnt = class_for_name("pronotepy.ent", Ent)
+        else:
+            ClassEnt = ""
+
+        # Identification d'un compte parent
+        if not Pronote_url.endswith("?login=true"):
+            Pronote_url = Pronote_url + "?login=true"
+
+        if "parent.html" in Pronote_url:
+            logging.info("LOG : Je tente de me connecter en tant que Parent")
+            Account = Connectparent(
+                pronote_url=Pronote_url,
+                login=Username,
+                password=Password,
+                ent=ClassEnt,
+                enfant=NomEnfant,
+            )
+
+        else:
+            logging.info("LOG : Je tente de me connecter en tant qu' élève")
+            Account = ConnectEleve(
+                pronote_url=Pronote_url, login=Username, password=Password, ent=ClassEnt
+            )
+
+        if Account.logged_in:
+            logging.info("LOG : Je suis connecté et je demande le QR LOG")
+            logging.info("Login : %s", Account.username)
+            logging.info("URL : %s", Account.pronote_url)
+            logging.info("Password : %s", Account.password)
+            logging.info("ENT : %s", Account.ent)
+            logging.info("Picture : %s", Account.info.profile_picture)
+            # je requête le QR code
+            Pin = "4321"
+            Qrcode_data = Account.request_qr_code_data(Pin)
+            logging.debug("QR_code : %s", Qrcode_data)
+            # JE me loggue avec le QR code
+
+            # Tentative de connexion via le QR code
+
+        if "parent" not in Qrcode_data["url"]:
+            # Test de connection en tant que Parent
+            Account = pronotepy.Client.qrcode_login(
+                qr_code=Qrcode_data, pin=Pin, uuid="ProJote"
+            )
+
+        else:
+            Account = pronotepy.ParentClient.qrcode_login(
+                qr_code=Qrcode_data, pin=Pin, uuid="ProJote"
+            )
+        if Account.logged_in:
+            logging.info("Client connecté")
+
+            # Je crée le fichier pou le Token.
+            writedataPronotepy(Account, "/var/www/html/plugins/ProJote/data", EqID)
+
+<<<<<<< Updated upstream
+=======
+        writedataPronotepy(Account, "/var/www/html/plugins/ProJote/data", EqID)
+=======
     if __name__ == "__main__":
         # Définition du niveau de log par défaut
         _log_level = "INFO"
@@ -375,8 +571,17 @@ try:
             # Je crée le fichier pou le Token.
             writedataPronotepy(Account, "/var/www/html/plugins/ProJote/data", EqID)
 
+>>>>>>> dev
+>>>>>>> Stashed changes
 
 except Exception as e:
     line_number = e.__traceback__.tb_lineno
     logging.error("An error occurred: lig.", line_number, e)
+<<<<<<< Updated upstream
     sys.exit(1)
+=======
+<<<<<<< HEAD
+=======
+    sys.exit(1)
+>>>>>>> dev
+>>>>>>> Stashed changes

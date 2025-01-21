@@ -12,9 +12,22 @@ try {
         die();
     }
 
+<<<<<<< Updated upstream
     $result = json_decode(file_get_contents("php://input"), true);
 
     if (log::convertLogLevel(log::getLogLevel('ProJote')) == "debug") {
+=======
+<<<<<<< HEAD
+    $json_result = file_get_contents("php://input");
+
+    $result = json_decode($json_result, true);
+    if (log::convertLogLevel(log::getLogLevel(__CLASS__)) == "debug") {
+=======
+    $result = json_decode(file_get_contents("php://input"), true);
+
+    if (log::convertLogLevel(log::getLogLevel('ProJote')) == "debug") {
+>>>>>>> dev
+>>>>>>> Stashed changes
         $result_json = json_encode($result, JSON_PRETTY_PRINT);
         log::add('ProJote', 'debug', 'Résultat reçu : ' . $result_json);
     }
@@ -99,17 +112,37 @@ try {
     }
 
     // Vérifie les entrés des Menus
+<<<<<<< Updated upstream
     if (is_array($result["Menu"])) {
         // Parcourt toutes les clés possibles
         foreach ($result["Menu"] as $key => $value) {
+=======
+<<<<<<< HEAD
+    if (is_array($result["Menus"])) {
+        // Parcourt toutes les clés possibles
+        foreach ($result["Menus"] as $key => $value) {
+=======
+    if (is_array($result["Menu"])) {
+        // Parcourt toutes les clés possibles
+        foreach ($result["Menu"] as $key => $value) {
+>>>>>>> dev
+>>>>>>> Stashed changes
             // Vérifie si la clé existe et met à jour la commande correspondante
             if (isset($value) && $eqLogic->getCmd(null, $key)) {
                 log::add('ProJote', 'debug', 'Champ reçu : ' . $key . ' - Valeur reçue : ' . print_r($value, true));
                 $eqLogic->checkAndUpdateCmd($key, $value);
             }
         }
+<<<<<<< Updated upstream
     } else {
         log::add('ProJote', 'debug', 'Menus non reçu');
+=======
+<<<<<<< HEAD
+=======
+    } else {
+        log::add('ProJote', 'debug', 'Menus non reçu');
+>>>>>>> dev
+>>>>>>> Stashed changes
     }
 
     // Vérifie les entrés des Notifications
@@ -122,6 +155,11 @@ try {
                 $eqLogic->checkAndUpdateCmd($key, $value);
             }
         }
+<<<<<<< Updated upstream
+=======
+<<<<<<< HEAD
+=======
+>>>>>>> Stashed changes
     } else {
         log::add('ProJote', 'debug', 'Notifications non reçu');
     }
@@ -145,6 +183,10 @@ try {
         }
     } else {
         log::add('ProJote', 'debug', 'Token non reçu');
+<<<<<<< Updated upstream
+=======
+>>>>>>> dev
+>>>>>>> Stashed changes
     }
 } catch (Exception $e) {
     log::add('ProJote', 'error', displayException($e));
