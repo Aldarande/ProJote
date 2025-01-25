@@ -1,48 +1,19 @@
 {
 	"id": "ProJote",
 	"name": "Plugin Pronote",
-<<<<<<< Updated upstream
 	"pluginVersion": "0.",
-=======
-<<<<<<< HEAD
-	"pluginVersion": "0.5",
-=======
-	"pluginVersion": "0.",
->>>>>>> dev
->>>>>>> Stashed changes
 	"description": {
 		"fr_FR": "Plugin destinée à récupérer les inforamtions de Pronote"
 	},
 	"licence": "AGPL",
 	"author": "Aldarande",
-<<<<<<< Updated upstream
 	"require": "4.3",
-=======
-<<<<<<< HEAD
-	"require": "4.4",
-=======
-	"require": "4.3",
->>>>>>> dev
->>>>>>> Stashed changes
 	"category": "organization",
 	"hasDependency": true,
 	"hasOwnDeamon": true,
-	"maxDependancyInstallTime": 10,
-<<<<<<< Updated upstream
+	"maxDependancyInstallTime": 20,
 	"changelog": "https://aldarande.github.io/ProJote/#language#/index.html#Version",
-	// "changelog_beta": "https://aldarande.github.io/ProJote/#language#/changelog_beta",
 	"documentation": "https://aldarande.github.io/ProJote/#language#/index.html",
-=======
-<<<<<<< HEAD
-	"changelog": "../docs/fr_FR/changelog.md",
-	"changelog_beta": "../plugins/ProJote/docs/FR_fr/changelog_beta.md",
-	"documentation": "../docs/fr_FR/index.md",
-=======
-	"changelog": "https://aldarande.github.io/ProJote/#language#/index.html#Version",
-	// "changelog_beta": "https://aldarande.github.io/ProJote/#language#/changelog_beta",
-	"documentation": "https://aldarande.github.io/ProJote/#language#/index.html",
->>>>>>> dev
->>>>>>> Stashed changes
 	"language": [
 		"fr_FR"
 	],
