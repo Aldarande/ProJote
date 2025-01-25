@@ -7,17 +7,7 @@ if (!isConnect('admin')) {
 $plugin = plugin::byId('ProJote');
 sendVarToJS('eqType', $plugin->getId());
 $eqLogics = eqLogic::byType($plugin->getId());
-<<<<<<< Updated upstream
 define('FILE_PATH', '/var/www/html/plugins/ProJote/data/');
-=======
-<<<<<<< HEAD
-
-define('FILE_PATH', '/var/www/html/plugins/ProJote/data/');
-
-=======
-define('FILE_PATH', '/var/www/html/plugins/ProJote/data/');
->>>>>>> dev
->>>>>>> Stashed changes
 function generateFormGroup($label, $input, $tooltip = '')
 {
 	return '<div class="form-group">
@@ -28,15 +18,7 @@ function generateFormGroup($label, $input, $tooltip = '')
             </div>';
 }
 ?>
-<<<<<<< Updated upstream
 
-=======
-<<<<<<< HEAD
-<!-- pages de pramétres des objets/ Compte eleve -->
-=======
-
->>>>>>> dev
->>>>>>> Stashed changes
 <div class="row row-overflow">
 	<!-- Page d'accueil du plugin -->
 	<div class="col-xs-12 eqLogicThumbnailDisplay">
@@ -165,16 +147,11 @@ function generateFormGroup($label, $input, $tooltip = '')
 								</div>
 							</div>
 							<div class="form-group Login" style="display:none;">
-<<<<<<< Updated upstream
 								<legend><i class="fa fa-user"></i> {{Login}}
 									<i class="fas fa-hourglass-half fa-spin hidden"></i>
 									<i class="fas fa-check hidden"></i>
 									<i class="fas fa-times hidden"></i>
 								</legend>
-=======
-<<<<<<< HEAD
-								<legend><i class="fa fa-user"></i> {{Login}}</legend>
->>>>>>> Stashed changes
 								<div class="form-group ENT">
 									<label class="col-sm-4 control-label">{{ENT / CAS}}<i class="fas fa-question-circle tooltips" title="{{Renseignez le CAS ENT qui correspond à ce compte}}"></i></label>
 									<select type="text" class="col-sm-6 eqLogicAttr form-control" data-l1key="configuration" data-l2key="CasEnt">
@@ -241,123 +218,15 @@ function generateFormGroup($label, $input, $tooltip = '')
 									<input type="text" class="col-sm-6 eqLogicAttr form-control" data-l1key="configuration" data-l2key="url">
 								</div>
 								<div class="form-group listenfant" style="display:block;">
-<<<<<<< Updated upstream
 									<label class="col-sm-4 control-label">{{Enfants }} <i class="fas fa-question-circle tooltips" title="{{Choisissez le nom de l'enfant}}"></i></label>
 									<select id="enfantList" class="col-sm-6 eqLogicAttr form-control" data-l1key="configuration" data-l2key="enfant"></select>
-=======
-									<?php echo generateFormGroup('{{Enfants}}', '<select id="enfantList" class="eqLogicAttr form-control" data-l1key="configuration" data-l2key="enfant"><?php $filePath = FILE_PATH . $eqLogic->getId() . "/enfant.ProJote"; populateEnfantList($filePath); ?> </select>', '{{Choisissez le nom de l\'enfant}}');
-									function populateEnfantList($filePath)
-									{
-										if (file_exists($filePath)) {
-											$content = file_get_contents($filePath);
-											$data = json_decode($content, true);
+									<!-- Liste des enfants provisionnée en JS via -->
 
-											if ($data !== null && isset($data['Liste_Enfant'])) {
-												$enfants = json_decode($data['Liste_Enfant'], true);
-												if (is_array($enfants)) {
-													foreach ($enfants as $enfant) {
-														echo '<option value="' . htmlspecialchars($enfant) . '">' . htmlspecialchars($enfant) . '</option>';
-													}
-												} else {
-													echo '<option value="">Aucun enfant trouvé</option>';
-												}
-											} else {
-												echo '<option value="">Erreur : Liste_Enfant non trouvée ou fichier JSON invalide</option>';
-											}
-										} else {
-											echo '<option value="">Erreur : Le fichier n\'existe pas</option>';
-										}
-									}
-									?>
-=======
-								<legend><i class="fa fa-user"></i> {{Login}}
-									<i class="fas fa-hourglass-half fa-spin hidden"></i>
-									<i class="fas fa-check hidden"></i>
-									<i class="fas fa-times hidden"></i>
-								</legend>
-								<div class="form-group ENT">
-									<label class="col-sm-4 control-label">{{ENT / CAS}}<i class="fas fa-question-circle tooltips" title="{{Renseignez le CAS ENT qui correspond à ce compte}}"></i></label>
-									<select type="text" class="col-sm-6 eqLogicAttr form-control" data-l1key="configuration" data-l2key="CasEnt">
-										<option value="">{{Aucun}}</option>
-										<option value="pronotepy.ent">{{pronotepy.ent}}</option>
-										<option value="ac_orleans_tours">{{ac_orleans_tours}}</option>
-										<option value="ac_poitiers">{{ac_poitiers}}</option>
-										<option value="ac_reunion">{{ac_reunion}}</option>
-										<option value="ac_reims">{{ac_reims}}</option>
-										<option value="ac_rennes">{{ac_rennes}}</option>
-										<option value="atrium_sud">{{atrium_sud}}</option>
-										<option value="cas_agora06">{{cas_agora06}}</option>
-										<option value="cas_arsene76_edu">{{cas_arsene76_edu}}</option>
-										<option value="cas_cybercolleges42_edu">{{cas_cybercolleges42_edu}}</option>
-										<option value="cas_kosmos">{{cas_kosmos}}</option>
-										<option value="cas_seinesaintdenis_edu">{{cas_seinesaintdenis_edu}}</option>
-										<option value="eclat_bfc">{{eclat_bfc}}</option>
-										<option value="ecollege_haute_garonne_edu">{{ecollege_haute_garonne_edu}}</option>
-										<option value="ent_94">{{ent_94}}</option>
-										<option value="ent_auvergnerhonealpe">{{ent_auvergnerhonealpe}}</option>
-										<option value="ent_creuse">{{ent_creuse}}</option>
-										<option value="ent_creuse_educonnect">{{ent_creuse_educonnect}}</option>
-										<option value="ent_elyco">{{ent_elyco}}</option>
-										<option value="ent_essonne">{{ent_essonne}}</option>
-										<option value="ent_hdf">{{ent_hdf}}</option>
-										<option value="ent_mayotte">{{ent_mayotte}}</option>
-										<option value="ent_somme">{{ent_somme}}</option>
-										<option value="ent_var">{{ent_var}}</option>
-										<option value="ent77">{{ent77}}</option>
-										<option value="ent_ecollege78">{{ent_ecollege78}}</option>
-										<option value="extranet_colleges_somme">{{extranet_colleges_somme}}</option>
-										<option value="ile_de_france">{{ile_de_france}}</option>
-										<option value="laclasse_educonnect">{{laclasse_educonnect}}</option>
-										<option value="laclasse_lyon">{{laclasse_lyon}}</option>
-										<option value="l_normandie">{{l_normandie}}</option>
-										<option value="lyceeconnecte_aquitaine">{{lyceeconnecte_aquitaine}}</option>
-										<option value="lyceeconnecte_edu">{{lyceeconnecte_edu}}</option>
-										<option value="monbureaunumerique">{{monbureaunumerique}}</option>
-										<option value="neoconnect_guadeloupe">{{neoconnect_guadeloupe}}</option>
-										<option value="occitanie_montpellier">{{occitanie_montpellier}}</option>
-										<option value="occitanie_montpellier_educonnect">{{occitanie_montpellier_educonnect}}</option>
-										<option value="occitanie_toulouse_edu">{{occitanie_toulouse_edu}}</option>
-										<option value="ozecollege_yvelines">{{ozecollege_yvelines}}</option>
-										<option value="paris_classe_numerique">{{paris_classe_numerique}}</option>
-										<option value="pronote_hubeduconnect">{{pronote_hubeduconnect}}</option>
-										<option value="val_de_marne">{{val_de_marne}}</option>
-										<option value="val_doise">{{val_doise}}</option>
-									</select>
-								</div>
-								<div class="form-group">
-									<label class="col-sm-4 control-label">{{Compte Parent}}<i class="fas fa-question-circle tooltips" title="{{Cochez si vous utilisez une compte parent, donc pas un compte élève}}"></i></label>
-									<input type="checkbox" id="Parent" class="eqLogicAttr form-control" data-l1key="configuration" data-l2key="CptParent">
-								</div>
-								<div class=" form-group">
-									<label class="col-sm-4 control-label">{{Login du compte}}<i class="fas fa-question-circle tooltips" title="{{Renseignez le login pour vous connecter à Pronote}}"></i></label>
-									<input type="text" class="col-sm-6 eqLogicAttr form-control" data-l1key="configuration" data-l2key="login">
-								</div>
-								<div class="form-group">
-									<label class="col-sm-4 control-label">{{Mot de passe}}<i class="fas fa-question-circle tooltips" title="{{Renseignez le mot de passe}}"></i></label>
-									<input type="password" class=" col-sm-6 eqLogicAttr form-control inputPassword" data-l1key="configuration" data-l2key="password">
-								</div>
-								<div class="form-group">
-									<label class="col-sm-4 control-label">{{Url }}<i class="fas fa-question-circle tooltips" title="{{Renseignez l'adresse web pour vous connecter à Pronote}}"></i></label>
-									<input type="text" class="col-sm-6 eqLogicAttr form-control" data-l1key="configuration" data-l2key="url">
-								</div>
-								<div class="form-group listenfant" style="display:block;">
-									<label class="col-sm-4 control-label">{{Enfants }} <i class="fas fa-question-circle tooltips" title="{{Choisissez le nom de l'enfant}}"></i></label>
-									<select id="enfantList" class="col-sm-6 eqLogicAttr form-control" data-l1key="configuration" data-l2key="enfant"></select>
->>>>>>> dev
->>>>>>> Stashed changes
 								</div>
 								<div class="form-group Validate">
 									<div class=" form-group">
 										<div class="col-sm-6 col-sm-offset-4 control-label">
-<<<<<<< Updated upstream
-											<a class="eqLogicAttr btn btn-sm btn-success eqLogicAction" id="bt_Validate"><i class="fas fa-check-circle"></i> {{Valider}}</a>
-=======
-<<<<<<< HEAD
 											<a class="btn btn-sm btn-success eqLogicAction" id="bt_Validate"><i class="fas fa-check-circle"></i> {{Valider}}</a>
-=======
-											<a class="eqLogicAttr btn btn-sm btn-success eqLogicAction" id="bt_Validate"><i class="fas fa-check-circle"></i> {{Valider}}</a>
->>>>>>> dev
->>>>>>> Stashed changes
 										</div>
 									</div>
 								</div>
@@ -372,77 +241,6 @@ function generateFormGroup($label, $input, $tooltip = '')
 								<div class="form-group">
 									<label class="col-sm-3 control-label"></label>
 									<div class="col-sm-6">
-<<<<<<< Updated upstream
-										<div class="rectangle eqLogicAction" contenteditable="true">
-=======
-<<<<<<< HEAD
-										<div class="rectangle" contenteditable="true">
->>>>>>> Stashed changes
-											<input type="file" id="fileInput" style="display:none;">
-											<label for="fileInput" class="button">Parcourir</label>
-										</div>
-									</div>
-								</div>
-							</div>
-							<div class="form-group text-center" id="error-message" style="color: red; font-weight: bold;text-align: center; margin: 0 auto;"></div>
-						</div>
-						<style>
-							.rectangle {
-								width: 200px;
-								height: 200px;
-								background-color: lightgray;
-								display: flex;
-								justify-content: center;
-								align-items: center;
-								cursor: pointer;
-							}
-
-							#error-message {
-								color: red;
-								font-weight: bold;
-								text-align: center;
-							}
-
-							.button {
-								padding: 10px;
-								/* background-color: white; */
-								cursor: pointer;
-							}
-
-							.fa-spin {
-								animation: fa-spin 2s infinite linear;
-							}
-
-							.fa-check {
-								color: green;
-							}
-
-							.fa-times {
-								color: red;
-							}
-
-							.hidden {
-								display: none;
-							}
-
-							@keyframes fa-spin {
-								0% {
-									transform: rotate(0deg);
-								}
-
-<<<<<<< Updated upstream
-=======
-												100% {
-													transform: rotate(360deg);
-												}
-											}
-										</style>
-									</div>
-								</div>
-								<div id="error-message" style="color: red; font-weight: bold;"></div>
-							</div>
-						</div>
-=======
 										<div class="rectangle eqLogicAction" contenteditable="true">
 											<input type="file" id="fileInput" style="display:none;">
 											<label for="fileInput" class="button">Parcourir</label>
@@ -496,16 +294,11 @@ function generateFormGroup($label, $input, $tooltip = '')
 									transform: rotate(0deg);
 								}
 
->>>>>>> Stashed changes
 								100% {
 									transform: rotate(360deg);
 								}
 							}
 						</style>
-<<<<<<< Updated upstream
-=======
->>>>>>> dev
->>>>>>> Stashed changes
 						<!-- Partie droite de l'onglet "Équipement" -->
 						<!-- Affiche un champ de commentaire par défaut mais vous pouvez y mettre ce que vous voulez -->
 						<div class="col-lg-6">
@@ -516,25 +309,16 @@ function generateFormGroup($label, $input, $tooltip = '')
 									<textarea class="form-control eqLogicAttr autogrow" data-l1key="comment"></textarea>
 								</div>
 							</div>
-							<!-- Section du Token -->
-<<<<<<< Updated upstream
+							<!-- Section du Token 
+							 
 							<div style="display:none;" class="form-group Token">
 								<input type="hidden" id="eqLogicId" value="<?php echo $eqLogic->getId(); ?>">
-=======
-<<<<<<< HEAD
-							<div class="form-group Token" id="Token">
-=======
-							<div style="display:none;" class="form-group Token">
-								<input type="hidden" id="eqLogicId" value="<?php echo $eqLogic->getId(); ?>">
->>>>>>> dev
->>>>>>> Stashed changes
 								<legend>
 									<i class="col-sm-1 fa fa-compress"></i> {{Token}}
 									<sup>
 										<i class="fas fa-question-circle tooltips" title="{{Il s'agit des informations servant à la connexion obtenue.}}"></i>
 									</sup>
 								</legend>
-<<<<<<< Updated upstream
 								<div id="error-message" style="color: red; font-weight: bold;"></div>
 								<div class="form-group">
 									<label class="col-sm-2 control-label">{{Username}} :</label>
@@ -554,138 +338,7 @@ function generateFormGroup($label, $input, $tooltip = '')
 										<a id="token-url" href="#" target="_blank" class="eqLogicAttr url-link small-font scrollable-container"></a>
 									</div>
 								</div>
-							</div>
-=======
-<<<<<<< HEAD
-							</div>
-							<?php
-							// Construire le chemin vers le fichier en fonction de l'ID de l'équipement
-							$file_path = FILE_PATH . $eqLogic->getId() . '/enfant.ProJote';
-							$profile_picture_path = dirname($file_path) . '/profile_picture.jpg';
-
-							log::add('ProJote', 'debug', 'ProJote.php:: emplacement du Fichier ' . $file_path);
-							log::add('ProJote', 'debug', 'ProJote.php:: chemin vers profile_picture.jpg ' . $profile_picture_path);
-
-							// Vérifier si le fichier existe
-							if (file_exists($file_path)) {
-								// Lire le contenu du fichier
-								$content = file_get_contents($file_path);
-								// Décoder le contenu JSON en tableau associatif
-								$data = json_decode($content, true);
-
-								// Vérifier si le contenu JSON est valide
-								if ($data !== null) {
-									$token = isset($data['Token']) ? $data['Token'] : null;
-
-									if ($token !== null) {
-										$token_url = isset($token['Token_URL']) ? htmlspecialchars($token['Token_URL']) : 'Non défini';
-										$token_username = isset($token['Token_username']) ? htmlspecialchars($token['Token_username']) : 'Non défini';
-										$token_password = isset($token['Token_Password']) ? htmlspecialchars($token['Token_Password']) : 'Non défini';
-
-										// Afficher les données dans les champs
-										echo '<div class="form-group">';
-										echo '<label class="col-sm-2 control-label">{{Username}} :</label>';
-										echo '<div class="col-sm-10">';
-										echo '<span style="position:relative;top:+5px;left:+5px;" class="form-control small-font">' . $token_username . '</span>';
-										echo '</div>';
-										echo '</div>';
-
-										echo '<div class="form-group">';
-										echo '<label class="col-sm-2 control-label">{{Token_Pass}} :</label>';
-										echo '<div class="col-sm-10 scrollable-container">';
-										echo '<span style="position:relative;top:+5px;left:+5px;display:inline-block;" class="form-control small-font scrollable-container">' . $token_password . '</span>';
-										echo '</div>';
-										echo '</div>';
-
-										echo '<div class="form-group">';
-										echo '<label class="col-sm-2 control-label">{{Token_URL}} :</label>';
-										echo '<div style="scrollbar-width: none;" class="col-sm-10 scrollable-container">';
-										echo '<a href="' . $token_url . '" target="_blank" class="form-control url-link small-font scrollable-container">' . $token_url . '</a>';
-										echo '</div>';
-										echo '</div>';
-									} else {
-										echo '<p>Erreur : Les informations de Token sont absentes.</p>';
-									}
-								} else {
-									echo '<p>Erreur : Le fichier JSON est invalide.</p>';
-								}
-							} else {
-								echo '<p>Erreur : Le fichier n\'existe pas à l\'emplacement spécifié.</p>';
-							}
-
-							// Vérifier si le fichier profile_picture.jpg existe
-							if (file_exists($profile_picture_path)) {
-							} else {
-								echo '<p>Le fichier profile_picture.jpg n\'existe pas.</p>';
-							}
-							?>
-						</div>
-
-						<div class="col-lg-6">
-							<div class="form-group">
-								<legend><i class="col-sm-1 fas fa-school"></i> {{Elève}}</legend>
-								<div class="form-group info_eleve">
-									<label class="col-sm-2 control-label"></label>
-									<div class="col-sm-6">
-										<?php
-										// Construire le chemin vers le fichier en fonction de l'ID de l'équipement
-										$file_path = FILE_PATH . $eqLogic->getId() . '/enfant.ProJote';
-										log::add('ProJote', 'debug', 'ProJote.php:: emplacement du Fichier ' . $file_path);
-										log::add('ProJote', 'debug', 'ProJote.php:: présence du Fichier ' . file_get_contents($file_path));
-										// Vérifier si le fichier existe
-										if (file_exists($file_path)) {
-											// Lire le contenu du fichier
-											$content = file_get_contents($file_path);
-											// Décoder le contenu JSON en tableau associatif
-											$data = json_decode($content, true);
-											// Vérifier si le contenu JSON est valide
-											if ($data !== null) {
-												// Extraire les données demandées
-												$eleve = isset($data['Eleve']) ? htmlspecialchars($data['Eleve']) : 'Inconnu';
-												$classe = isset($data['Classe']) ? htmlspecialchars($data['Classe']) : 'Inconnue';
-												$etablissement = isset($data['Etablissement']) ? htmlspecialchars($data['Etablissement']) : 'Inconnu';
-												//$picture = isset($data['Local_Picture']) ? htmlspecialchars($data['Local_Picture']) : '';
-												$picture =	'plugins/ProJote/data/' . $eqLogic->getId() . '/profile_picture.jpg';
-												// Afficher les informations extraites
-												echo "<p><strong>Nom de Élève :</strong> $eleve</p>";
-												echo "<p><strong>Classe :</strong> $classe</p>";
-												echo "<p><strong>Établissement :</strong> $etablissement</p>";
-
-												// Vérifier et afficher l'image
-												if (!empty($picture)) {
-													echo '<img src="' . $picture . '" alt="Photo de l\'élève" style="max-width: 200px; max-height: 200px;">';
-												} else {
-													echo "<p>Image non disponible.</p>";
-												}
-											} else {
-												echo "<p>Erreur : Le fichier JSON est invalide.</p>";
-											}
-										} else {
-											echo "<p>Erreur : Le fichier n'existe pas à l'emplacement spécifié.</p>";
-										}
-										?>
-=======
-								<div id="error-message" style="color: red; font-weight: bold;"></div>
-								<div class="form-group">
-									<label class="col-sm-2 control-label">{{Username}} :</label>
-									<div class="col-sm-10">
-										<span id="token-username" style="position:relative;top:+5px;left:+5px;" class="eqLogicAttr small-font"></span>
-									</div>
-								</div>
-								<div class="form-group">
-									<label class="col-sm-2 control-label">{{Token_Pass}} :</label>
-									<div class="col-sm-10 scrollable-container">
-										<span id="token-password" style="position:relative;top:+5px;left:+5px;display:inline-block;" class="eqLogicAttr  small-font scrollable-container"></span>
-									</div>
-								</div>
-								<div class="form-group">
-									<label class="eqLogicAttr col-sm-2 control-label">{{Token_URL}} :</label>
-									<div style="scrollbar-width: none;" class="col-sm-10 scrollable-container">
-										<a id="token-url" href="#" target="_blank" class="eqLogicAttr url-link small-font scrollable-container"></a>
-									</div>
-								</div>
-							</div>
->>>>>>> Stashed changes
+							</div> -->
 							<!-- Section du Eleve -->
 							<div class="form-group Eleve">
 								<legend><i class="col-sm-1 fas fa-info"></i> {{Elève}} </legend>
@@ -705,10 +358,6 @@ function generateFormGroup($label, $input, $tooltip = '')
 									<label class="col-sm-2 control-label">{{Photo de l'élève}} : </label>
 									<div class="text-center">
 										<img id="local-picture" src="" alt="Photo de l'élève" style="max-width: 200px; max-height: 200px; display: none;">
-<<<<<<< Updated upstream
-=======
->>>>>>> dev
->>>>>>> Stashed changes
 									</div>
 								</div>
 							</div>
@@ -743,15 +392,7 @@ function generateFormGroup($label, $input, $tooltip = '')
 </div><!-- /.row row-overflow -->
 <!-- Inclusion du fichier javascript du plugin (dossier, nom_du_fichier, extension_du_fichier, id_du_plugin) -->
 <?php include_file('desktop', 'ProJote', 'js', 'ProJote'); ?>
-<<<<<<< Updated upstream
 <?php include_file('3rdparty', 'jsQR', 'js', 'ProJote'); ?>
-=======
-<<<<<<< HEAD
-<?php include_file('desktop', 'jsQR', 'js', 'ProJote'); ?>
-=======
-<?php include_file('3rdparty', 'jsQR', 'js', 'ProJote'); ?>
->>>>>>> dev
->>>>>>> Stashed changes
 <!-- Inclusion du fichier javascript du core - NE PAS MODIFIER NI SUPPRIMER -->
 <?php include_file('core', 'plugin.template', 'js'); ?>
 
