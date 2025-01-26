@@ -11,7 +11,6 @@ if ($plugin === null) {
 } else {
 	error_log('Plugin ProJote trouvé : ' . print_r($plugin, true));
 	$eqLogics = eqLogic::byType($plugin->getId());
-	define('FILE_PATH', '/var/www/html/plugins/ProJote/data/');
 }
 sendVarToJS('eqType', $plugin->getId());
 ?>
@@ -216,7 +215,35 @@ sendVarToJS('eqType', $plugin->getId());
 								</div>
 								<div class="form-group listenfant" style="display:block;">
 									<label class="col-sm-4 control-label">{{Enfants }} <i class="fas fa-question-circle tooltips" title="{{Choisissez le nom de l'enfant}}"></i></label>
-									<select id="enfantList" class="col-sm-6 eqLogicAttr form-control" data-l1key="configuration" data-l2key="enfant"></select>
+									<select id="enfantList" class="col-sm-6 eqLogicAttr form-control" data-l1key="configuration" data-l2key="enfant">
+										<?php
+										$jsonFile = '/var/www/html/plugins/ProJote/data/' . $eqLogic->getId() . '/enfant.ProJote.json.txt';
+										if (file_exists($jsonFile)) {
+											$jsonContent = file_get_contents($jsonFile);
+											if ($jsonContent === false) {
+												echo '<option value="">Erreur de lecture du fichier JSON</option>';
+											} else {
+												$data = json_decode($jsonContent, true);
+												if ($data === null) {
+													echo '<option value="">Erreur de décodage du fichier JSON</option>';
+												} elseif (isset($data['Liste_Enfant'])) {
+													$listeEnfant = json_decode($data['Liste_Enfant'], true);
+													if (is_array($listeEnfant)) {
+														foreach ($listeEnfant as $enfant) {
+															echo '<option value="' . htmlspecialchars($enfant) . '">' . htmlspecialchars($enfant) . '</option>';
+														}
+													} else {
+														echo '<option value="">Liste d\'enfants vide ou incorrecte</option>';
+													}
+												} else {
+													echo '<option value="">Clé Liste_Enfant non trouvée dans le fichier JSON</option>';
+												}
+											}
+										} else {
+											echo '<option value="">Fichier JSON non trouvé</option>';
+										}
+										?>
+									</select>
 								</div>
 								<div class="form-group Validate">
 									<div class=" form-group">
