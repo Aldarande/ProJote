@@ -99,9 +99,9 @@ try {
     }
 
     // Vérifie les entrés des Menus
-    if (is_array($result["Menu"])) {
+    if (is_array($result["Menus"])) {
         // Parcourt toutes les clés possibles
-        foreach ($result["Menu"] as $key => $value) {
+        foreach ($result["Menus"] as $key => $value) {
             // Vérifie si la clé existe et met à jour la commande correspondante
             if (isset($value) && $eqLogic->getCmd(null, $key)) {
                 log::add('ProJote', 'debug', 'Champ reçu : ' . $key . ' - Valeur reçue : ' . print_r($value, true));
@@ -130,8 +130,8 @@ try {
         // Correspondance des clés JSON avec les commandes Jeedom
         $cmdMapping = [
             'pronote_url' => 'TokenUrl',
-            'username' => 'TokenUsername',
-            'password' => 'TokenPassword',
+            'username' => 'Username',
+            'password' => 'Token',
             'client_identifier' => 'TokenId'
         ];
         // Parcourt toutes les clés possibles

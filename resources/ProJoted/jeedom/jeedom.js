@@ -24,12 +24,12 @@ Jeedom.http = {}
 
 /***************************ARGS*******************************/
 
-Jeedom.getArgs = function() {
+Jeedom.getArgs = function () {
   var result = {}
-  var args = process.argv.slice(2,process.argv.length);
+  var args = process.argv.slice(2, process.argv.length);
   for (var i = 0, len = args.length; i < len; i++) {
-    if (args[i].slice(0,2) === '--') {
-      result[args[i].slice(2,args[i].length)] = args[i + 1]
+    if (args[i].slice(0, 2) === '--') {
+      result[args[i].slice(2, args[i].length)] = args[i + 1]
     }
   }
   return result
@@ -37,39 +37,39 @@ Jeedom.getArgs = function() {
 
 /***************************LOGS*******************************/
 
-Jeedom.log.setLevel = function(_level){
-  var convert = {debug  : 0,info : 10,notice : 20,warning : 30,error : 40,critical : 50,none : 60}
+Jeedom.log.setLevel = function (_level) {
+  var convert = { debug: 0, info: 10, notice: 20, warning: 30, error: 40, critical: 50, none: 60 }
   Jeedom.log.level = convert[_level]
 }
 
-Jeedom.log.debug  = function(_log){
-  if(Jeedom.log.level > 0){
+Jeedom.log.debug = function (_log) {
+  if (Jeedom.log.level > 0) {
     return;
   }
-  console.log('['+(new Date().toISOString().replace(/T/, ' ').replace(/\..+/, ''))+'][DEBUG] : '+_log)
+  console.log('[' + (new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '')) + '][DEBUG] : ' + _log)
 }
 
-Jeedom.log.info  = function(_log){
-  if(Jeedom.log.level > 10){
+Jeedom.log.info = function (_log) {
+  if (Jeedom.log.level > 10) {
     return;
   }
-  console.log('['+(new Date().toISOString().replace(/T/, ' ').replace(/\..+/, ''))+'][INFO] : '+_log)
+  console.log('[' + (new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '')) + '][INFO] : ' + _log)
 }
 
-Jeedom.log.error  = function(_log){
-  if(Jeedom.log.level > 40){
+Jeedom.log.error = function (_log) {
+  if (Jeedom.log.level > 40) {
     return;
   }
-  console.log('['+(new Date().toISOString().replace(/T/, ' ').replace(/\..+/, ''))+'][ERROR] : '+_log)
+  console.log('[' + (new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '')) + '][ERROR] : ' + _log)
 }
 
 /***************************PID*******************************/
 
-Jeedom.write_pid = function(_file){
+Jeedom.write_pid = function (_file) {
   var fs = require('fs');
-  fs.writeFile(_file, process.pid.toString(), function(err) {
-    if(err) {
-      Jeedom.log.error("Can't write pid file : "+err);
+  fs.writeFile(_file, process.pid.toString(), function (err) {
+    if (err) {
+      Jeedom.log.error("Can't write pid file : " + err);
       process.exit()
     }
   });
@@ -77,11 +77,11 @@ Jeedom.write_pid = function(_file){
 
 /***************************COM*******************************/
 
-Jeedom.isObject = function(item) {
+Jeedom.isObject = function (item) {
   return (item && typeof item === 'object' && !Array.isArray(item));
 }
 
-Jeedom.mergeDeep = function(target, ...sources) {
+Jeedom.mergeDeep = function (target, ...sources) {
   if (!sources.length) return target;
   const source = sources.shift();
   if (Jeedom.isObject(target) && Jeedom.isObject(source)) {
@@ -97,14 +97,14 @@ Jeedom.mergeDeep = function(target, ...sources) {
   return Jeedom.mergeDeep(target, ...sources);
 }
 
-Jeedom.com.config = function(_apikey,_callback,_cycle){
+Jeedom.com.config = function (_apikey, _callback, _cycle) {
   Jeedom.com.apikey = _apikey;
   Jeedom.com.callback = _callback;
   Jeedom.com.cycle = _cycle;
   Jeedom.com.changes = {};
-  if(Jeedom.com.cycle > 0){
-    setInterval(function() {
-      if(Object.keys(Jeedom.com.changes).length > 0){
+  if (Jeedom.com.cycle > 0) {
+    setInterval(function () {
+      if (Object.keys(Jeedom.com.changes).length > 0) {
         Jeedom.com.send_change_immediate(Jeedom.com.changes);
         Jeedom.com.changes = {};
       }
@@ -112,71 +112,71 @@ Jeedom.com.config = function(_apikey,_callback,_cycle){
   }
 }
 
-Jeedom.com.add_changes = function(_key,_value){
-  if (_key.indexOf('::') != -1){
+Jeedom.com.add_changes = function (_key, _value) {
+  if (_key.indexOf('::') != -1) {
     tmp_changes = {}
     var changes = _value
     var keys = _key.split('::').reverse();
-    for (var k in keys){
-      if (typeof tmp_changes[keys[k]] == 'undefined'){
+    for (var k in keys) {
+      if (typeof tmp_changes[keys[k]] == 'undefined') {
         tmp_changes[keys[k]] = {}
       }
       tmp_changes[keys[k]] = changes
       changes = tmp_changes
       tmp_changes = {}
     }
-    if (Jeedom.com.cycle <= 0){
+    if (Jeedom.com.cycle <= 0) {
       Jeedom.com.send_change_immediate(changes)
-    }else{
-      Jeedom.com.changes = Jeedom.mergeDeep(Jeedom.com.changes,changes)
+    } else {
+      Jeedom.com.changes = Jeedom.mergeDeep(Jeedom.com.changes, changes)
     }
-  } else{
-    if (Jeedom.com.cycle <= 0){
-      Jeedom.com.send_change_immediate({_key:_value})
-    }else{
+  } else {
+    if (Jeedom.com.cycle <= 0) {
+      Jeedom.com.send_change_immediate({ _key: _value })
+    } else {
       Jeedom.com.changes[_key] = _value
     }
   }
 }
 
-Jeedom.com.send_change_immediate = function(_changes){
-  Jeedom.log.debug('Send data to jeedom : '+JSON.stringify(_changes));
+Jeedom.com.send_change_immediate = function (_changes) {
+  Jeedom.log.debug('Send data to jeedom : ' + JSON.stringify(_changes));
   axios({
-    method : 'POST',
-    url:Jeedom.com.callback+'?apikey='+Jeedom.com.apikey,
+    method: 'POST',
+    url: Jeedom.com.callback + '?apikey=' + Jeedom.com.apikey,
     data: JSON.stringify(_changes)
   }).catch(function (error) {
-      Jeedom.log.error('Error on send to jeedom : '+JSON.stringify(error));
+    Jeedom.log.error('Error on send to jeedom : ' + JSON.stringify(error));
   })
 }
 
-Jeedom.com.test = function(){
+Jeedom.com.test = function () {
   axios({
-    method:'GET',
-    url:Jeedom.com.callback+'?apikey='+Jeedom.com.apikey
+    method: 'GET',
+    url: Jeedom.com.callback + '?apikey=' + Jeedom.com.apikey
   }).catch(function (error) {
-    Jeedom.log.error('Callback error.Please check your network configuration page : '+JSON.stringify(error));
+    Jeedom.log.error('Callback error.Please check your network configuration page : ' + JSON.stringify(error));
     process.exit();
   })
 }
 
 /***************************HTTP SERVER*******************************/
 
-Jeedom.http.config = function(_port,_apikey){
+Jeedom.http.config = function (_port, _apikey) {
   Jeedom.http.apikey = _apikey;
   Jeedom.http.app = express();
-  Jeedom.http.app.use(express.urlencoded({limit: '5mb'}));
-  Jeedom.http.app.use(express.json({limit: '5mb'}));
-  Jeedom.http.app.get('/', function(req, res) {
+  Jeedom.http.app.use(express.urlencoded({ limit: '5mb' }));
+  Jeedom.http.app.use(express.json({ limit: '5mb' }));
+  Jeedom.http.app.get('/', function (req, res) {
     res.setHeader('Content-Type', 'text/plain');
     res.status(404).send('Not found');
   });
-  Jeedom.http.app.listen(_port,'127.0.0.1', function() {
-    Jeedom.log.debug('HTTP listen on 127.0.0.1 port : '+_port+' started');
+  Jeedom.http.app.listen(_port, '127.0.0.1', function () {
+    Jeedom.log.debug('HTTP listen on 127.0.0.1 port : ' + _port + ' started');
   });
 }
 
-Jeedom.http.checkApikey = function(_req){
+Jeedom.http.checkApikey = function (_req) {
   return (_req.query.apikey === Jeedom.http.apikey)
 }
 
