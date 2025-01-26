@@ -63,6 +63,7 @@ try:
             logging.debug("Tentative de connection en tant que parent")
             client = pronotepy.ParentClient(pronote_url, login, password, ent)
             logging.info("Je suis connecté en tant que parent")
+
             client.parent = 1
             client.listenfant = []
             # Je retourne la liste d'enfants du compte parent
@@ -209,7 +210,6 @@ try:
             verifdossier(chemin_fichier)
             chemin_fichier = os.path.join(dossier + "/" + eqid, nom_fichier)
             logging.debug("voici les informations d'écriture : %s", chemin_fichier)
-
             # Lire le fichier pour récupérer les données existantes
             existing_data = {}
             if os.path.exists(chemin_fichier):
@@ -229,7 +229,7 @@ try:
                 # "Raw_login": client.info.raw_resource,
             }
             if client._selected_child:
-                logging.debug("Je recherche les enfants : ")
+                logging.debug("Je recherche l'enfants : ")
                 # Je retourne la liste d'enfants du compte parent
                 client.listenfant = []
                 for child in client.children:
@@ -241,12 +241,12 @@ try:
                 data["Liste_Enfant"] = json.dumps(
                     client.listenfant, separators=(",", ":")
                 )
+
                 data["Eleve"] = client._selected_child.name
                 data["Classe"] = client._selected_child.class_name
                 data["Etablissement"] = client._selected_child.establishment
                 # data["Raw_Parent"] = client._selected_child.raw_resource
                 data["Picture"] = client._selected_child.profile_picture.url
-
             else:
                 data["Eleve"] = client.info.name
                 data["Class_Name"] = client.info.class_name
@@ -369,9 +369,8 @@ try:
             Account = pronotepy.ParentClient.qrcode_login(
                 qr_code=Qrcode_data, pin=Pin, uuid="ProJote"
             )
-        if Account.logged_in:
-            logging.info("Client connecté")
-
+            if NomEnfant != "":
+                Account.set_child(NomEnfant)
             # Je crée le fichier pou le Token.
             writedataPronotepy(Account, "/var/www/html/plugins/ProJote/data", EqID)
 

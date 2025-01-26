@@ -31,21 +31,12 @@ function getParameterByName(name, url) {
 $('#Parent').change(function () {
   if ($(this).is(':checked')) {
     $('.form-group.listenfant').show(); // Affiche la liste des enfants
-    populateEnfantList(); // Met à jour la liste si nécessaire
+    //populateEnfantList(); // Met à jour la liste si nécessaire
   } else {
     $('.form-group.listenfant').hide(); // Cache la liste des enfants
-    $('#enfantList').empty(); // Vide la liste des enfants
+    //$('#enfantList').empty(); // Vide la liste des enfants
   }
 });
-
-// Initialiser l'état du champ listenfant au chargement de la page
-if ($('#Parent').is(':checked')) {
-  $('.form-group.listenfant').show(); // Affiche la liste au démarrage si Parent est coché
-  populateEnfantList(); // Remplit la liste si nécessaire
-} else {
-  $('.form-group.listenfant').hide(); // Cache la liste au démarrage
-  $('#enfantList').empty(); // Vide la liste au démarrage
-}
 
 function loadProJoteData(eqLogicId) {
   if (eqLogicId) {
@@ -74,6 +65,13 @@ function loadProJoteData(eqLogicId) {
 
             if (localPicture) {
               $('#local-picture').attr('src', localPicture).show();
+              // Je change le timestamp pour forcer la mise à joru de l'image.
+              if ($('#local-picture').length) {
+                var newSrc = localPicture + '?' + new Date().getTime();
+                $('#local-picture').attr('src', newSrc).show();
+              } else {
+                console.error('Element with id "local-picture" not found.');
+              }
             } else {
               $('#local-picture').hide();
             }
@@ -100,7 +98,7 @@ function loadProJoteData(eqLogicId) {
             $('#profile-picture').attr('src', ''); // Réinitialiser l'image
           });
 
-        populateEnfantList(eqLogicId); // Appeler la fonction pour peupler la liste des enfants
+        //populateEnfantList(eqLogicId); // Appeler la fonction pour peupler la liste des enfants
 
       })
       .fail(function () {
@@ -136,14 +134,12 @@ function populateEnfantList(eqLogicId) {
     console.log('ProJote.js:: Liste des enfants non affichée, aucune action.');
     return;
   }
-
   var filePath = '/plugins/ProJote/data/' + eqLogicId + '/enfant.ProJote.json.txt';
   $.getJSON(filePath, function (data) {
     if (data && data.Liste_Enfant) {
       var enfants = JSON.parse(data.Liste_Enfant); // Transformer la chaîne en tableau
       var $enfantList = $('#enfantList');
       $enfantList.empty(); // Vider la liste existante
-
       if (Array.isArray(enfants)) {
         enfants.forEach(function (enfant) {
           $enfantList.append('<option value="' + htmlspecialchars(enfant.trim()) + '">' + htmlspecialchars(enfant.trim()) + '</option>');
@@ -162,7 +158,6 @@ function populateEnfantList(eqLogicId) {
   });
 }
 
-
 function htmlspecialchars(str) {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }
@@ -173,7 +168,7 @@ $(document).ready(function () {
     var eqLogicId = $(this).attr('data-eqlogic_id'); // Récupérer l'ID de l'équipement depuis l'attribut data
     console.log('ProJote.js:: Detection du click pour ', eqLogicId);
     loadProJoteData(eqLogicId);
-    populateEnfantList(eqLogicId); // Appeler la fonction pour peupler la liste des enfants
+    //populateEnfantList(eqLogicId); // Appeler la fonction pour peupler la liste des enfants
   });
 
   // Vérifier si un équipement est déjà sélectionné lors du chargement de la page
@@ -181,7 +176,7 @@ $(document).ready(function () {
   if (eqLogicIdFromUrl) {
     console.log('ProJote.js:: Chargement des données pour ', eqLogicIdFromUrl);
     loadProJoteData(eqLogicIdFromUrl);
-    populateEnfantList(eqLogicIdFromUrl); // Appeler la fonction pour peupler la liste des enfants
+    //populateEnfantList(eqLogicIdFromUrl); // Appeler la fonction pour peupler la liste des enfants
   }
 
   // Gestion de l'affichage du champ listenfant en fonction de la case à cocher Parent
@@ -193,12 +188,6 @@ $(document).ready(function () {
     }
   });
 
-  // Initialiser l'état du champ listenfant en fonction de la case à cocher Parent
-  if ($('#Parent').is(':checked')) {
-    $('.form-group.listenfant').show();
-  } else {
-    $('.form-group.listenfant').hide();
-  }
 });
 /*********************************************************************
 * Ajoutez un gestionnaire d'événements change pour le champ "AUTH"
@@ -272,17 +261,12 @@ $('#bt_Validate').on('click', function () {
         setTimeout(function () {
           document.querySelector('.form-group.Login .fa-check').classList.add('hidden');
         }, 10000); // 10000 millisecondes = 10 secondes
-        if (typeof saveEqLogic === 'function') {
-          saveEqLogic();
-        } else {
-          console.error("La fonction saveEqLogic n'est pas définie. Vérifier dans la fichier PHP que la fonction plugin tempalte est bien incluse");
+        var eqLogicIdFromUrl = getParameterByName('id');
+        if (eqLogicIdFromUrl) {
+          console.log('ProJote.js:: Chargement des données pour ', eqLogicIdFromUrl);
+          loadProJoteData(eqLogicIdFromUrl);
         }
 
-        if (typeof saveEqLogic === 'function') {
-          saveEqLogic();
-        } else {
-          console.error("La fonction saveEqLogic n'est pas définie. Vérifier dans la fichier PHP que la fonction plugin tempalte est bien incluse");
-        }
 
       } else {
         // Masquer le sablier et afficher la croix
