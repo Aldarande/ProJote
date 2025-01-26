@@ -5,18 +5,14 @@ if (!isConnect('admin')) {
 
 // Déclaration des variables obligatoires
 $plugin = plugin::byId('ProJote');
-sendVarToJS('eqType', $plugin->getId());
-$eqLogics = eqLogic::byType($plugin->getId());
-define('FILE_PATH', '/var/www/html/plugins/ProJote/data/');
-function generateFormGroup($label, $input, $tooltip = '')
-{
-	return '<div class="form-group">
-                <label class="col-sm-4 control-label">' . $label . '
-                    <sup><i class="fas fa-question-circle tooltips" title="' . $tooltip . '"></i></sup>
-                </label>
-                <div class="col-sm-6">' . $input . '</div>
-            </div>';
+if ($plugin === null) {
+	error_log('Plugin ProJote non trouvé');
+	throw new Exception('{{Plugin ProJote non trouvé}}');
+} else {
+	error_log('Plugin ProJote trouvé : ' . print_r($plugin, true));
+	$eqLogics = eqLogic::byType($plugin->getId());
 }
+sendVarToJS('eqType', $plugin->getId());
 ?>
 
 <div class="row row-overflow">
@@ -219,7 +215,35 @@ function generateFormGroup($label, $input, $tooltip = '')
 								</div>
 								<div class="form-group listenfant" style="display:block;">
 									<label class="col-sm-4 control-label">{{Enfants }} <i class="fas fa-question-circle tooltips" title="{{Choisissez le nom de l'enfant}}"></i></label>
-									<select id="enfantList" class="col-sm-6 eqLogicAttr form-control" data-l1key="configuration" data-l2key="enfant"></select>
+									<select id="enfantList" class="col-sm-6 eqLogicAttr form-control" data-l1key="configuration" data-l2key="enfant">
+										<?php
+										$jsonFile = '/var/www/html/plugins/ProJote/data/' . $eqLogic->getId() . '/enfant.ProJote.json.txt';
+										if (file_exists($jsonFile)) {
+											$jsonContent = file_get_contents($jsonFile);
+											if ($jsonContent === false) {
+												echo '<option value="">Erreur de lecture du fichier JSON</option>';
+											} else {
+												$data = json_decode($jsonContent, true);
+												if ($data === null) {
+													echo '<option value="">Erreur de décodage du fichier JSON</option>';
+												} elseif (isset($data['Liste_Enfant'])) {
+													$listeEnfant = json_decode($data['Liste_Enfant'], true);
+													if (is_array($listeEnfant)) {
+														foreach ($listeEnfant as $enfant) {
+															echo '<option value="' . htmlspecialchars($enfant) . '">' . htmlspecialchars($enfant) . '</option>';
+														}
+													} else {
+														echo '<option value="">Liste d\'enfants vide ou incorrecte</option>';
+													}
+												} else {
+													echo '<option value="">Clé Liste_Enfant non trouvée dans le fichier JSON</option>';
+												}
+											}
+										} else {
+											echo '<option value="">Fichier JSON non trouvé</option>';
+										}
+										?>
+									</select>
 								</div>
 								<div class="form-group Validate">
 									<div class=" form-group">
@@ -307,35 +331,6 @@ function generateFormGroup($label, $input, $tooltip = '')
 									<textarea class="form-control eqLogicAttr autogrow" data-l1key="comment"></textarea>
 								</div>
 							</div>
-							<!-- Section du Token -->
-							<div style="display:none;" class="form-group Token">
-								<input type="hidden" id="eqLogicId" value="<?php echo $eqLogic->getId(); ?>">
-								<legend>
-									<i class="col-sm-1 fa fa-compress"></i> {{Token}}
-									<sup>
-										<i class="fas fa-question-circle tooltips" title="{{Il s'agit des informations servant à la connexion obtenue.}}"></i>
-									</sup>
-								</legend>
-								<div id="error-message" style="color: red; font-weight: bold;"></div>
-								<div class="form-group">
-									<label class="col-sm-2 control-label">{{Username}} :</label>
-									<div class="col-sm-10">
-										<span id="token-username" style="position:relative;top:+5px;left:+5px;" class="eqLogicAttr small-font"></span>
-									</div>
-								</div>
-								<div class="form-group">
-									<label class="col-sm-2 control-label">{{Token_Pass}} :</label>
-									<div class="col-sm-10 scrollable-container">
-										<span id="token-password" style="position:relative;top:+5px;left:+5px;display:inline-block;" class="eqLogicAttr  small-font scrollable-container"></span>
-									</div>
-								</div>
-								<div class="form-group">
-									<label class="eqLogicAttr col-sm-2 control-label">{{Token_URL}} :</label>
-									<div style="scrollbar-width: none;" class="col-sm-10 scrollable-container">
-										<a id="token-url" href="#" target="_blank" class="eqLogicAttr url-link small-font scrollable-container"></a>
-									</div>
-								</div>
-							</div>
 							<!-- Section du Eleve -->
 							<div class="form-group Eleve">
 								<legend><i class="col-sm-1 fas fa-info"></i> {{Elève}} </legend>
@@ -392,7 +387,6 @@ function generateFormGroup($label, $input, $tooltip = '')
 <?php include_file('3rdparty', 'jsQR', 'js', 'ProJote'); ?>
 <!-- Inclusion du fichier javascript du core - NE PAS MODIFIER NI SUPPRIMER -->
 <?php include_file('core', 'plugin.template', 'js'); ?>
-
 <style>
 	.small-font {
 		font-size: 12px;
