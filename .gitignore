@@ -7,3 +7,4 @@ resources/python_venv
 .venv/
 .cspell/
 plugin_info/ProJote_icon.png
+resources/ProJoted\jeedom/__pycache__
