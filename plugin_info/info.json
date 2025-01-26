@@ -13,7 +13,6 @@
 	"hasOwnDeamon": true,
 	"maxDependancyInstallTime": 10,
 	"changelog": "https://aldarande.github.io/ProJote/#language#/index.html#Version",
-	
 	"documentation": "https://aldarande.github.io/ProJote/#language#/index.html",
 	"language": [
 		"fr_FR"
