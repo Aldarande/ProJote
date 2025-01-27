@@ -577,9 +577,9 @@ def identites(clientinfo):
         data = {"identiteinfo": []}
         # Création du dictionnaire d'informations d'identité avec des valeurs non vides
         IdentityInfo = {
-            "Nom_Eleve": clientinfo.name,
-            "Nom_Classe": clientinfo.class_name,
-            "Etablissement": clientinfo.establishment,
+            "Nom_Eleve": clientinfo.info.name,
+            "Nom_Classe": clientinfo.info.class_name,
+            "Etablissement": clientinfo.info.establishment,
             # "Email": clientinfo.email,
         }
 
@@ -920,7 +920,6 @@ def read_socket():
                                 client._selected_child.profile_picture.url
                             )
                         # Si tout a marché je retourne True
-
                     else:
                         jsondata["eleve"] = identites(client.info)
                         if (
@@ -928,7 +927,6 @@ def read_socket():
                             and client.info.profile_picture.url
                         ):
                             jsondata["Photo"] = client.info.profile_picture.url
-
                     # J'ajoute l'emploi du temps
                     logging.info("Je récupére l'emploi du temps")
                     jsondata["emploi_du_temps"] = Emploidutemps(client)
