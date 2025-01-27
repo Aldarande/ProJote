@@ -920,7 +920,6 @@ def read_socket():
                                 client._selected_child.profile_picture.url
                             )
                         # Si tout a marché je retourne True
-
                     else:
                         jsondata["eleve"] = identites(client.info)
                         if (
@@ -928,7 +927,6 @@ def read_socket():
                             and client.info.profile_picture.url
                         ):
                             jsondata["Photo"] = client.info.profile_picture.url
-
                     # J'ajoute l'emploi du temps
                     logging.info("Je récupére l'emploi du temps")
                     jsondata["emploi_du_temps"] = Emploidutemps(client)
