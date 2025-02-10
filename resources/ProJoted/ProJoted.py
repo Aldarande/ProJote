@@ -577,9 +577,9 @@ def identites(clientinfo):
         data = {"identiteinfo": []}
         # Création du dictionnaire d'informations d'identité avec des valeurs non vides
         IdentityInfo = {
-            "Nom_Eleve": clientinfo.info.name,
-            "Nom_Classe": clientinfo.info.class_name,
-            "Etablissement": clientinfo.info.establishment,
+            "Nom_Eleve": clientinfo.name,
+            "Nom_Classe": clientinfo.class_name,
+            "Etablissement": clientinfo.establishment,
             # "Email": clientinfo.email,
         }
 
