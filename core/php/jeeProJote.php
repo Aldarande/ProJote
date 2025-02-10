@@ -39,6 +39,11 @@ try {
         }
     }
 
+    //Mise à jour du nom de l'élève
+    if (isset($result['eleve'][0]['Nom']) && $eqLogic->getCmd(null, 'Nom')) {
+        $eqLogic->checkAndUpdateCmd('Nom_Eleve', $result['eleve'][0]['Nom']);
+    }
+
     // saisie unitaire des valeurs
     // Met à jour la photo de l'élève si elle est présente
     if (isset($result['Photo']) && $eqLogic->getCmd(null, 'Picture')) {
