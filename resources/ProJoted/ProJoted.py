@@ -574,6 +574,7 @@ def ical(client):
 def identites(clientinfo):
     # Le but est de collecter toutes les informations concernant l'identité de l'élève
     try:
+
         data = {"identiteinfo": []}
         # Création du dictionnaire d'informations d'identité avec des valeurs non vides
         IdentityInfo = {
@@ -582,13 +583,9 @@ def identites(clientinfo):
             "Etablissement": clientinfo.establishment,
             # "Email": clientinfo.email,
         }
-
-        # Filtrer les valeurs vides du dictionnaire
-        IdentityInfo = {key: value for key, value in IdentityInfo.items() if value}
-
-        # Ajout du dictionnaire à la liste si des informations sont disponibles
-        if IdentityInfo:
-            data["identiteinfo"].append(IdentityInfo)
+        logging.debug("Nom de l''identité %s", clientinfo.name)
+        logging.debug("Nom de l''identité %s", clientinfo.class_name)
+        logging.debug("Nom de l''identité %s", clientinfo.establishment)
         """
             if hasattr(clientinfo, "email"):
                 identiteinfo["email"] = append(clientinfo.email)
@@ -629,7 +626,7 @@ def identites(clientinfo):
         else:
             identiteinfo["delegue"] = ""
         """
-        return data["IdentityInfo"]
+        return IdentityInfo
     except Exception as e:
         line_number = e.__traceback__.tb_lineno
         logging.info(
@@ -905,13 +902,18 @@ def read_socket():
                 else:
                     # là nous sommes vraiment en train de chercher les données du comptes
                     # Maintenant que je suis connecté je vais collecter les infos d'identités
-
-                    if (tokenconnected != "true") and (message["CptParent"] == "1"):
+                    logging.debug(
+                        "Validation Token %s",
+                        tokenconnected,
+                    )
+                    if (tokenconnected == "true") and (message["CptParent"] == "1"):
                         logging.debug(
                             "Le nom de l'élève %s", client._selected_child.name
                         )
+
                         jsondata["eleve"] = identites(client._selected_child)
-                        jsondata["listenfant"] = listenfant
+                        # Neutralisation car listenfant en erreur
+                        # jsondata["listenfant"] = listenfant
                         if (
                             client._selected_child.profile_picture
                             and client._selected_child.profile_picture.url
@@ -919,7 +921,6 @@ def read_socket():
                             jsondata["Photo"] = (
                                 client._selected_child.profile_picture.url
                             )
-                        # Si tout a marché je retourne True
                     else:
                         jsondata["eleve"] = identites(client.info)
                         if (

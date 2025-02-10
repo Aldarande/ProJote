@@ -40,8 +40,16 @@ try {
     }
 
     //Mise à jour du nom de l'élève
-    if (isset($result['eleve'][0]['Nom']) && $eqLogic->getCmd(null, 'Nom')) {
-        $eqLogic->checkAndUpdateCmd('Nom_Eleve', $result['eleve'][0]['Nom']);
+    if (isset($result['eleve']['Nom_Eleve']) && $eqLogic->getCmd(null, 'Nom_Eleve')) {
+        $eqLogic->checkAndUpdateCmd('Nom_Eleve', $result['eleve']['Nom_Eleve']);
+    }
+    //Mise à jour du nom de la classe
+    if (isset($result['eleve']['Nom_Classe']) && $eqLogic->getCmd(null, 'Nom_Classe')) {
+        $eqLogic->checkAndUpdateCmd('Nom_Classe', $result['eleve']['Nom_Classe']);
+    }
+    //Mise à jour du nom de l'etablissement'
+    if (isset($result['eleve']['Etablissement']) && $eqLogic->getCmd(null, 'Etablissement')) {
+        $eqLogic->checkAndUpdateCmd('Etablissement', $result['eleve']['Etablissement']);
     }
 
     // saisie unitaire des valeurs
