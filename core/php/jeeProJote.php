@@ -143,8 +143,8 @@ try {
         // Correspondance des clés JSON avec les commandes Jeedom
         $cmdMapping = [
             'pronote_url' => 'TokenUrl',
-            'username' => 'Username',
-            'password' => 'Token',
+            'username' => 'TokenUsername',
+            'password' => 'TokenPassword',
             'client_identifier' => 'TokenId'
         ];
         // Parcourt toutes les clés possibles
