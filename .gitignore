@@ -1,5 +1,6 @@
 # Ignore data directory
 data/
+Parle en francais/
 
 # Ignore Python virtual environment directory
 resources/python_venv
