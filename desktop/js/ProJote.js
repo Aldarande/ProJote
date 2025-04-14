@@ -363,11 +363,11 @@ function sendImageToServer(code, pin) {
         }, 10000); // 10000 millisecondes = 10 secondes
       }
       // Exécuter la fonction saveEqLogic après la validation du QR code
-      if (typeof saveEqLogic === 'function') {
-        saveEqLogic();
-      } else {
-        console.error("La fonction saveEqLogic n'est pas définie. Vérifier dans la fichier PHP que la fonction plugin tempalte est bien incluse");
-      }
+      /*       if (typeof saveEqLogic === 'function') {
+              saveEqLogic();
+            } else {
+              console.error("La fonction saveEqLogic n'est pas définie. Vérifier dans la fichier PHP que la fonction plugin tempalte est bien incluse");
+            } */
     }
   });
 }

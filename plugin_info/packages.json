@@ -12,7 +12,8 @@
     "autoslot": {},
     "cryptography": {},
     "pycryptodome": {
-      "version": "3.20.0"
+      "version": "3.20.0",
+      "reinstall": true
     },
     "requests": {},
     "beautifulsoup4": {},
