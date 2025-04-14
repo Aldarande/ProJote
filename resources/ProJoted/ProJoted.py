@@ -56,8 +56,10 @@ except ImportError as e:
 # https://gist.github.com/eoli3n/d6d862feb71102588867516f3b34fef1
 def my_encrypt(data, passphrase):
     """
+    # cSpell:disable
     Encrypt using AES-256-CBC with random/shared iv
     'passphrase' must be in hex, generate with 'openssl rand -hex 32'
+
     """
     try:
         key = binascii.unhexlify(passphrase)
@@ -68,9 +70,7 @@ def my_encrypt(data, passphrase):
             "ascii"
         )
         iv_64 = base64.b64encode(iv).decode("ascii")
-        json_data = {}
-        json_data["iv"] = iv_64
-        json_data["data"] = encrypted_64
+        json_data = {"iv": iv_64, "data": encrypted_64}
         clean = base64.b64encode(json.dumps(json_data).encode("ascii"))
     except Exception as e:
         logging.error("Cannot encrypt datas...")
@@ -86,20 +86,23 @@ def my_decrypt(data, passphrase):
     # https://stackoverflow.com/a/54166852/11061370
     """
     try:
-        unpad = lambda s: s[: -s[-1]]
-        key = binascii.unhexlify(passphrase)
-        encrypted = json.loads(base64.b64decode(data).decode("ascii"))
-        encrypted_data = base64.b64decode(encrypted["data"])
-        iv = base64.b64decode(encrypted["iv"])
-        cipher = AES.new(key, AES.MODE_CBC, iv)
-        decrypted = cipher.decrypt(encrypted_data)
-        clean = unpad(decrypted).decode("ascii").rstrip()
-        return clean
-
+        return _extracted_from_my_decrypt_(passphrase, data)
     except Exception as e:
         logging.error("Cannot decrypt datas...")
         logging.error(e)
         exit(1)
+
+
+# TODO Rename this here and in `my_decrypt`
+def _extracted_from_my_decrypt_(passphrase, data):
+    unpad = lambda s: s[: -s[-1]]
+    key = binascii.unhexlify(passphrase)
+    encrypted = json.loads(base64.b64decode(data).decode("ascii"))
+    encrypted_data = base64.b64decode(encrypted["data"])
+    iv = base64.b64decode(encrypted["iv"])
+    cipher = AES.new(key, AES.MODE_CBC, iv)
+    decrypted = cipher.decrypt(encrypted_data)
+    return unpad(decrypted).decode("ascii").rstrip()
 
 
 def verifdossier(chemin_dossier):
@@ -113,16 +116,12 @@ def verifdossier(chemin_dossier):
         bool: True si le dossier existe ou a été créé avec succès, False sinon.
     """
     try:
-        # Vérifier si le dossier existe
-        if not os.path.exists(chemin_dossier):
-            # Créer le dossier s'il n'existe pas
-            os.makedirs(chemin_dossier)
-            logging.info(f"Dossier créé avec succès : {chemin_dossier}")
-        else:
-            logging.info(f"Le dossier existe déjà : {chemin_dossier}")
+        # Créer le dossier s'il n'existe pas, sinon ne rien faire
+        os.makedirs(chemin_dossier, exist_ok=True)
+        logging.info(f"Dossier vérifié ou créé avec succès : {chemin_dossier}")
         return True
     except Exception as e:
-        logging.error(f"Erreur lors de la création du dossier : {e}")
+        logging.error(f"Erreur lors de la vérification ou création du dossier : {e}")
         return False
 
 
@@ -130,23 +129,42 @@ def class_for_name(module_name, class_name):
     try:
         # load the module, will raise ImportError if module cannot be loaded
         m = importlib.import_module(module_name)
-        # get the class, will raise AttributeError if class cannot be found
-        c = getattr(m, class_name)
-        return c
-    except:
+        return getattr(m, class_name)
+    except e:
+        # ModuleNotFoundError will be a subclass of OSError
+        logging.error("Error importing module %s: %s", module_name, e)
         return None
+
+
+def class_for_name(module_name, class_name):
+    try:
+        # Load the module, will raise ImportError if module cannot be loaded
+        m = importlib.import_module(module_name)
+        return getattr(m, class_name)
+    except ImportError as e:
+        logging.error("Error importing module %s: %s", module_name, e)
+    except AttributeError as e:
+        logging.error(
+            "Error getting class %s from module %s: %s", class_name, module_name, e
+        )
+    return None
 
 
 def cours_affiche_from_lesson(lesson_data):
     if lesson_data.detention == True:
         return "RETENUE"
-    if lesson_data.subject:
-        return lesson_data.subject.name
-    else:
-        return "autre"
+    return lesson_data.subject.name if lesson_data.subject else "autre"
 
 
 def build_cours_data(lesson_data):
+    """
+    Construit un dictionnaire contenant les informations formatées d'un cours.
+
+    Args:
+        lesson_data (object): Un objet représentant les données d'un cours.
+    Returns:
+        dict: Un dictionnaire contenant les informations formatées du cours.
+    """
     return {
         "id": lesson_data.id,
         "date_heure": lesson_data.start.strftime("%d/%m/%Y, %H:%M"),
@@ -193,6 +211,35 @@ def download_image(url, filepath):
         return False
 
 
+def replace_if_different_no_lib(file1_path, file2_path):
+    """
+    Remplace le contenu de file2 par celui de file1 si les deux fichiers sont différents,
+    sans utiliser de bibliothèques supplémentaires.
+
+    :param file1_path: Chemin du premier fichier JPEG.
+    :param file2_path: Chemin du second fichier JPEG.
+    """
+    # Lire le contenu des deux fichiers
+    with open(file1_path, "rb") as f1, open(file2_path, "rb") as f2:
+        content1 = f1.read()
+        content2 = f2.read()
+
+    # Comparer les contenus
+    if content1 != content2:
+        # Écrire le contenu de file1 dans file2
+        with open(file2_path, "wb") as f2:
+            f2.write(content1)
+        print(f"Le contenu de {file1_path} a été copié dans {file2_path}.")
+    else:
+        print(
+            f"Les fichiers {file1_path} et {file2_path} sont identiques. Aucune copie effectuée."
+        )
+
+
+# Exemple d'utilisation
+# replace_if_different_no_lib('chemin/vers/image1.jpg', 'chemin/vers/image2.jpg')
+
+
 def write_listenfant_to_file(listenfant, filename):
     try:
         with open(filename, "w") as file:
@@ -207,20 +254,21 @@ def write_listenfant_to_file(listenfant, filename):
 
 def Emploidutemps(client):
     try:
-        data = {}
         # Transformation Json des emplois du temps (J,J+1 et next)
         # Récupération  emploi du temps du jour
         lessons_today = client.lessons(datetime.date.today())
         lessons_today = sorted(lessons_today, key=lambda lesson: lesson.start)
-        data["edt_aujourdhui"] = []
-        data["edt_aujourdhui_debut"] = ""
-        data["edt_aujourdhui_fin"] = ""
+        data = {
+            "edt_aujourdhui": [],
+            "edt_aujourdhui_debut": "",
+            "edt_aujourdhui_fin": "",
+        }
         if lessons_today:
             for lesson in lessons_today:
                 index = lessons_today.index(lesson)
-                if not (
-                    lesson.start == lessons_today[index - 1].start
-                    and lesson.canceled == True
+                if (
+                    lesson.start != lessons_today[index - 1].start
+                    or lesson.canceled != True
                 ):
                     data["edt_aujourdhui"].append(build_cours_data(lesson))
                 if lesson.canceled == False and data["edt_aujourdhui_debut"] == "":
@@ -402,7 +450,7 @@ def devoirs(client):
                     "title": homework.subject.name,
                     "description": (
                         homework.description.encode("utf-8").decode("unicode_escape")
-                    )[0:longmax_devoir],
+                    )[:longmax_devoir],
                     "description_longue": (
                         homework.description.encode("utf-8").decode("unicode_escape")
                     ),
@@ -448,7 +496,7 @@ def devoirs(client):
                             homework.description.encode("utf-8").decode(
                                 "unicode_escape"
                             )
-                        )[0:longmax_devoir],
+                        )[:longmax_devoir],
                         "description_longue": (
                             homework.description.encode("utf-8").decode(
                                 "unicode_escape"
@@ -574,21 +622,18 @@ def ical(client):
 def identites(clientinfo):
     # Le but est de collecter toutes les informations concernant l'identité de l'élève
     try:
+
         data = {"identiteinfo": []}
         # Création du dictionnaire d'informations d'identité avec des valeurs non vides
         IdentityInfo = {
-            "Nom_Eleve": clientinfo.info.name,
-            "Nom_Classe": clientinfo.info.class_name,
-            "Etablissement": clientinfo.info.establishment,
+            "Nom_Eleve": clientinfo.name,
+            "Nom_Classe": clientinfo.class_name,
+            "Etablissement": clientinfo.establishment,
             # "Email": clientinfo.email,
         }
-
-        # Filtrer les valeurs vides du dictionnaire
-        IdentityInfo = {key: value for key, value in IdentityInfo.items() if value}
-
-        # Ajout du dictionnaire à la liste si des informations sont disponibles
-        if IdentityInfo:
-            data["identiteinfo"].append(IdentityInfo)
+        logging.debug("Nom de l''identité nom  %s", clientinfo.name)
+        logging.debug("Nom de l''identité Classe %s", clientinfo.class_name)
+        logging.debug("Nom de l''identité Etablissement %s", clientinfo.establishment)
         """
             if hasattr(clientinfo, "email"):
                 identiteinfo["email"] = append(clientinfo.email)
@@ -629,7 +674,7 @@ def identites(clientinfo):
         else:
             identiteinfo["delegue"] = ""
         """
-        return data["IdentityInfo"]
+        return IdentityInfo
     except Exception as e:
         line_number = e.__traceback__.tb_lineno
         logging.info(
@@ -665,7 +710,7 @@ def RenewToken(client):
         # Récupération des tokens
         data = {"Token": []}
         data["Token"] = client.export_credentials()
-
+        logging.debug("Les tokens sont : %s", data["Token"])
         return data["Token"]
     except Exception as e:
         logging.error("Un erreur est retourné sur le traitement des tokens: %s", e)
@@ -849,8 +894,7 @@ def read_socket():
                         password=message["password"],
                         ent=ent,
                     )
-                # Maintenant que connecté je vais chercher les informations de Token pour la prochaine fois
-
+                # Maintenant que je suis connecté je vais chercher les informations de Token pour la prochaine fois
                 client = GetTokenFromLogin(client)
 
                 # J'écris le fichier avec les infos de base
@@ -905,13 +949,19 @@ def read_socket():
                 else:
                     # là nous sommes vraiment en train de chercher les données du comptes
                     # Maintenant que je suis connecté je vais collecter les infos d'identités
-
-                    if (tokenconnected != "true") and (message["CptParent"] == "1"):
+                    logging.debug(
+                        "Validation Token %s",
+                        tokenconnected,
+                        #
+                    )
+                    if (tokenconnected == "true") and (message["CptParent"] == "1"):
                         logging.debug(
                             "Le nom de l'élève %s", client._selected_child.name
                         )
+
                         jsondata["eleve"] = identites(client._selected_child)
-                        jsondata["listenfant"] = listenfant
+                        # Neutralisation car listenfant en erreur
+                        # jsondata["listenfant"] = listenfant
                         if (
                             client._selected_child.profile_picture
                             and client._selected_child.profile_picture.url
@@ -919,7 +969,6 @@ def read_socket():
                             jsondata["Photo"] = (
                                 client._selected_child.profile_picture.url
                             )
-                        # Si tout a marché je retourne True
                     else:
                         jsondata["eleve"] = identites(client.info)
                         if (
