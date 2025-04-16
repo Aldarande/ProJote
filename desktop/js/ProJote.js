@@ -13,6 +13,10 @@
 * You should have received a copy of the GNU General Public License
 * along with Jeedom. If not, see <http://www.gnu.org/licenses/>.
 */
+/*********************************************************************
+* Affiche les informations du Token si le niveau de log du plugin est à debug
+*********************************************************************/
+
 
 /*********************************************************************
 * Remplit le champs select avec la liste des enfants de l'équipement
@@ -31,7 +35,7 @@ function getParameterByName(name, url) {
 $('#Parent').change(function () {
   if ($(this).is(':checked')) {
     $('.form-group.listenfant').show(); // Affiche la liste des enfants
-    //populateEnfantList(); // Met à jour la liste si nécessaire
+    //populateEnfantList(eqLogicId); // Met à jour la liste si nécessaire
   } else {
     $('.form-group.listenfant').hide(); // Cache la liste des enfants
     //$('#enfantList').empty(); // Vide la liste des enfants
@@ -40,6 +44,7 @@ $('#Parent').change(function () {
 
 function loadProJoteData(eqLogicId) {
   if (eqLogicId) {
+
     var filePath = '/plugins/ProJote/data/' + eqLogicId + '/enfant.ProJote.json.txt';
     var profilePicturePath = '/plugins/ProJote/data/' + eqLogicId + '/profile_picture.jpg';
     console.log('ProJote.js:: emplacement du Fichier ' + filePath);
@@ -47,22 +52,29 @@ function loadProJoteData(eqLogicId) {
     $.get(filePath)
       .done(function () {
         // Le fichier existe, continuer à récupérer les données
+        data = "";
         $.getJSON(filePath, function (data) {
           console.log('ProJote.js:: données récupérées', data);
           if (data) {
-            var token = data.Token || null;
-
-
             // Afficher les informations de l'élève
-            var eleve = data.Eleve || 'Inconnu';
-            var classe = data.Classe || 'Inconnue';
-            var etablissement = data.Etablissement || 'Inconnu';
             var localPicture = data.Local_Picture ? data.Local_Picture.replace('/var/www/html', '') : '';
 
-            $('#eleve-name').text(eleve);
-            $('#eleve-classe').text(classe);
-            $('#eleve-etablissement').text(etablissement);
-
+            if (data.Eleve && data.Eleve.trim() !== '') {
+              $('#eleve-name').text(data.Eleve);
+            } else {
+              $('#eleve-name').text('Non trouvé');
+            }
+            if (data.Classe) {
+              $('#eleve-classe').text(data.Classe);
+            } else {
+              $('#eleve-classe').text('Non trouvé');
+            }
+            if (data.Etablissement) {
+              $('#eleve-etablissement').text(data.Etablissement);
+            } else {
+              $('#eleve-etablissement').text('Non trouvé');
+            }
+            // Afficher l'image locale si elle existe
             if (localPicture) {
               $('#local-picture').attr('src', localPicture).show();
               // Je change le timestamp pour forcer la mise à joru de l'image.
@@ -75,8 +87,16 @@ function loadProJoteData(eqLogicId) {
             } else {
               $('#local-picture').hide();
             }
-
             $('.form-group.Eleve').show(); // Afficher la section Elève
+            // Afficher la section TOKEN
+            if (LogLevel === 'debug') {
+              $('#Token_pronote_url').text(data.Token.pronote_url);
+              $('#Token_username').text(data.Token.username);
+              $('#Token_password').text(data.Token.password);
+              $('#Token_client_identifier').text(data.Token.client_identifier);
+              $('.form-group.Token').show();
+            }
+
           } else {
             $('#error-message').text('Erreur : Le fichier JSON est invalide.');
             resetFields();
@@ -98,7 +118,7 @@ function loadProJoteData(eqLogicId) {
             $('#profile-picture').attr('src', ''); // Réinitialiser l'image
           });
 
-        //populateEnfantList(eqLogicId); // Appeler la fonction pour peupler la liste des enfants
+        populateEnfantList(eqLogicId); // Appeler la fonction pour peupler la liste des enfants
 
       })
       .fail(function () {
@@ -115,6 +135,7 @@ function loadProJoteData(eqLogicId) {
     $('.form-group.Token').hide(); // Masquer la section TOKEN
     $('.form-group.Eleve').hide(); // Masquer la section Elève
   }
+
 }
 
 function resetFields() {
@@ -130,20 +151,35 @@ function resetFields() {
 }
 
 function populateEnfantList(eqLogicId) {
+  console.log('ProJote.js:: populateEnfantList appelée avec eqLogicId:', eqLogicId);
   if (!$('.form-group.listenfant').is(':visible')) {
     console.log('ProJote.js:: Liste des enfants non affichée, aucune action.');
     return;
   }
+  console.log('ProJote.js:: Liste des enfants affichée, récupération des enfants pour ID:', eqLogicId);
+
   var filePath = '/plugins/ProJote/data/' + eqLogicId + '/enfant.ProJote.json.txt';
   $.getJSON(filePath, function (data) {
     if (data && data.Liste_Enfant) {
       var enfants = JSON.parse(data.Liste_Enfant); // Transformer la chaîne en tableau
       var $enfantList = $('#enfantList');
       $enfantList.empty(); // Vider la liste existante
+      var eleveName = $('#eleve-name').text().trim();
+      var found = false;
       if (Array.isArray(enfants)) {
         enfants.forEach(function (enfant) {
-          $enfantList.append('<option value="' + htmlspecialchars(enfant.trim()) + '">' + htmlspecialchars(enfant.trim()) + '</option>');
+          var enfantTrim = enfant.trim();
+          var selected = '';
+          if (enfantTrim === eleveName) {
+            selected = ' selected';
+            found = true;
+          }
+          $enfantList.append('<option value="' + htmlspecialchars(enfantTrim) + '"' + selected + '>' + htmlspecialchars(enfantTrim) + '</option>');
         });
+        // Si aucun enfant ne correspond, sélectionner le premier par défaut
+        if (!found && enfants.length > 0) {
+          $enfantList.find('option:first').prop('selected', true);
+        }
       } else {
         $enfantList.append('<option value="">Aucun enfant trouvé</option>');
       }
@@ -153,7 +189,7 @@ function populateEnfantList(eqLogicId) {
     }
   }).fail(function (jqXHR, textStatus, errorThrown) {
     console.log('ProJote.js:: erreur lors de la récupération de la liste des enfants', textStatus, errorThrown);
-    $('#error-message').text('Erreur : Le fichier n\'existe pas à l\'emplacement spécifié.');
+    $('#error-message').text('Erreur : Le fichier n\'existe pas à l\'emplacement spécifié : ' + filePath);
     $('#enfantList').empty();
   });
 }
@@ -225,8 +261,15 @@ $('#bt_Validate').on('click', function () {
   document.querySelector('.form-group.Login .fa-check').classList.add('hidden');
   document.querySelector('.form-group.Login .fa-times').classList.add('hidden');
 
-  // Transformer en un tableau d'objets
 
+  //on valide si Url contient la chaine de caractéres parent.html si oui il faut cocher la case type="checkbox" id="Parent"
+  if (Url.includes('parent.html')) {
+    console.log('ProJote.js:: URL contient parent.html');
+    // Si l'URL contient "parent.html", cochez la case "Parent" <input type="checkbox" id="Parent" class="eqLogicAttr form-control" data-l1key="configuration" data-l2key="CptParent">
+    document.querySelector('#Parent').checked = true;
+    // Affiche le form-group listenfant en enlevant le style="display:block;"
+    $('.form-group.listenfant').show();
+  }
   // Exécution de la requête AJAX
   $.ajax({
     type: "POST", // Méthode de transmission des données au fichier php
@@ -266,8 +309,6 @@ $('#bt_Validate').on('click', function () {
           console.log('ProJote.js:: Chargement des données pour ', eqLogicIdFromUrl);
           loadProJoteData(eqLogicIdFromUrl);
         }
-
-
       } else {
         // Masquer le sablier et afficher la croix
         document.querySelector('.form-group.Login .fa-hourglass-half').classList.add('hidden');
