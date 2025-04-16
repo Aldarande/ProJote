@@ -255,7 +255,7 @@ class ProJote extends eqLogic
       "TokenUsername" => array('Token Username', 'info', 'string', "", 0, 0, "GENERIC_INFO", 'core::badge', 'core::badge'),
       "TokenPassword" => array('Token Password', 'info', 'string', "", 0, 0, "GENERIC_INFO", 'core::badge', 'core::badge'),
       "TokenUrl" => array('Token_Url', 'info', 'string', "", 0, 0, "GENERIC_INFO", 'core::badge', 'core::badge'),
-      "TokenUrl" => array('Token_Id', 'info', 'string', "", 0, 0, "GENERIC_INFO", 'core::badge', 'core::badge'),
+      "TokenId" => array('Token_Id', 'info', 'string', "", 0, 0, "GENERIC_INFO", 'core::badge', 'core::badge'),
       "Nom_Eleve" => array("Nom de l'éleve", 'info', 'string', "", 0, 1, "GENERIC_INFO", 'core::badge', 'core::badge'),
       "Nom_Classe" => array('Nom de la classe', 'info', 'string', "", 0, 1, "GENERIC_INFO", 'core::badge', 'core::badge'),
       "Etablissement" => array('Etablissement', 'info', 'string', "", 0, 1, "GENERIC_INFO", 'core::badge', 'core::badge'),
@@ -479,7 +479,7 @@ class ProJote extends eqLogic
     } else {
       log::add('ProJote', 'debug', 'Class ReadEnfantToken:: Clé JSON non trouvée : password');
     }
-    log::add('ProJote', 'debug', 'Class ReadEnfantToken:: Clé TokenPassword : ' . $TokenData['client_identifier']);
+    log::add('ProJote', 'debug', 'Class ReadEnfantToken:: Clé TokenId : ' . $TokenData['client_identifier']);
     if (isset($TokenData['client_identifier']) && $eqLogic->getCmd(null, 'TokenId')) {
       $eqLogic->checkAndUpdateCmd('TokenId', $TokenData['client_identifier']);
     } else {

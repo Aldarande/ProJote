@@ -33,6 +33,7 @@ try:
             return None
 
     def Connectparent(pronote_url, login, password, ent, enfant):
+        client = None  # Initialisation de la variable client
         # Je valide que j'ai les bonnes informations pour me connecter en tant que Parent
         try:
             if login == "":
@@ -206,6 +207,7 @@ try:
             # nom_fichier = f"{client.name}.ProJote"
             nom_fichier = "enfant.ProJote.json.txt"
             # nom_fichier = nom_fichier.replace(" ", "")
+            eqid = str(eqid)
             chemin_fichier = dossier + "/" + eqid
             verifdossier(chemin_fichier)
             chemin_fichier = os.path.join(dossier + "/" + eqid, nom_fichier)
@@ -307,6 +309,8 @@ try:
             Password = args.Password
         if args.Ent:
             Ent = args.Ent
+        else:
+            Ent = None
         if args.Enfant:
             NomEnfant = args.Enfant
         else:
@@ -319,7 +323,7 @@ try:
         jeedom_utils.set_log_level(_log_level)
 
         # Je qualifie l'ENT
-        if Ent != "Inconnu":
+        if Ent != "Inconnu" or None:
             ClassEnt = class_for_name("pronotepy.ent", Ent)
         else:
             ClassEnt = ""
@@ -364,7 +368,6 @@ try:
             Account = pronotepy.Client.qrcode_login(
                 qr_code=Qrcode_data, pin=Pin, uuid="ProJote"
             )
-
         else:
             Account = pronotepy.ParentClient.qrcode_login(
                 qr_code=Qrcode_data, pin=Pin, uuid="ProJote"

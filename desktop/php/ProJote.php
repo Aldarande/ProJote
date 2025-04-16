@@ -13,6 +13,9 @@ if ($plugin === null) {
 	$eqLogics = eqLogic::byType($plugin->getId());
 }
 sendVarToJS('eqType', $plugin->getId());
+sendVarToJS('LogLevel', log::convertLogLevel(log::getLogLevel($plugin->getId())));
+sendVarToJS('eqLogicId', $eqLogic);
+
 ?>
 
 <div class="row row-overflow">
@@ -210,41 +213,13 @@ sendVarToJS('eqType', $plugin->getId());
 									<input type="password" class=" col-sm-6 eqLogicAttr form-control inputPassword" data-l1key="configuration" data-l2key="password">
 								</div>
 								<div class="form-group">
-									<label class="col-sm-4 control-label">{{Url }}<i class="fas fa-question-circle tooltips" title="{{Renseignez l'adresse web pour vous connecter à Pronote}}"></i></label>
+									<label class="col-sm-4 control-label">{{Url}}<i class="fas fa-question-circle tooltips" title="{{Renseignez l'adresse web pour vous connecter à Pronote}}"></i></label>
 									<input type="text" class="col-sm-6 eqLogicAttr form-control" data-l1key="configuration" data-l2key="url">
 								</div>
-								<div class="form-group listenfant" style="display:block;">
-									<label class="col-sm-4 control-label">{{Enfants }} <i class="fas fa-question-circle tooltips" title="{{Choisissez le nom de l'enfant}}"></i></label>
+								<div class="form-group listenfant" style="display:none;">
+									<label class="col-sm-4 control-label">{{Enfants}} <i class="fas fa-question-circle tooltips" title="{{Choisissez le nom de l'enfant}}"></i></label>
 									<select id="enfantList" class="col-sm-6 eqLogicAttr form-control" data-l1key="configuration" data-l2key="enfant">
-										<?php
-										if ($eqLogics != null) {
-											$jsonFile = __DIR__ . '/../../data/' . $eqLogic->getId() . '/enfant.ProJote.json.txt';
-											if (file_exists($jsonFile)) {
-												$jsonContent = file_get_contents($jsonFile);
-												if ($jsonContent === false) {
-													echo '<option value="">Erreur de lecture du fichier JSON</option>';
-												} else {
-													$data = json_decode($jsonContent, true);
-													if ($data === null) {
-														echo '<option value="">Erreur de décodage du fichier JSON</option>';
-													} elseif (isset($data['Liste_Enfant'])) {
-														$listeEnfant = json_decode($data['Liste_Enfant'], true);
-														if (is_array($listeEnfant)) {
-															foreach ($listeEnfant as $enfant) {
-																echo '<option value="' . htmlspecialchars($enfant) . '">' . htmlspecialchars($enfant) . '</option>';
-															}
-														} else {
-															echo '<option value="">Liste d\'enfants vide ou incorrecte</option>';
-														}
-													} else {
-														echo '<option value="">Clé Liste_Enfant non trouvée dans le fichier JSON</option>';
-													}
-												}
-											} else {
-												echo '<option value="">Fichier JSON non trouvé</option>';
-											}
-										}
-										?>
+
 									</select>
 								</div>
 								<div class="form-group Validate">
@@ -335,24 +310,54 @@ sendVarToJS('eqType', $plugin->getId());
 							</div>
 							<!-- Section du Eleve -->
 							<div class="form-group Eleve">
-								<legend><i class="col-sm-1 fas fa-info"></i> {{Elève}} </legend>
-								<div class="form-group">
-									<label class="col-sm-2 control-label">{{Nom de l'élève}} :</label>
-									<span id="eleve-name"></span>
-								</div>
-								<div class="form-group">
-									<label class="col-sm-2 control-label">{{Classe}} :</label>
-									<span id="eleve-classe"></span>
-								</div>
-								<div class="form-group">
-									<label class="col-sm-2 control-label">{{Établissement}} :</label>
-									<span id="eleve-etablissement"></span>
-								</div>
-								<div class="form-group">
-									<label class="col-sm-2 control-label">{{Photo de l'élève}} : </label>
-									<div class="text-center">
-										<img id="local-picture" src="" alt="Photo de l'élève" style="max-width: 200px; max-height: 200px; display: none;">
+								<legend><i class="col-sm-1 fas fa-address-card"></i> {{Elève}} </legend>
+								<div class="row">
+									<div class="col-sm-8">
+										<div class="form-group">
+											<label class="col-sm-4 control-label">{{Nom de l'élève}} :</label>
+											<div class="col-sm-8">
+												<span id="eleve-name"></span>
+											</div>
+										</div>
+										<div class="form-group">
+											<label class="col-sm-4 control-label">{{Classe}} :</label>
+											<div class="col-sm-8">
+												<span id="eleve-classe"></span>
+											</div>
+										</div>
+										<div class="form-group">
+											<label class="col-sm-4 control-label">{{Établissement}} :</label>
+											<div class="col-sm-8">
+												<span id="eleve-etablissement"></span>
+											</div>
+										</div>
 									</div>
+									<div class="col-sm-4 text-center">
+										<label class="control-label">{{Photo de l'élève}} :</label>
+										<div>
+											<img id="local-picture" src="" alt="Photo de l'élève" style="max-width: 200px; max-height: 200px; display: none;">
+										</div>
+									</div>
+								</div>
+							</div>
+							<div class="form-group Token" style="display: none;">
+								<!-- Section du Token -->
+								<legend><i class="col-sm-1 fas fa-file-code"></i> {{Token Info}} </legend>
+								<div class="form-group">
+									<label class="col-sm-2 control-label">{{pronote_url}} :</label>
+									<a id="Token_pronote_url" class="col-sm-10 eqLogicAttr autogrow" data-l1key="configuration" data-l2key="Token_pronote_url"></a>
+								</div>
+								<div class="form-group">
+									<label class="col-sm-2 control-label">{{username}} :</label>
+									<span id="Token_username" class="col-sm-10 eqLogicAttr autogrow" data-l1key="configuration" data-l2key="Token_username"></span>
+								</div>
+								<div class=" form-group">
+									<label class="col-sm-2 control-label">{{password}} :</label>
+									<span id="Token_password" class="col-sm-10 eqLogicAttr autogrow" data-l1key="configuration" data-l2key="Token_password"></span>
+								</div>
+								<div class="form-group">
+									<label class="col-sm-2 control-label">{{client_identifier}} :</label>
+									<span id="Token_client_identifier" class="col-sm-10 eqLogicAttr autogrow" data-l1key="configuration" data-l2key="Token_client_identifier"></span>
 								</div>
 							</div>
 						</div>
