@@ -417,7 +417,7 @@ def notes(client):
                     "cours": grade.subject.name,
                     "note": grade.grade,
                     "sur": grade.out_of,
-                    "note_sur": grade.grade + "\u00A0/\u00A0" + grade.out_of,
+                    "note_sur": grade.grade + "\u00aa/\u00a0" + grade.out_of,
                     "coeff": grade.coefficient,
                     "moyenne_classe": grade.average,
                     "max": grade.max,
@@ -688,15 +688,15 @@ def GetTokenFromLogin(Account):
     qrcode_data = Account.request_qr_code_data("4321")
     # Étape 1 : Extraire la partie de l'URL jusqu'à `/pronote/`
     ## We need to change url because
-    base_url = qrcode_data["url"].split("?login=true")[0]
+    # base_url = qrcode_data["url"].split("?login=true")[0]
     # base_url = qrcode_data["url"].split("/pronote/")[0] + "/pronote/"
 
     # Étape 2 : Extraire la dernière partie de l'URL qui commence par `mobile.`
 
-    last_part = base_url.split("parent.html")[0] + "mobile.parent.html"
+    # last_part = base_url.split("parent.html")[0] + "mobile.parent.html"
 
-    qrcode_data["url"] = last_part
-    logging.debug("Les info du QRCode : %s", qrcode_data)
+    # qrcode_data["url"] = last_part
+    logging.debug("Les info du QRCode : %s", qrcode_data["url"])
     Token_data = Account.qrcode_login(
         qrcode_data,
         "4321",
@@ -886,6 +886,7 @@ def read_socket():
                         ent=ent,
                         enfant=message["enfant"],
                     )
+                    message["CptParent"] == "1"
                 else:
                     logging.info("Je me connecte en tant qu'élève")
                     client = Connect(
@@ -896,6 +897,9 @@ def read_socket():
                     )
                 # Maintenant que je suis connecté je vais chercher les informations de Token pour la prochaine fois
                 client = GetTokenFromLogin(client)
+                # Teste si l'url contient parent.html pour définir le compte parent
+                if "parent.html" in message["url"]:
+                    message["CptParent"] == "1"
 
                 # J'écris le fichier avec les infos de base
                 logging.debug("Je vais tester si nous sommes loggué")
@@ -946,66 +950,61 @@ def read_socket():
                                 "Je viens de mettre à jours le fichier : %s",
                                 dossier,
                             )
-                else:
-                    # là nous sommes vraiment en train de chercher les données du comptes
-                    # Maintenant que je suis connecté je vais collecter les infos d'identités
-                    logging.debug(
-                        "Validation Token %s",
-                        tokenconnected,
-                        #
-                    )
-                    if (tokenconnected == "true") and (message["CptParent"] == "1"):
-                        logging.debug(
-                            "Le nom de l'élève %s", client._selected_child.name
-                        )
 
-                        jsondata["eleve"] = identites(client._selected_child)
-                        # Neutralisation car listenfant en erreur
-                        # jsondata["listenfant"] = listenfant
-                        if (
-                            client._selected_child.profile_picture
-                            and client._selected_child.profile_picture.url
-                        ):
-                            jsondata["Photo"] = (
-                                client._selected_child.profile_picture.url
-                            )
-                    else:
-                        jsondata["eleve"] = identites(client.info)
-                        if (
-                            client.info.profile_picture
-                            and client.info.profile_picture.url
-                        ):
-                            jsondata["Photo"] = client.info.profile_picture.url
-                    # J'ajoute l'emploi du temps
-                    logging.info("Je récupére l'emploi du temps")
-                    jsondata["emploi_du_temps"] = Emploidutemps(client)
-                    # J'ajoute les notes
-                    logging.info("Je récupére les notes")
-                    jsondata["notes"] = notes(client)
-                    # J'ajoute les devoirs
-                    logging.info("Je récupére les devoirs")
-                    jsondata["devoirs"] = devoirs(client)
-                    # j'ajoute les menus
-                    logging.info("Je récupére les menus")
-                    jsondata["Menus"] = menus(client)
-                    # J'ajoute les Messages
-                    logging.info("Je récupére les notifications")
-                    jsondata["Notifications"] = notifications(client)
-                    # j'ajoutes les absences
-                    logging.info("Je récupére les absences")
-                    jsondata["Absences"] = absences(client)
-                    # J'ajoutes les punitions
-                    logging.info("Je récupére les punitions")
-                    jsondata["Punissions"] = punissions(client)
-                    # J'ajoutes l'ICAL
-                    logging.info("Je récupére l'ICAL")
-                    jsondata["Ical"] = ical(client)
-                    logging.info("Je renew le Token")
-                    jsondata["Token"] = RenewToken(client)
-                    # J'envoie les données à Jeedom
-                    logging.debug("Données à envoyer : %s", json.dumps(jsondata))
-                    jeedom_com.send_change_immediate(jsondata)
-                    logging.info("Fin de récupération d'info depuis Projoted.py")
+                # là nous sommes vraiment en train de chercher les données du comptes
+                # Maintenant que je suis connecté je vais collecter les infos d'identités
+                logging.debug(
+                    "Validation Token %s",
+                    tokenconnected,
+                    #
+                )
+                if (tokenconnected == "true") and (
+                    "parent.html" in message["TokenUrl"]
+                ):
+                    logging.debug("Le nom de l'élève %s", client._selected_child.name)
+
+                    jsondata["eleve"] = identites(client._selected_child)
+                    # Neutralisation car listenfant en erreur
+                    # jsondata["listenfant"] = listenfant
+                    if (
+                        client._selected_child.profile_picture
+                        and client._selected_child.profile_picture.url
+                    ):
+                        jsondata["Photo"] = client._selected_child.profile_picture.url
+                else:
+                    jsondata["eleve"] = identites(client.info)
+                    if client.info.profile_picture and client.info.profile_picture.url:
+                        jsondata["Photo"] = client.info.profile_picture.url
+                # J'ajoute l'emploi du temps
+                logging.info("Je récupére l'emploi du temps")
+                jsondata["emploi_du_temps"] = Emploidutemps(client)
+                # J'ajoute les notes
+                logging.info("Je récupére les notes")
+                jsondata["notes"] = notes(client)
+                # J'ajoute les devoirs
+                logging.info("Je récupére les devoirs")
+                jsondata["devoirs"] = devoirs(client)
+                # j'ajoute les menus
+                logging.info("Je récupére les menus")
+                jsondata["Menus"] = menus(client)
+                # J'ajoute les Messages
+                logging.info("Je récupére les notifications")
+                jsondata["Notifications"] = notifications(client)
+                # j'ajoutes les absences
+                logging.info("Je récupére les absences")
+                jsondata["Absences"] = absences(client)
+                # J'ajoutes les punitions
+                logging.info("Je récupére les punitions")
+                jsondata["Punissions"] = punissions(client)
+                # J'ajoutes l'ICAL
+                logging.info("Je récupére l'ICAL")
+                jsondata["Ical"] = ical(client)
+                logging.info("Je renew le Token")
+                jsondata["Token"] = RenewToken(client)
+                # J'envoie les données à Jeedom
+                logging.debug("Données à envoyer : %s", json.dumps(jsondata))
+                jeedom_com.send_change_immediate(jsondata)
+                logging.info("Fin de récupération d'info depuis Projoted.py")
 
             else:
                 echo = "Le compte n'est pas loggué"
