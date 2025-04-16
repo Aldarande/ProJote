@@ -1,33 +1,28 @@
 {
 	"id": "ProJote",
 	"name": "Plugin Pronote",
-<<<<<<< HEAD
 	"pluginVersion": "0.5.6",
-=======
-	"pluginVersion": "0.5.4",
->>>>>>> origin/main
-	"description": {
-		"fr_FR": "Plugin destinée à récupérer les inforamtions de Pronote"
-	},
-	"licence": "AGPL",
-	"author": "Aldarande",
-	"require": "4.3",
-	"category": "organization",
-	"hasDependency": true,
-	"hasOwnDeamon": true,
-	"maxDependancyInstallTime": 10,
-	"changelog": "https://aldarande.github.io/ProJote/#language#/index.html#Version",
-	"documentation": "https://aldarande.github.io/ProJote/#language#/index.html",
-	"language": [
-		"fr_FR"
-	],
-	"compatibility": [
-		"smart",
-		"luna",
-		"atlas",
-		"rpi",
-		"docker",
-		"diy",
-		"mobile"
-	]
+	"fr_FR": "Plugin destinée à récupérer les inforamtions de Pronote"
+},
+"licence": "AGPL",
+"author": "Aldarande",
+"require": "4.3",
+"category": "organization",
+"hasDependency": true,
+"hasOwnDeamon": true,
+"maxDependancyInstallTime": 10,
+"changelog": "https://aldarande.github.io/ProJote/#language#/index.html#Version",
+"documentation": "https://aldarande.github.io/ProJote/#language#/index.html",
+"language": [
+	"fr_FR"
+],
+"compatibility": [
+	"smart",
+	"luna",
+	"atlas",
+	"rpi",
+	"docker",
+	"diy",
+	"mobile"
+]
 }
