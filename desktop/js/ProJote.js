@@ -392,6 +392,11 @@ function sendImageToServer(code, pin) {
         setTimeout(function () {
           document.querySelector('.form-group.QRCode .fa-check').classList.add('hidden');
         }, 10000); // 10000 millisecondes = 10 secondes
+        var eqLogicIdFromUrl = getParameterByName('id');
+        if (eqLogicIdFromUrl) {
+          console.log('ProJote.js:: Chargement des données pour ', eqLogicIdFromUrl);
+          loadProJoteData(eqLogicIdFromUrl);
+        }
       } else {
         console.error(data.result);
         document.getElementById('error-message').textContent = data.result;
