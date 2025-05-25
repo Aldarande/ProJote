@@ -262,6 +262,7 @@ def Emploidutemps(client):
             "edt_aujourdhui": [],
             "edt_aujourdhui_debut": "",
             "edt_aujourdhui_fin": "",
+            "edt_aujourdhui_cancel": 0,
         }
         if lessons_today:
             for lesson in lessons_today:
@@ -273,6 +274,8 @@ def Emploidutemps(client):
                     data["edt_aujourdhui"].append(build_cours_data(lesson))
                 if lesson.canceled == False and data["edt_aujourdhui_debut"] == "":
                     data["edt_aujourdhui_debut"] = lesson.start.strftime("%H%M")
+                if lesson.canceled == True:
+                    data["edt_aujourdhui_cancel"] = data["edt_aujourdhui_cancel"] + 1
             data["edt_aujourdhui_fin"] = lesson.end.strftime("%H%M")
 
             # Récupération  emploi du lendemain
@@ -284,6 +287,7 @@ def Emploidutemps(client):
         data["edt_demain"] = []
         data["edt_demain_debut"] = ""
         data["edt_demain_fin"] = ""
+        data["edt_demain_Annul"] = ""
         if lessons_tomorrow:
             for lesson in lessons_tomorrow:
                 index = lessons_tomorrow.index(lesson)
@@ -311,6 +315,7 @@ def Emploidutemps(client):
         data["edt_prochainjour"] = []
         data["edt_prochainjour_debut"] = ""
         data["edt_prochainjour_fin"] = ""
+        data["edt_prochainjour_cancel"] = 0
         if lessons_nextday:
             for lesson in lessons_nextday:
                 index = lessons_nextday.index(lesson)
@@ -321,6 +326,11 @@ def Emploidutemps(client):
                     lesson_to_append = build_cours_data(lesson)
                     lesson_to_append["index"] = index
                     data["edt_prochainjour"].append(lesson_to_append)
+
+                if lesson.canceled == True:
+                    data["edt_prochainjour_cancel"] = (
+                        data["edt_prochainjour_cancel"] + 1
+                    )
 
                 if lesson.canceled == False and data["edt_prochainjour_debut"] == "":
                     data["edt_prochainjour_debut"] = lesson.start.strftime("%H%M")
@@ -390,7 +400,7 @@ def menus(client):
                     "Dessert": (menu.dessert),
                 }
             )
-            return data["Menu"]
+        return data["Menu"]  # <-- PROBLÈME : ce return est dans la boucle !
     except Exception as e:
         logging.error("Un erreur est retourné sur le traitement des Menus: %s", e)
 
