@@ -1,5 +1,5 @@
 <div class="cmd cmd-widget #history#" data-type="info" data-subtype="string" data-template="picture" data-cmd_id="#id#"
-    data-cmd_uid="#uid#" data-version="#version#" data-eqLogic_id="#eqLogic_id#">
+    data-cmd_uid="#uid#" data-version="#version#" data-eqLogic_id="">
     <div class="content-xs">
         <div class="cmdName #hide_name#">#name_display#
 
@@ -15,17 +15,27 @@
             if (is_object(cmd = document.querySelector('.cmd[data-cmd_uid="#uid#"]'))) {
                 cmd.querySelector('.content-xs').setAttribute('title', '{{Date de valeur}}: ' + _options.valueDate + '<br>{{Date de collecte}}: ' + _options.collectDate)
 
-                cmd.querySelector('.value').src = _options.display_value
+                var img = cmd.querySelector('.value');
+                var fallbackUrl = '/plugins/ProJote/data/#eqLogic_id#/profile_picture.jpg'; // <-- Remplace par ton URL de secours
+
+                // Fonction de fallback si l'image ne charge pas
+                img.onerror = function () {
+                    if (img.src !== fallbackUrl) {
+                        img.src = fallbackUrl;
+                    }
+                };
+
+                img.src = _options.display_value;
 
                 if (_options.alertLevel == 'warning') {
-                    cmd.querySelector('.value').innerHTML = '<span class="label label-warning"><i class="fas fa-bell"></i> ' + _options.value + '</span>'
+                    img.innerHTML = '<span class="label label-warning"><i class="fas fa-bell"></i> ' + _options.value + '</span>'
                 } else if (_options.alertLevel == 'danger') {
-                    cmd.querySelector('.value').innerHTML = '<span class="label label-danger"><i class="fas fa-exclamation"></i> ' + _options.value + '</span>'
+                    img.innerHTML = '<span class="label label-danger"><i class="fas fa-exclamation"></i> ' + _options.value + '</span>'
                 }
             }
-        })
+        });
 
-        jeedom.cmd.refreshValue([{ cmd_id: '#id#', value: '#value#', display_value: '#state#', valueDate: '#valueDate#', collectDate: '#collectDate#', alertLevel: '#alertLevel#' }])
+        jeedom.cmd.refreshValue([{ cmd_id: '#id#', value: '#value#', display_value: '#state#', valueDate: '#valueDate#', collectDate: '#collectDate#', alertLevel: '#alertLevel#' }]);
 
         if (is_numeric('#maxHeight#')) {
             document.querySelector('.cmd[data-cmd_uid="#uid#"]').style.maxHeight = '#maxHeight#px'

@@ -156,10 +156,54 @@ def cours_affiche_from_lesson(lesson_data):
     return lesson_data.subject.name if lesson_data.subject else "autre"
 
 
+def build_menu_data(menu):
+    """
+    Construit un dictionnaire contenant toutes les informations d'un menu Pronote.
+    Args:
+        menu (pronotepy.Menu): Un objet Menu pronotepy.
+    Returns:
+        dict: Un dictionnaire structuré avec tous les champs utiles.
+    """
+
+    def serialize_food_list(food_list):
+        if not food_list:
+            return []
+        result = []
+        for food in food_list:
+            result.append(
+                {
+                    "id": getattr(food, "id", ""),
+                    "name": getattr(food, "name", ""),
+                    "labels": [
+                        {
+                            "id": getattr(label, "id", ""),
+                            "name": getattr(label, "name", ""),
+                            "color": getattr(label, "color", ""),
+                        }
+                        for label in getattr(food, "labels", [])
+                    ],
+                }
+            )
+        return result
+
+    return {
+        "id": getattr(menu, "id", ""),
+        "name": getattr(menu, "name", ""),
+        "date": menu.date.strftime("%Y-%m-%d") if getattr(menu, "date", None) else "",
+        "is_lunch": getattr(menu, "is_lunch", False),
+        "is_dinner": getattr(menu, "is_dinner", False),
+        "first_meal": serialize_food_list(getattr(menu, "first_meal", [])),
+        "main_meal": serialize_food_list(getattr(menu, "main_meal", [])),
+        "side_meal": serialize_food_list(getattr(menu, "side_meal", [])),
+        "other_meal": serialize_food_list(getattr(menu, "other_meal", [])),
+        "cheese": serialize_food_list(getattr(menu, "cheese", [])),
+        "dessert": serialize_food_list(getattr(menu, "dessert", [])),
+    }
+
+
 def build_cours_data(lesson_data):
     """
     Construit un dictionnaire contenant les informations formatées d'un cours.
-
     Args:
         lesson_data (object): Un objet représentant les données d'un cours.
     Returns:
@@ -389,18 +433,9 @@ def menus(client):
         data = {"Menu": []}
         # Transformation des menu en json
         for menu in menu_today:
-            data["Menu"].append(
-                {
-                    "Nom": (menu.name),
-                    "Entree": (menu.first_meal),
-                    "Plat": (menu.main_meal),
-                    "Accompagnement": (menu.side_meal),
-                    "Autre Plat": (menu.other_meal),
-                    "Fromage": (menu.cheese),
-                    "Dessert": (menu.dessert),
-                }
-            )
-        return data["Menu"]  # <-- PROBLÈME : ce return est dans la boucle !
+            data["Menu"].append(build_menu_data(menu))
+
+        return data["Menu"]
     except Exception as e:
         logging.error("Un erreur est retourné sur le traitement des Menus: %s", e)
 
