@@ -1,0 +1,126 @@
+<div class="cmd cmd-widget #history#" data-type="info" data-subtype="string" data-template="punission"
+    data-cmd_id="#id#" data-cmd_uid="#uid#" data-version="#version#" data-eqLogic_id="">
+    <div class="content-xs">
+        <div class="cmdName #hide_name#">#name_display#
+            <div id="date-punission-#id#" class="date-item" style="font-style: italic; font-weight: bold;"></div>
+            <span class="value" style="max-width: 245px; max-height: 350px;">#value#</span>
+        </div>
+    </div>
+    <style>
+        .color-band {
+            width: 10px;
+            height: 100%;
+            position: absolute;
+            left: 0;
+            top: 0;
+            border-radius: 5px 0 0 5px;
+        }
+
+        .punission-item {
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.07);
+            position: relative;
+
+        }
+
+        .punission-date {
+            font-weight: bold;
+            font-size: 1.2em;
+
+            margin-bottom: 2px;
+        }
+
+        .punission-raison {
+            font-weight: bold;
+            font-size: 1em;
+            margin-bottom: 2px;
+            display: inline-block;
+        }
+
+        .punission-justification {
+
+            margin-bottom: 2px;
+        }
+
+        .punission-minutes {
+            font-size: 0.97em;
+            margin-bottom: 2px;
+            font-weight: bold;
+            color: #8B0000;
+            text-shadow:
+                -1px -1px 0 #000,
+                1px -1px 0 #000,
+                -1px 1px 0 #000,
+                1px 1px 0 #000;
+            border: 1px solid #8B0000;
+            font-style: italic;
+            margin-bottom: 2px;
+            margin-top: 2px;
+            margin-left: 10px;
+            margin-right: 10px;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.07);
+            padding: 2px 8px;
+
+            display: inline-block;
+            text-align: center;
+            width: 100%;
+        }
+
+        .punission-bottom-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 4px;
+        }
+
+        .punission-justifie {
+            margin-left: 10px;
+            white-space: nowrap;
+        }
+
+        .punission-donneur {
+            text-align: right;
+            font-weight: bold;
+            width: 100%;
+            margin-top: 4px;
+        }
+    </style>
+    <div id="punission-list-#id#"></div>
+    <script>
+        jeedom.cmd.addUpdateFunction('#id#', function (_options) {
+            if (is_object(cmd = document.querySelector('.cmd[data-cmd_uid="#uid#"]'))) {
+                const punissionData = _options.value;
+                try {
+                    const punissions = JSON.parse(punissionData);
+                    const punissionHTML = Array.isArray(punissions) ? punissions.map(punission => `
+                    <div class="punission-item">
+                        <div class="color-band" style="background-color: #8B0000"></div>
+                        <div class="punission-type" style="font-weight: bold;">${punission.type ?? ''}</div>
+                        <div class="punission-minutes">
+                        ${punission.duree ? punission.duree + ' min' : ''}
+                        </div>     
+                        <div class="punission-justification">${punission.justification ?? ''}</div>
+                        <div class="punission-circonstances">${punission.circonstances ?? ''}</div>
+                        <div class="punission-bottom-row">
+                        <div class="punission-raison"> ${Array.isArray(punission.raison) ? punission.raison.join(', ') : (punission.raison ?? '')}</div>
+                        </div>
+                        <div class="punission-donneur">${punission.donneur ?? ''}</div>
+                    </div>
+                    `).join('') : '<div style="color:gray;">Aucune punition</div>';
+                    cmd.querySelector('.value').innerHTML = punissionHTML;
+                } catch (e) {
+                    cmd.querySelector('.value').innerHTML = '<div style="color:#8B0000;">Erreur de données punission</div>';
+                    console.error("Erreur lors du parsing des données JSON :", e);
+                }
+            }
+        });
+
+        jeedom.cmd.refreshValue([{ cmd_id: '#id#', value: '#value#', display_value: '#state#', valueDate: '#valueDate#', collectDate: '#collectDate#', alertLevel: '#alertLevel#' }]);
+    </script>
+</div>

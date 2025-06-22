@@ -1,9 +1,9 @@
 {
 	"id": "ProJote",
 	"name": "Plugin Pronote",
-	"pluginVersion": "0.5.8",
+	"pluginVersion": "0.7",
 	"description": {
-		"fr_FR": "Plugin destinée à récupérer les inforamtions de Pronote"
+		"fr_FR": "Plugin destinée à récupérer les informations de Pronote"
 	},
 	"licence": "AGPL",
 	"author": "Aldarande",

@@ -156,10 +156,54 @@ def cours_affiche_from_lesson(lesson_data):
     return lesson_data.subject.name if lesson_data.subject else "autre"
 
 
+def build_menu_data(menu):
+    """
+    Construit un dictionnaire contenant toutes les informations d'un menu Pronote.
+    Args:
+        menu (pronotepy.Menu): Un objet Menu pronotepy.
+    Returns:
+        dict: Un dictionnaire structuré avec tous les champs utiles.
+    """
+
+    def serialize_food_list(food_list):
+        if not food_list:
+            return []
+        result = []
+        for food in food_list:
+            result.append(
+                {
+                    "id": getattr(food, "id", ""),
+                    "name": getattr(food, "name", ""),
+                    "labels": [
+                        {
+                            "id": getattr(label, "id", ""),
+                            "name": getattr(label, "name", ""),
+                            "color": getattr(label, "color", ""),
+                        }
+                        for label in getattr(food, "labels", [])
+                    ],
+                }
+            )
+        return result
+
+    return {
+        "id": getattr(menu, "id", ""),
+        "name": getattr(menu, "name", ""),
+        "date": menu.date.strftime("%Y-%m-%d") if getattr(menu, "date", None) else "",
+        "is_lunch": getattr(menu, "is_lunch", False),
+        "is_dinner": getattr(menu, "is_dinner", False),
+        "first_meal": serialize_food_list(getattr(menu, "first_meal", [])),
+        "main_meal": serialize_food_list(getattr(menu, "main_meal", [])),
+        "side_meal": serialize_food_list(getattr(menu, "side_meal", [])),
+        "other_meal": serialize_food_list(getattr(menu, "other_meal", [])),
+        "cheese": serialize_food_list(getattr(menu, "cheese", [])),
+        "dessert": serialize_food_list(getattr(menu, "dessert", [])),
+    }
+
+
 def build_cours_data(lesson_data):
     """
     Construit un dictionnaire contenant les informations formatées d'un cours.
-
     Args:
         lesson_data (object): Un objet représentant les données d'un cours.
     Returns:
@@ -305,7 +349,7 @@ def Emploidutemps(client):
         lessons_nextday = client.lessons(
             datetime.date.today() + datetime.timedelta(days=delta)
         )
-        while not lessons_nextday:
+        while not lessons_nextday and delta < 120:
             lessons_nextday = client.lessons(
                 datetime.date.today() + datetime.timedelta(days=delta)
             )
@@ -353,25 +397,24 @@ def Emploidutemps(client):
                     lesson_to_append["num"] = lesson.num
                     data["edt_date_specific"].append(lesson_to_append)
 
-        # Récupération  emploi d'un jour spécifique pour des tests
+        # Récupération  emploi du temps global de la période en cours
         lessons_full = client.lessons(
             client.current_period.start, datetime.date.today()
         )
         lessons_full = sorted(lessons_full, key=lambda lesson: lesson.start)
 
-        data["edt_period_full"] = []
-        data["edt_absent_full"] = []
+        # data["edt_period_full"] = []
+        # data["edt_absent_full"] = []
         data["edt_Cours_canceled"] = 0
         if lessons_full:
             for lesson in lessons_full:
-                lesson_to_append = build_cours_data(lesson)
-                lesson_to_append["index"] = index
-                lesson_to_append["num"] = lesson.num
-                data["edt_period_full"].append(lesson_to_append)
+                # lesson_to_append = build_cours_data(lesson)
+                # lesson_to_append["index"] = index
+                # lesson_to_append["num"] = lesson.num
+                # data["edt_period_full"].append(lesson_to_append)
                 if lesson.canceled == True:
-                    data["edt_absent_full"].append(lesson_to_append)
+                    # data["edt_absent_full"].append(lesson_to_append)
                     data["edt_Cours_canceled"] += 1
-
         return data
     except Exception as e:
         line_number = e.__traceback__.tb_lineno
@@ -389,20 +432,46 @@ def menus(client):
         data = {"Menu": []}
         # Transformation des menu en json
         for menu in menu_today:
-            data["Menu"].append(
-                {
-                    "Nom": (menu.name),
-                    "Entree": (menu.first_meal),
-                    "Plat": (menu.main_meal),
-                    "Accompagnement": (menu.side_meal),
-                    "Autre Plat": (menu.other_meal),
-                    "Fromage": (menu.cheese),
-                    "Dessert": (menu.dessert),
-                }
-            )
-        return data["Menu"]  # <-- PROBLÈME : ce return est dans la boucle !
+            data["Menu"].append(build_menu_data(menu))
+
+        return data["Menu"]
     except Exception as e:
         logging.error("Un erreur est retourné sur le traitement des Menus: %s", e)
+
+
+def evaluations(client):
+    try:
+        # Récupération des évaluations
+        evaluations = client.current_period.evaluations
+        data = {
+            "evaluations": [],
+        }
+        if evaluations == []:
+            return data
+        else:
+            for evaluation in evaluations:
+                data["evaluations"].append(
+                    {
+                        "id": evaluation.id,
+                        "nom": evaluation.name,
+                        "domaine": evaluation.domain,
+                        "Professeur": evaluation.teacher,
+                        "Sujet": evaluation.subject,
+                        "date": evaluation.date.strftime("%d/%m/%Y"),
+                        # "acquisitions": evaluation.acquisitions,
+                        "description": evaluation.description,
+                        "Paliers": evaluation.paliers,
+                        "coeff": evaluation.coefficient,
+                    }
+                )
+        return data
+    except Exception as e:
+        line_number = e.__traceback__.tb_lineno
+        logging.error(
+            "Une erreur est retournée sur le traitement des évaluations-lig: %s; %s",
+            line_number,
+            e,
+        )
 
 
 def notes(client):
@@ -415,28 +484,41 @@ def notes(client):
         limit_note = 11  # nombre max de note à afficher + 1
 
         # Transformation des notes en Json
-        data = {"note": []}
+        data = {"note": [], "derniere_note": []}
         for grade in grades:
             index_note += 1
             if index_note == limit_note:
                 break
             data["note"].append(
                 {
+                    "id": grade.id,
                     "date": grade.date.strftime("%d/%m/%Y"),
                     "date_courte": grade.date.strftime("%d/%m"),
                     "cours": grade.subject.name,
                     "note": grade.grade,
                     "sur": grade.out_of,
-                    "note_sur": grade.grade + "\u00aa/\u00a0" + grade.out_of,
+                    "note_sur": grade.grade + "\u00a0/\u00a0" + grade.out_of,
                     "coeff": grade.coefficient,
                     "moyenne_classe": grade.average,
                     "max": grade.max,
                     "min": grade.min,
+                    "commentaire": grade.comment,
+                    "optionnel": grade.is_optionnal,
+                    "bonus": grade.is_bonus,
                 }
             )
-        return data["note"]
+            # je récupére la derniére note
+        if index_note > 0:
+            data["derniere_note"].append(data["note"][0])
+
+        return data
     except Exception as e:
-        logging.error("Un erreur est retourné sur le traitement des notes: %s", e)
+        line_number = e.__traceback__.tb_lineno
+        logging.error(
+            "Une erreur est retournée sur le traitement des notes-lig: %s; %s",
+            line_number,
+            e,
+        )
 
 
 def devoirs(client):
@@ -450,56 +532,15 @@ def devoirs(client):
         longmax_devoir = 125  # nombre de caractère max dans la description des devoirs
 
         # Transformation des devoirs  en Json
+        # JE teste si homework_today est vide
+        if not homework_today:
+            logging.info("Aucun devoir trouvé pour aujourd'hui.")
+        else:
+            for homework in homework_today:
 
-        for homework in homework_today:
-
-            data["devoir"].append(
-                {
-                    "index": homework_today.index(homework),
-                    "date": homework.date.strftime("%d/%m"),
-                    "title": homework.subject.name,
-                    "description": (
-                        homework.description.encode("utf-8").decode("unicode_escape")
-                    )[:longmax_devoir],
-                    "description_longue": (
-                        homework.description.encode("utf-8").decode("unicode_escape")
-                    ),
-                    "done": homework.done,
-                    "est_service_groupe": getattr(homework, "estServiceGroupe", None),
-                }
-            )
-            Devoir = Devoir + 1
-            if homework.done == 1:
-                Devoirfait = Devoirfait + 1
-            else:
-                Devoirnonfait = Devoirnonfait + 1
-            data["nb_devoir"] = Devoir
-            data["nb_devoirF"] = Devoirfait
-            data["nb_devoirNF"] = Devoirnonfait
-
-        # Récupération  des devoirs  du prochain jour d'école (ça sert le weekend et les vacances)
-        Devoir = 0
-        Devoirfait = 0
-        Devoirnonfait = 0
-        delta = 1
-        homework_nextday = client.homework(
-            datetime.date.today() + datetime.timedelta(days=delta)
-        )
-
-        while not homework_nextday:
-            homework_nextday = client.homework(
-                datetime.date.today() + datetime.timedelta(days=delta)
-            )
-            delta = delta + 1
-
-        homework_nextday = sorted(homework_nextday, key=lambda homework: homework.date)
-        nextdate = homework_nextday[0].date
-        for homework in homework_nextday:
-
-            if homework.date == nextdate:
-                data["devoir_Demain"].append(
+                data["devoir"].append(
                     {
-                        "index": homework_nextday.index(homework),
+                        "index": homework_today.index(homework),
                         "date": homework.date.strftime("%d/%m"),
                         "title": homework.subject.name,
                         "description": (
@@ -507,11 +548,7 @@ def devoirs(client):
                                 "unicode_escape"
                             )
                         )[:longmax_devoir],
-                        "description_longue": (
-                            homework.description.encode("utf-8").decode(
-                                "unicode_escape"
-                            )
-                        ),
+                        "color": (homework.background_color),
                         "done": homework.done,
                         "est_service_groupe": getattr(
                             homework, "estServiceGroupe", None
@@ -523,10 +560,64 @@ def devoirs(client):
                     Devoirfait = Devoirfait + 1
                 else:
                     Devoirnonfait = Devoirnonfait + 1
+                data["nb_devoir"] = Devoir
+                data["nb_devoirF"] = Devoirfait
+                data["nb_devoirNF"] = Devoirnonfait
 
-        data["nb_devoir_Demain"] = Devoir
-        data["nb_devoirF_Demain"] = Devoirfait
-        data["nb_devoirNF_Demain"] = Devoirnonfait
+        # Récupération  des devoirs  du prochain jour d'école (ça sert le weekend et les vacances)
+
+        Devoir = 0
+        Devoirfait = 0
+        Devoirnonfait = 0
+        delta = 1
+        homework_nextday = client.homework(
+            datetime.date.today() + datetime.timedelta(days=delta)
+        )
+
+        while not homework_nextday and delta < 120:
+            homework_nextday = client.homework(
+                datetime.date.today() + datetime.timedelta(days=delta)
+            )
+            logging.info(
+                "Je recherche des devoirs pour le prochain jour d'école + %s.", delta
+            )
+            delta = delta + 1
+        if not homework_nextday:
+            logging.info("Aucun devoir trouvé pour le prochain jour d'école.")
+        else:
+            logging.info("J'ai des devoirs trouvés pour le prochain jour d'école.")
+            homework_nextday = sorted(
+                homework_nextday, key=lambda homework: homework.date
+            )
+            nextdate = homework_nextday[0].date
+            for homework in homework_nextday:
+                if homework.date == nextdate:
+                    data["devoir_Demain"].append(
+                        {
+                            "index": homework_nextday.index(homework),
+                            "date": homework.date.strftime("%d/%m"),
+                            "title": homework.subject.name,
+                            "description": (
+                                homework.description.encode("utf-8").decode(
+                                    "unicode_escape"
+                                )
+                            )[:longmax_devoir],
+                            "color": homework.background_color,
+                            "done": homework.done,
+                            "est_service_groupe": getattr(
+                                homework, "estServiceGroupe", None
+                            ),
+                        }
+                    )
+                    Devoir = Devoir + 1
+                    if homework.done == 1:
+                        Devoirfait = Devoirfait + 1
+                    else:
+                        Devoirnonfait = Devoirnonfait + 1
+
+            data["nb_devoir_Demain"] = Devoir
+            data["nb_devoirF_Demain"] = Devoirfait
+            data["nb_devoirNF_Demain"] = Devoirnonfait
 
         return data
     except Exception as e:
@@ -542,20 +633,69 @@ def notifications(client):
     try:
         # Récupération des notifications
         notification_eleve = client.information_and_surveys()
-        data = {"Message": []}
+        notification_eleve = sorted(
+            notification_eleve,
+            key=lambda information_and_survey: information_and_survey.start_date,
+            reverse=True,
+        )
+        data = {"Notification": [], "dernier_Notification": []}
         # Récupération des notifications
         for notif in notification_eleve:
-            data["Message"].append(
+            data["Notification"].append(
                 {
                     "Sujet": (notif.title),
                     "Auteur": (notif.author),
                     "Création": (notif.creation_date).strftime("%d/%m"),
+                    "message": (notif.content),
+                    "catégorie": (notif.category),
+                    "lu": (notif.read),
                 }
             )
-        return data["Message"]
+            # récupération du dernier message
+        if data["Notification"]:
+            data["dernier_Notification"] = (
+                [data["Notification"][0]] if data["Notification"] else []
+            )
+        return data
     except Exception as e:
         logging.error(
             "Un erreur est retourné sur le traitement des notifications: %s", e
+        )
+
+
+def retards(client):
+    try:
+        # recupération des retards
+        retards = client.current_period.delays
+        # tri des retards par date décroissante
+        retards = sorted(retards, key=lambda delay: delay.date, reverse=True)
+        data = {"retard": [], "dernier_retard": [], "nb_retard": 0}
+        nbretard = 0
+        # Récupération des retards pour la période en cours
+        for retard in retards:
+            data["retard"].append(
+                {
+                    "id": retard.id,
+                    "date": retard.date.strftime("%d/%m/%y %H:%M"),
+                    "justifie": retard.justified,
+                    "nb_minutes": retard.minutes,
+                    "justification": retard.justification,
+                    "raison": str(retard.reasons)[2:-2],
+                }
+            )
+            nbretard = nbretard + 1
+        data["nb_retard"] = nbretard
+        # récupération du denrier retard
+        data["dernier_retard"] = [data["retard"][0]] if data["retard"] else []
+        # transformation des retards en Json
+
+        return data
+    except Exception as e:
+        line_number = e.__traceback__.tb_lineno
+        logging.error(
+            "Un erreur est retourné sur le traitement des retards: %s; %s",
+            line_number,
+            e,
         )
 
 
@@ -568,15 +708,15 @@ def absences(client):
         absences = sorted(absences, key=lambda absence: absence.from_date, reverse=True)
 
         # Transformation des absences en Json
-        data = {"absence": []}
+        data = {"absence": [], "nb_absences": 0, "derniere_absence": []}
+
         nbabsences = 0
         for absence in absences:
             data["absence"].append(
                 {
                     "id": absence.id,
-                    "date_debut": absence.from_date.strftime("%d/%m/%y %H%M"),
-                    "date_debut_format": absence.from_date.strftime("Le %d %b à %H%M"),
-                    "date_fin": absence.to_date.strftime("%d/%m/%y %H%M"),
+                    "date_debut": absence.from_date.strftime("%d/%m/%y %H:%M"),
+                    "date_fin": absence.to_date.strftime("%d/%m/%y %H:%M"),
                     "justifie": absence.justified,
                     "nb_heures": absence.hours,
                     "nb_jours": absence.days,
@@ -585,30 +725,64 @@ def absences(client):
             )
             nbabsences = nbabsences + 1
         data["nb_absences"] = nbabsences
-
+        # Je récupére la derniére absence
+        data["derniere_absence"].append(
+            {
+                "id": absences[nbabsences - 1].id,
+                "date_debut": absences[nbabsences - 1].from_date.strftime(
+                    "%d/%m/%y %H:%M"
+                ),
+                "date_fin": absences[nbabsences - 1].to_date.strftime("%d/%m/%y %H:%M"),
+                "justifie": absences[nbabsences - 1].justified,
+                "nb_heures": absences[nbabsences - 1].hours,
+                "nb_jours": absences[nbabsences - 1].days,
+                "raison": str(absences[nbabsences - 1].reasons)[2:-2],
+            }
+        )
         return data
     except Exception as e:
-        logging.error("Un erreur est retourné sur le traitement des absences: %s", e)
+        line_number = e.__traceback__.tb_lineno
+        logging.error(
+            "Un erreur est retourné sur le traitement des absences: %s; %s",
+            line_number,
+            e,
+        )
 
 
-def punissions(client):
+def punitions(client):
     try:
         # Récupération des punitions
         punitions = client.current_period.punishments
         # Transformation des punition   en Json
-        data = {"punition": []}
+        data = {"punition": [], "derniere_punition": [], "Nb_Punissions": 0}
+        if punitions == []:
+            return data
+        data["derniere_punition"].append(
+            {
+                "id": punitions[0].id,
+                "type": punitions[0].nature,
+                "raison": punitions[0].reasons,
+                "donneur": punitions[0].giver,
+                "date": punitions[0].given.strftime("%d/%m/%Y"),
+                "date_court": punitions[0].given.strftime("%d/%m"),
+                "circonstances": punitions[0].circumstances,
+                "exclusion": punitions[0].exclusion,
+                "duree": int(punitions[0].duration.total_seconds() // 60),
+            }
+        )
         nbpunition = 0
         for punition in punitions:
             data["punition"].append(
                 {
+                    "id": punition.id,
                     "type": punition.nature,
                     "raison": punition.reasons,
                     "donneur": punition.giver,
                     "date": punition.given.strftime("%d/%m/%Y"),
                     "date_court": punition.given.strftime("%d/%m"),
-                    "Competence": punition.grade,
-                    "Commentaire": punition.comment,
-                    "coeff": punition.coefficient,
+                    "circonstances": punition.circumstances,
+                    "exclusion": punition.exclusion,
+                    "duree": int(punition.duration.total_seconds() // 60),
                 }
             )
             nbpunition = nbpunition + 1
@@ -622,7 +796,7 @@ def ical(client):
     # Récupération des coordonnées ICAL
     try:
 
-        jsondata = {"ICAL": client.export_ical(2)}
+        jsondata = {"ICAL": client.export_ical()}
     except Exception as e:
         jsondata = {"ICAL": ""}
         logging.info("Un erreur est retourné sur le traitement de l'ICAL: %s", e)
@@ -817,7 +991,7 @@ def read_socket():
     global JEEDOM_SOCKET_MESSAGE
     try:
         if not JEEDOM_SOCKET_MESSAGE.empty():
-            logging.debug("Message received in socket JEEDOM_SOCKET_MESSAGE")
+            logging.debug("Notification received in socket JEEDOM_SOCKET_MESSAGE")
 
             raw_message = JEEDOM_SOCKET_MESSAGE.get()
             decoded_message = raw_message.decode("utf-8")
@@ -825,13 +999,13 @@ def read_socket():
             if (
                 not decoded_message.strip()
             ):  # Vérifier si la chaîne est vide après suppression des espaces
-                logging.error("Message vide ou invalide reçu depuis le socket.")
+                logging.error("Notification vide ou invalide reçu depuis le socket.")
                 return
             try:
                 message = json.loads(decoded_message)
             except json.JSONDecodeError as e:
                 logging.error("Erreur de décodage JSON : %s", e)
-                logging.debug("Message en erreur : %s", stripped_message)
+                logging.debug("Notification en erreur : %s", stripped_message)
                 return
 
             logging.debug("Le MESSAGE reçu est  %s", message)
@@ -985,34 +1159,45 @@ def read_socket():
                     jsondata["eleve"] = identites(client.info)
                     if client.info.profile_picture and client.info.profile_picture.url:
                         jsondata["Photo"] = client.info.profile_picture.url
+                # je renew le token
+                logging.info("Je renew le Token")
+                jsondata["Token"] = RenewToken(client)
+
                 # J'ajoute l'emploi du temps
                 logging.info("Je récupére l'emploi du temps")
                 jsondata["emploi_du_temps"] = Emploidutemps(client)
                 # J'ajoute les notes
                 logging.info("Je récupére les notes")
                 jsondata["notes"] = notes(client)
-                # J'ajoute les devoirs
-                logging.info("Je récupére les devoirs")
-                jsondata["devoirs"] = devoirs(client)
                 # j'ajoute les menus
                 logging.info("Je récupére les menus")
                 jsondata["Menus"] = menus(client)
-                # J'ajoute les Messages
+                # J'ajoute les Notifications
                 logging.info("Je récupére les notifications")
                 jsondata["Notifications"] = notifications(client)
                 # j'ajoutes les absences
                 logging.info("Je récupére les absences")
                 jsondata["Absences"] = absences(client)
+                # J'ajoutes les retards
+                logging.info("Je récupére les retards")
+                jsondata["Retards"] = retards(client)
                 # J'ajoutes les punitions
                 logging.info("Je récupére les punitions")
-                jsondata["Punissions"] = punissions(client)
+                jsondata["Punissions"] = punitions(client)
+                # J'ajoute les devoirs
+                logging.info("Je récupére les devoirs")
+                jsondata["devoirs"] = devoirs(client)
+                # J'ajoutes des évaluations -- à finir
+                # logging.info("Je récupére les évaluations")
+                # jsondata["evaluations"] = evaluations(client)
                 # J'ajoutes l'ICAL
                 logging.info("Je récupére l'ICAL")
                 jsondata["Ical"] = ical(client)
-                logging.info("Je renew le Token")
-                jsondata["Token"] = RenewToken(client)
+
                 # J'envoie les données à Jeedom
-                logging.debug("Données à envoyer : %s", json.dumps(jsondata))
+                logging.debug(
+                    "Projoted.py :: Données JSON à envoyer : %s", json.dumps(jsondata)
+                )
                 jeedom_com.send_change_immediate(jsondata)
                 logging.info("Fin de récupération d'info depuis Projoted.py")
 
