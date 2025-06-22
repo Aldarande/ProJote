@@ -1,0 +1,115 @@
+<div class="cmd cmd-widget #history#" data-type="info" data-subtype="string" data-template="retard" data-cmd_id="#id#"
+  data-cmd_uid="#uid#" data-version="#version#" data-eqLogic_id="">
+  <div class="content-xs">
+    <div class="cmdName #hide_name#">#name_display#
+      <div id="date-retard-#id#" class="date-item" style="font-style: italic; font-weight: bold;"></div>
+      <span class="value" style="max-width: 245px; max-height: 350px;">#value#</span>
+    </div>
+  </div>
+  <style>
+    .color-band {
+      width: 10px;
+      height: 100%;
+      position: absolute;
+      left: 0;
+      top: 0;
+      border-radius: 5px 0 0 5px;
+    }
+
+    .retard-item {
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      margin-bottom: 10px;
+      padding: 10px;
+      border-radius: 5px;
+      background: rgba(255, 255, 255, 0.07);
+      position: relative;
+
+    }
+
+    .retard-date {
+      font-weight: bold;
+      font-size: 1.2em;
+
+      margin-bottom: 2px;
+    }
+
+    .retard-raison {
+      font-weight: bold;
+      font-size: 1em;
+      margin-bottom: 2px;
+      display: inline-block;
+    }
+
+    .retard-justification {
+
+      margin-bottom: 2px;
+    }
+
+    .retard-minutes {
+      font-size: 0.97em;
+      margin-bottom: 2px;
+      font-weight: bold;
+      color: #f44336;
+      font-style: italic;
+      margin-bottom: 2px;
+      margin-top: 2px;
+      margin-left: 10px;
+      margin-right: 10px;
+      border-radius: 5px;
+      background: rgba(255, 255, 255, 0.07);
+      padding: 2px 8px;
+
+      display: inline-block;
+      text-align: center;
+      width: 100%;
+    }
+
+    .retard-bottom-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 4px;
+    }
+
+    .retard-justifie {
+      margin-left: 10px;
+      white-space: nowrap;
+    }
+  </style>
+  <div id="retard-list-#id#"></div>
+  <script>
+    jeedom.cmd.addUpdateFunction('#id#', function (_options) {
+      if (is_object(cmd = document.querySelector('.cmd[data-cmd_uid="#uid#"]'))) {
+        const retardData = _options.value;
+        try {
+          const retards = JSON.parse(retardData);
+          const retardHTML = Array.isArray(retards) ? retards.map(retard => `
+            <div class="retard-item">
+              <div class="color-band" style="background-color: ${retard.justifie ? 'green' : '#FF4500'}"></div>
+              <div class="retard-date">Retard du ${retard.date ?? ''}</div>              
+              <div class="retard-minutes">
+                ${retard.nb_minutes ? retard.nb_minutes + ' min' : ''}
+              </div>
+              <div class="retard-justification">${retard.justification ?? ''}</div>
+              <div class="retard-raison">Raison : ${retard.raison ?? ''}</div>     
+              <div class="retard-justifie"> Justifié : 
+              ${retard.justifie
+              ? '<i class="fas fa-check" style="color:green;"></i>'
+              : '<i class="fas fa-times" style="color:#FF4500;"></i>'
+            }
+</div>         
+            </div >
+          `).join('') : '<div style="color:gray;">Aucun retard</div>';
+          cmd.querySelector('.value').innerHTML = retardHTML;
+        } catch (e) {
+          cmd.querySelector('.value').innerHTML = '<div style="color:#FF4500;">Erreur de données retard</div>';
+          console.error("Erreur lors du parsing des données JSON :", e);
+        }
+      }
+    });
+
+    jeedom.cmd.refreshValue([{ cmd_id: '#id#', value: '#value#', display_value: '#state#', valueDate: '#valueDate#', collectDate: '#collectDate#', alertLevel: '#alertLevel#' }]);
+  </script>
+</div>

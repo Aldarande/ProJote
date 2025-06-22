@@ -1,0 +1,134 @@
+<div class="cmd cmd-widget #history#" data-type="info" data-subtype="string" data-template="devoir" data-cmd_id="#id#"
+    data-cmd_uid="#uid#" data-version="#version#" data-eqLogic_id="">
+    <div class="content-xs">
+        <div class="cmdName #hide_name#">#name_display#
+            <div id="date-devoir-#id#" class="date-item" style="font-style: italic; font-weight: bold;"></div>
+            <span class="value" style="max-width: 245px; max-height: 350px;">#value#</span>
+        </div>
+    </div>
+    <style>
+        .color-band {
+            width: 10px;
+            height: 100%;
+            position: absolute;
+            left: 0;
+            top: 0;
+            border-radius: 5px 0 0 5px;
+        }
+
+        .devoir-item {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 5px;
+
+            background: rgba(255, 255, 255, 0.07);
+            position: relative;
+
+        }
+
+        .devoir-date {
+            font-weight: bold;
+            font-size: 1.2em;
+
+            margin-bottom: 2px;
+        }
+
+        .devoir-title {
+            font-weight: bold;
+            font-size: 1em;
+            margin-bottom: 2px;
+        }
+
+        .devoir-description {
+            font-size: 0.97em;
+            margin-bottom: 2px;
+        }
+
+        .date {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 2px;
+        }
+
+        .devoir-done {
+            position: absolute;
+            right: 10px;
+            bottom: 10px;
+            font-size: 0.9em;
+            padding: 2px 8px;
+            border-radius: 6px;
+            background: #4caf50;
+            color: #fff;
+        }
+
+        .devoir-todo {
+            position: absolute;
+            right: 10px;
+            bottom: 10px;
+            font-size: 0.9em;
+            padding: 2px 8px;
+            border-radius: 6px;
+            background: #f44336;
+            color: #fff;
+        }
+    </style>
+    <script>
+        jeedom.cmd.addUpdateFunction('#id#', function (_options) {
+            if (is_object(cmd = document.querySelector('.cmd[data-cmd_uid="#uid#"]'))) {
+                // Récupération des données JSON
+                const devoirsData = _options.value;
+                try {
+                    const devoirs = JSON.parse(devoirsData);
+
+                    // Afficher la première date si dispo
+                    //if (Array.isArray(devoirs) && devoirs.length > 0 && devoirs[0].date) {
+                    //    cmd.querySelector('#date-devoir-#id#').textContent = devoirs[0].date;
+                    //}
+
+                    // Générer le HTML
+                    const devoirsHTML = Array.isArray(devoirs) ? devoirs.map(devoir => `                        
+                        <div class="devoir-item">
+                            <div class="color-band" style="background-color: ${devoir.color}"></div>
+                            <div class="devoir-date">${devoir.date ?? ''}</div>
+                            <div class="devoir-title">${devoir.title ?? ''}</div>
+                            <div class="devoir-description">${wrapText(decodeUTF8(devoir.description ?? ''), 40)}</div>        
+                            <div class="${devoir.done ? 'devoir-done' : 'devoir-todo'}">
+                                ${devoir.done ? 'Fait' : 'À faire'}
+                            </div>
+                        </div>
+                    `).join('') : '<div style="color:gray;">Aucun devoir</div>';
+
+                    cmd.querySelector('.value').innerHTML = devoirsHTML;
+                } catch (e) {
+                    cmd.querySelector('.value').innerHTML = '<div style="color:red;">Erreur de données devoirs</div>';
+                    console.error("Erreur lors du parsing des données JSON :", e);
+                }
+            }
+        });
+
+        jeedom.cmd.refreshValue([{ cmd_id: '#id#', value: '#value#', display_value: '#state#', valueDate: '#valueDate#', collectDate: '#collectDate#', alertLevel: '#alertLevel#' }]);
+
+        function decodeUTF8(str) {
+            try {
+                return decodeURIComponent(escape(str));
+            } catch (e) {
+                return str;
+            }
+        }
+
+        function wrapText(str, maxLen) {
+            if (!str) return '';
+            let result = '';
+            let line = '';
+            str.split(' ').forEach(word => {
+                if ((line + word).length > maxLen) {
+                    result += line + '<br>';
+                    line = '';
+                }
+                line += word + ' ';
+            });
+            result += line;
+            return result.trim();
+        }
+    </script>
+</div>

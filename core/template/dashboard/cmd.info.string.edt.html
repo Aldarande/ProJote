@@ -1,0 +1,118 @@
+<div class="cmd cmd-widget #history#" data-type="info" data-subtype="string" data-template="picture" data-cmd_id="#id#"
+    data-cmd_uid="#uid#" data-version="#version#" data-eqLogic_id="">
+    <div class="content-xs">
+        <div class="cmdName #hide_name#">#name_display#
+            <div id="date-cours-#id#" class="date-item" style="font-style: italic; font-weight: bold;"></div>
+            <span class=" value" style="max-width: 245px; max-height: 350px;">#value#</span>
+        </div>
+    </div>
+    <div id="schedule"></div>
+
+    <style>
+        .date-item {
+            font-size: 0.96em;
+            margin-bottom: 1px;
+            margin-right: 10px;
+            padding: -2px;
+            border-radius: 5px 5px 0 0;
+            /*color: white;*/
+            position: relative;
+            overflow: hidden;
+            /*background-color: rgba(0, 0, 0, 0.5);*/
+
+        }
+
+        .course-item {
+            margin-right: 10px;
+            margin-bottom: 1px;
+            padding: 10px;
+            border-radius: 0 5px 5px 0;
+
+            position: relative;
+            overflow: hidden;
+            background: rgba(255, 255, 255, 0.07);
+
+        }
+
+        .color-band {
+            width: 10px;
+            height: 100%;
+            position: absolute;
+            left: 0;
+            top: 0;
+            border-radius: 5px 0 0 5px;
+        }
+
+        .course-details {
+            margin-left: 20px;
+        }
+
+        .time {
+            font-weight: bold;
+            text-align: left;
+            padding-left: 5px;
+        }
+
+        .end-time {
+            font-weight: bold;
+            text-align: left;
+            padding-left: 5px;
+        }
+    </style>
+    <script>
+        jeedom.cmd.addUpdateFunction('#id#', function (_options) {
+            if (is_object(cmd = document.querySelector('.cmd[data-cmd_uid="#uid#"]'))) {
+                cmd.querySelector('.content-xs').setAttribute('title', '{{Date de valeur}}: ' + _options.valueDate + '<br>{{Date de collecte}}: ' + _options.collectDate);
+
+                // Exemple de données JSON que vous pourriez recevoir
+                const coursesData = _options.value;
+
+                try {
+                    // Parser les données JSON
+                    const courses = JSON.parse(coursesData);
+
+                    // Vérifier si les données sont bien un tableau
+                    if (Array.isArray(courses)) {
+                        // Générer le HTML pour l'emploi du temps
+                        const scheduleHTML = generateScheduleHTML(courses);
+                        // affiche la valeur de courses[0].date dans le tooltip de cmd.querySelector('.content-xs')
+                        if (courses.length > 0 && courses[0].date) {
+                            cmd.querySelector('#date-cours-#id#').textContent = courses[0].date;
+                        }
+                        // Insérer le HTML généré dans l'élément .value
+                        cmd.querySelector('.value').innerHTML = scheduleHTML;
+                    } else {
+                        console.error("Les données récupérées ne sont pas un tableau.");
+                    }
+                } catch (e) {
+                    console.error("Erreur lors du parsing des données JSON :", e);
+                }
+            }
+        });
+
+        function formatHour(h) {
+            if (typeof h === 'string' && h.length === 4) {
+                return h.slice(0, 2) + ':' + h.slice(2);
+            }
+            return h;
+        }
+
+        function generateScheduleHTML(courses) {
+            return courses.map(course => `
+                <div class="course-item" style="${course.annulation ? 'font-style:italic;' : ''}; position:relative;">
+                    <div class="color-band" style="background-color: ${course.background_color}"></div>
+                    <div class="time">${formatHour(course.heure)}</div>
+                    <div class="course-details">
+                        <div class="course-name" style="font-weight:normal;">${course.cours ?? ''}</div>
+                        <div class="teacher" style="font-weight:normal;">${course.Professeur ?? ''}</div>
+                        <div class="room" style="font-weight:normal;">${(course.salle !== undefined && course.salle !== null && course.salle !== '') ? course.salle : '&nbsp;'}</div>
+                    </div>
+                    <div class="end-time">${formatHour(course.heure_fin)}</div>
+                    ${course.status ? `<div class="status" style="position:absolute; right:10px; bottom:10px; font-size:0.9em; padding:2px 8px; border-radius:6px; background:${course.annulation ? '#d32f2f' : '#21bbef'}; color:#fff;">${course.status}</div>` : ''}
+                </div>
+            `).join('');
+        }
+
+        jeedom.cmd.refreshValue([{ cmd_id: '#id#', value: '#value#', display_value: '#state#', valueDate: '#valueDate#', collectDate: '#collectDate#', alertLevel: '#alertLevel#' }]);
+    </script>
+</div>
