@@ -1,0 +1,140 @@
+<div class="cmd cmd-widget #history#" data-type="info" data-subtype="string" data-template="competence"
+    data-cmd_id="#id#" data-cmd_uid="#uid#" data-version="#version#" data-eqLogic_id="">
+    <div class="content-xs">
+        <div class="cmdName #hide_name#">#name_display#
+            <div id="date-competence-#id#" class="date-item" style="font-style: italic; font-weight: bold;"></div>
+            <span class="value" style="max-width: 700px; max-height: 350px;">#value#</span>
+        </div>
+    </div>
+    <style>
+        .competence-acquisitions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .acq-abbr {
+            display: inline-block;
+            min-width: 2.5em;
+            font-weight: bold;
+            font-size: 1.1em;
+            cursor: pointer;
+            position: relative;
+            color: #1976d2;
+            text-align: center;
+        }
+
+        .acq-abbr[data-color="A+"] {
+            color: #388e3c;
+
+        }
+
+        .acq-abbr[data-color="A"] {
+            color: #1976d2;
+        }
+
+        .acq-abbr[data-color="C"] {
+            color: #ffa000;
+        }
+
+        .acq-abbr[data-color="E"] {
+            color: #d32f2f;
+        }
+
+        .acq-tooltip {
+            display: none;
+            position: absolute;
+            min-width: 180px;
+            max-width: 500px;
+            width: max-content;
+            left: 50%;
+            top: 120%;
+            transform: translateX(-50%);
+            background: #fff;
+            color: #222;
+            border: 1px solid #bbb;
+            border-radius: 5px;
+            padding: 6px 10px;
+            font-size: 0.95em;
+            white-space: normal;
+            word-break: break-word;
+            z-index: 10;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            max-width: 250px
+        }
+
+        .acq-abbr:hover .acq-tooltip {
+            display: block;
+        }
+
+        .acq-tooltip-level {
+            font-weight: bold;
+            /* Couleur principale (même que l'abréviation) */
+
+        }
+
+        .acq-tooltip-name {
+            /* Ton moyen */
+            opacity: 0.85;
+        }
+
+        .acq-tooltip-domain {
+            /* Ton clair */
+            opacity: 0.65;
+        }
+    </style>
+    <script>
+        jeedom.cmd.addUpdateFunction('#id#', function (_options) {
+            if (is_object(cmd = document.querySelector('.cmd[data-cmd_uid="#uid#"]'))) {
+                // Récupération des données JSON
+                const competencesData = _options.value;
+                try {
+                    const competences = JSON.parse(competencesData);
+
+                    // Afficher la première date si dispo
+                    //if (Array.isArray(competences) && competences.length > 0 && competences[0].date_debut_format) {
+                    //    cmd.querySelector('#date-competence-#id#').textContent = competences[0].date_debut_format;
+                    //}
+
+                    // Générer le HTML
+                    const competencesHTML = Array.isArray(competences) ? competences.map(comp => `
+                        <div class="competence-item" style="margin-bottom:14px; padding:10px; border-radius:6px; background:rgba(255,255,255,0.07);">
+                            <div class="competence-nom" style="font-weight:bold; font-size:1.1em;">${comp.nom ?? ''}</div>
+                            <div class="competence-meta" style="font-size:0.95em; color:#666; font-style:italic; margin-bottom:4px;">
+                            ${comp.Sujet ?? ''}${comp.professeur ? ' - ' + comp.professeur : ''}${comp.date ? ' - ' + comp.date : ''}
+                            </div>
+                            <div class="competence-acquisitions">
+                            ${(Array.isArray(comp.acquisitions) && comp.acquisitions.length > 0) ? comp.acquisitions.map(acq => `
+                                <span class="acq-abbr" data-color="${acq.abbreviation ?? ''}">
+                                ${acq.abbreviation ?? ''}
+                                    <span class="acq-tooltip">
+                                        <div class="acq-tooltip-level" style="color:inherit;">${acq.level ?? ''}</div>
+                                        <div class="acq-tooltip-name" style="color:inherit;">${acq.name ?? ''}</div>
+                                        <div class="acq-tooltip-domain" style="color:inherit;">${acq.domain ?? ''}</div>
+                                    </span>
+                                </span>
+                            `).join('') : '<span style="color:#aaa;">Aucune acquisition</span>'}
+                            </div>
+                            ${comp.description ? `<div class="competence-desc" style="font-size:0.95em; color:#888; margin-top:4px;">${comp.description}</div>` : ''}
+                            <!-- ${Array.isArray(comp.Paliers) && comp.Paliers.length > 0 ? `<div class="competence-palier" style="font-size:0.9em; color:#1976d2; margin-top:2px;">${comp.Paliers.join(', ')}</div>` : ''} -->
+                        </div>
+                    `).join('') : '<div style="color:gray;">Aucune compétence</div>';
+
+                    cmd.querySelector('.value').innerHTML = competencesHTML;
+
+                    cmd.querySelectorAll('.acq-abbr').forEach(el => {
+                        const color = getComputedStyle(el).color;
+                        el.querySelectorAll('.acq-tooltip-level, .acq-tooltip-name, .acq-tooltip-domain').forEach(child => {
+                            child.style.color = color;
+                        });
+                    });
+                } catch (e) {
+                    cmd.querySelector('.value').innerHTML = '<div style="color:red;">Erreur de données competences</div>';
+                    console.error("Erreur lors du parsing des données JSON :", e, competencesData);
+                }
+            }
+        });
+
+        jeedom.cmd.refreshValue([{ cmd_id: '#id#', value: '#value#', display_value: '#state#', valueDate: '#valueDate#', collectDate: '#collectDate#', alertLevel: '#alertLevel#' }]);
+    </script>
+</div>

@@ -450,21 +450,56 @@ def evaluations(client):
             return data
         else:
             for evaluation in evaluations:
+
+                def acquisition_to_dict(acq):
+                    # Si c'est déjà un dict, on le retourne
+                    if isinstance(acq, dict):
+                        return acq
+                    # Sinon, on extrait les attributs principaux
+                    return {
+                        "ordre": getattr(acq, "order", ""),
+                        "name": getattr(acq, "name", ""),
+                        "name_id": getattr(acq, "name_id", ""),
+                        "abbreviation": getattr(acq, "abbreviation", ""),
+                        "level": getattr(acq, "level", ""),
+                        "coefficient": getattr(acq, "coefficient", ""),
+                        "domain": getattr(acq, "domain", ""),
+                        "domain_id": getattr(acq, "domain_id", ""),
+                        "pillar": getattr(acq, "pillar", ""),
+                        "pillar_id": getattr(acq, "pillar_id", ""),
+                    }
+
+                # Si c'est un dict, on convertit ses valeurs
+                if isinstance(evaluation.acquisitions, dict):
+                    acquisitions = {
+                        k: acquisition_to_dict(v)
+                        for k, v in evaluation.acquisitions.items()
+                    }
+                # Si c'est une liste
+                elif isinstance(evaluation.acquisitions, list):
+                    acquisitions = [
+                        acquisition_to_dict(a) for a in evaluation.acquisitions
+                    ]
+                else:
+                    acquisitions = evaluation.acquisitions
+
                 data["evaluations"].append(
                     {
                         "id": evaluation.id,
                         "nom": evaluation.name,
                         "domaine": evaluation.domain,
-                        "Professeur": evaluation.teacher,
-                        "Sujet": evaluation.subject,
+                        "professeur": evaluation.teacher,
+                        "Sujet": getattr(
+                            evaluation.subject, "name", str(evaluation.subject)
+                        ),
                         "date": evaluation.date.strftime("%d/%m/%Y"),
-                        # "acquisitions": evaluation.acquisitions,
+                        "acquisitions": acquisitions,
                         "description": evaluation.description,
                         "Paliers": evaluation.paliers,
                         "coeff": evaluation.coefficient,
                     }
                 )
-        return data
+        return data["evaluations"]
     except Exception as e:
         line_number = e.__traceback__.tb_lineno
         logging.error(
@@ -643,11 +678,11 @@ def notifications(client):
         for notif in notification_eleve:
             data["Notification"].append(
                 {
-                    "Sujet": (notif.title),
-                    "Auteur": (notif.author),
-                    "Création": (notif.creation_date).strftime("%d/%m"),
+                    "sujet": (notif.title),
+                    "auteur": (notif.author),
+                    "creation": (notif.creation_date).strftime("%d/%m"),
                     "message": (notif.content),
-                    "catégorie": (notif.category),
+                    "categorie": (notif.category),
                     "lu": (notif.read),
                 }
             )
@@ -754,7 +789,7 @@ def punitions(client):
         # Récupération des punitions
         punitions = client.current_period.punishments
         # Transformation des punition   en Json
-        data = {"punition": [], "derniere_punition": [], "Nb_Punissions": 0}
+        data = {"punition": [], "derniere_punition": [], "Nb_Punitions": 0}
         if punitions == []:
             return data
         data["derniere_punition"].append(
@@ -786,7 +821,7 @@ def punitions(client):
                 }
             )
             nbpunition = nbpunition + 1
-        data["Nb_Punissions"] = nbpunition
+        data["Nb_Punitions"] = nbpunition
         return data
     except Exception as e:
         logging.error("Un erreur est retourné sur le traitement des Punissions: %s", e)
@@ -1147,7 +1182,7 @@ def read_socket():
                 ):
                     logging.debug("Le nom de l'élève %s", client._selected_child.name)
 
-                    jsondata["eleve"] = identites(client._selected_child)
+                    jsondata["Eleve"] = identites(client._selected_child)
                     # Neutralisation car listenfant en erreur
                     # jsondata["listenfant"] = listenfant
                     if (
@@ -1156,7 +1191,7 @@ def read_socket():
                     ):
                         jsondata["Photo"] = client._selected_child.profile_picture.url
                 else:
-                    jsondata["eleve"] = identites(client.info)
+                    jsondata["Eleve"] = identites(client.info)
                     if client.info.profile_picture and client.info.profile_picture.url:
                         jsondata["Photo"] = client.info.profile_picture.url
                 # je renew le token
@@ -1165,10 +1200,10 @@ def read_socket():
 
                 # J'ajoute l'emploi du temps
                 logging.info("Je récupére l'emploi du temps")
-                jsondata["emploi_du_temps"] = Emploidutemps(client)
+                jsondata["Emploi_du_temps"] = Emploidutemps(client)
                 # J'ajoute les notes
                 logging.info("Je récupére les notes")
-                jsondata["notes"] = notes(client)
+                jsondata["Notes"] = notes(client)
                 # j'ajoute les menus
                 logging.info("Je récupére les menus")
                 jsondata["Menus"] = menus(client)
@@ -1183,13 +1218,13 @@ def read_socket():
                 jsondata["Retards"] = retards(client)
                 # J'ajoutes les punitions
                 logging.info("Je récupére les punitions")
-                jsondata["Punissions"] = punitions(client)
+                jsondata["Punitions"] = punitions(client)
                 # J'ajoute les devoirs
                 logging.info("Je récupére les devoirs")
-                jsondata["devoirs"] = devoirs(client)
+                jsondata["Devoirs"] = devoirs(client)
                 # J'ajoutes des évaluations -- à finir
-                # logging.info("Je récupére les évaluations")
-                # jsondata["evaluations"] = evaluations(client)
+                logging.info("Je récupére les évaluations")
+                jsondata["Competences"] = evaluations(client)
                 # J'ajoutes l'ICAL
                 logging.info("Je récupére l'ICAL")
                 jsondata["Ical"] = ical(client)

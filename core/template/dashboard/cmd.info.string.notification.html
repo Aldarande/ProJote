@@ -1,0 +1,85 @@
+<div class="cmd cmd-widget #history#" data-type="info" data-subtype="string" data-template="notification"
+    data-cmd_id="#id#" data-cmd_uid="#uid#" data-version="#version#" data-eqLogic_id="">
+    <div class="content-xs">
+        <div class="cmdName #hide_name#">#name_display#
+            <div id="date-notif-#id#" class="date-item" style="font-style: italic; font-weight: bold;"></div>
+            <span class="value" style="max-width: 245px; max-height: 350px;">#value#</span>
+        </div>
+    </div>
+    <style>
+        .notif-item {
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            margin-bottom: 10px;
+            margin: 0 5px 10px 5px;
+            /* haut, droite, bas, gauche */
+            padding: 10px;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.07);
+            position: relative;
+            max-width: 245px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .notif-categorie-auteur {
+            font-size: 0.95em;
+            color: #666;
+            font-style: italic;
+            margin-bottom: 2px;
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+
+        .notif-bottom-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9em;
+            margin-top: 4px;
+        }
+
+        .notif-date {
+            color: #888;
+        }
+
+        .notif-lu {
+            font-size: 1.1em;
+        }
+    </style>
+    <div id="notification-list-#id#"></div>
+    <script>
+        jeedom.cmd.addUpdateFunction('#id#', function (_options) {
+            if (is_object(cmd = document.querySelector('.cmd[data-cmd_uid="#uid#"]'))) {
+                const notifData = _options.value;
+                try {
+                    const notifications = JSON.parse(notifData);
+                    const notifHTML = Array.isArray(notifications) ? notifications.map(notif => `
+            <div class="notif-item">
+                <div class="notif-sujet">${notif.sujet ?? ''}</div>
+                <div class="notif-categorie-auteur">
+                    <span class="notif-categorie">${notif.categorie ?? ''}</span>
+                    <span class="notif-sep"> | </span>
+                    <span class="notif-auteur">${notif.auteur ?? ''}</span>
+                </div>
+                <div class="notif-bottom-row">
+                    <span class="notif-date">${notif.creation ?? ''}</span>
+                    <span class="notif-lu">
+                        ${notif.lu ? '<i class="fas fa-envelope-open"></i>' : '<i class="fas fa-envelope"></i>'}
+                    </span>
+                </div>
+            </div>
+                    `).join('') : '<div style="color:gray;">Aucune notification</div>';
+                    cmd.querySelector('.value').innerHTML = notifHTML;
+                } catch (e) {
+                    cmd.querySelector('.value').innerHTML = '<div style="color:#FF4500;">Erreur de données de notification</div>';
+                    console.error("Erreur lors du parsing des données JSON :", e);
+                }
+            }
+        });
+
+        jeedom.cmd.refreshValue([{ cmd_id: '#id#', value: '#value#', display_value: '#state#', valueDate: '#valueDate#', collectDate: '#collectDate#', alertLevel: '#alertLevel#' }]);
+    </script>
+</div>
