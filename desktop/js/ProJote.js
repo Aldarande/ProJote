@@ -593,7 +593,8 @@ function addCmdToTable(_cmd) {
     'note',
     'derniere_note',
     'notifications',
-    'derniere_notification'
+    'derniere_notification',
+    'competences'
   ];
 
   if (!excludedLogicalIds.includes(_cmd.logicalId)) {

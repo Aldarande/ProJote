@@ -262,7 +262,7 @@ class ProJote extends eqLogic
       "Picture" => array('Picture', 'info', 'string', "", 0, 1, "GENERIC_PICTURE", 'ProJote::picture', 'picture'),
       "URL_Ical" => array('URL Ical', 'info', 'string', "", 0, 0, "GENERIC_URL", 'core::badge', 'core::badge'),
       "Nb_absences" => array("Nombre d'absence", 'info', 'numeric', "", 0, 1, "GENERIC_INFO", 'core::badge', 'core::badge'),
-      "Nb_punission" => array("Nombre de punission", 'info', 'numeric', "", 0, 1, "GENERIC_INFO", 'core::badge', 'core::badge'),
+      "Nb_punitions" => array("Nombre de punitions", 'info', 'numeric', "", 0, 1, "GENERIC_INFO", 'core::badge', 'core::badge'),
       "Nb_retard" => array("Nombre de retard", 'info', 'numeric', "", 0, 1, "GENERIC_INFO", 'core::badge', 'core::badge'),
       "Nb_devoir" => array("Nombre de Devoir", 'info', 'numeric', "", 0, 1, "GENERIC_INFO", 'core::badge', 'core::badge'),
       "Nb_devoirNF" => array("Nombre de Devoir non fait", 'info', 'numeric', "", 0, 1, "GENERIC_INFO", 'core::badge', 'core::badge'),
@@ -272,11 +272,11 @@ class ProJote extends eqLogic
       "Nb_devoirF_Demain" => array("Nombre de Devoir fait pour le prochain jour", 'info', 'numeric', "", 0, 1, "GENERIC_INFO", 'core::badge', 'core::badge'),
       "edt_aujourdhui_debut" => array("Heure de début Aujourd'hui", 'info', 'string', "", 0, 1, "GENERIC_TIME", 'core::badge', 'core::badge'),
       "edt_aujourdhui_fin" => array("Heure de fin Aujourd'hui", 'info', 'string', "", 0, 1, "GENERIC_DATE ", 'core::badge', 'core::badge'),
-      "edt_aujourdhui_cancel" => array("Nombre de cours annulé Aujourd'hui", 'info', 'string', "cours", 0, 1, "GENERIC_INFO", 'core::badge', 'core::badge'),
+      "edt_aujourdhui_cancel" => array("Nombre de cours annulé Aujourd'hui", 'info', 'numeric', "cours", 0, 1, "GENERIC_INFO", 'core::badge', 'core::badge'),
       "edt_prochainjour_date" => array("Date du Prochain Jour", 'info', 'string', "", 0, 1, "GENERIC_TIME", 'core::badge', 'core::badge'),
       "edt_prochainjour_debut" => array("Heure de début du Prochain Jour", 'info', 'string', "", 0, 1, "GENERIC_TIME", 'core::badge', 'core::badge'),
       "edt_prochainjour_fin" => array("Heure de fin du Prochain Jour", 'info', 'string', "", 0, 1, "GENERIC_TIME", 'core::badge', 'core::badge'),
-      "edt_prochainjour_cancel" => array("Nombre de cours annulé du Prochain Jour", 'info', 'string', "", 0, 1, "GENERIC_INFO", 'core::badge', 'core::badge'),
+      "edt_prochainjour_cancel" => array("Nombre de cours annulé du Prochain Jour", 'info', 'numeric', "", 0, 1, "GENERIC_INFO", 'core::badge', 'core::badge'),
       "edt_aujourdhui_fin" => array("Heure de fin Aujourd'hui", 'info', 'string', "", 0, 1, "GENERIC_INFO", 'core::badge', 'core::badge'),
       "edt_Cours_canceled" => array("Nombre de cours annulé", 'info', 'string', "", 0, 1, "GENERIC_INFO", 'core::badge', 'core::badge'),
       "edt_prochainjour" => array("Emploi du temps du Prochain Jour", 'info', 'string', "", 0, 1, "GENERIC_INFO", 'ProJote::edt', 'core::badge'),
@@ -287,12 +287,13 @@ class ProJote extends eqLogic
       "derniere_absence" => array("Dernière absence", 'info', 'string', "", 0, 1, "GENERIC_INFO", 'ProJote::absence', 'core::badge'),
       "retard" => array("Liste des 10 derniers retards", 'info', 'string', "", 0, 1, "GENERIC_INFO", 'ProJote::retard', 'core::badge'),
       "dernier_retard" => array("Dernier retard", 'info', 'string', "", 0, 1, "GENERIC_INFO", 'ProJote::retard', 'core::badge'),
-      "punition" => array("Liste des punissions", 'info', 'string', "", 0, 1, "GENERIC_INFO", 'ProJote::punition', 'core::badge'),
-      "derniere_punition" => array("Dernière punission", 'info', 'string', "", 0, 1, "GENERIC_INFO", 'ProJote::punition', 'core::badge'),
+      "punition" => array("Liste des punitions", 'info', 'string', "", 0, 1, "GENERIC_INFO", 'ProJote::punition', 'core::badge'),
+      "derniere_punition" => array("Dernière punition", 'info', 'string', "", 0, 1, "GENERIC_INFO", 'ProJote::punition', 'core::badge'),
       "note" => array("Liste des notes", 'info', 'string', "", 0, 1, "GENERIC_INFO", 'ProJote::note', 'core::badge'),
       "derniere_note" => array("Dernière note", 'info', 'string', "", 0, 1, "GENERIC_INFO", 'ProJote::note', 'core::badge'),
       "notifications" => array("liste des notifications", 'info', 'string', "", 0, 1, "GENERIC_INFO", 'ProJote::notification', 'core::badge'),
-      "derniere_notification" => array("Dernière notification", 'info', 'string', "", 0, 1, "GENERIC_INFO", 'ProJote::notification', 'core::badge')
+      "derniere_notification" => array("Dernière notification", 'info', 'string', "", 0, 1, "GENERIC_INFO", 'ProJote::notification', 'core::badge'),
+      "competences" => array("Liste des compétences", 'info', 'string', "", 0, 1, "GENERIC_INFO", 'ProJote::competence', 'core::badge')
     );
   }
 
