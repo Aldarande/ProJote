@@ -12,6 +12,9 @@
 # You should have received a copy of the GNU General Public License
 # along with Jeedom. If not, see <http://www.gnu.org/licenses/>.
 
+
+import contextlib
+
 try:
     import logging
     import sys
@@ -34,6 +37,7 @@ try:
 
     # Chiffrement du password
     from Crypto.Cipher import AES
+    from random import Random
 
     # from Crypto import Random
 except ImportError as e:
@@ -48,6 +52,7 @@ except ImportError as e:
         e.__traceback__.tb_lineno,
         e,
     )
+    sys.exit(1)
     sys.exit(1)
 
 
@@ -122,6 +127,39 @@ def verifdossier(chemin_dossier):
         return True
     except Exception as e:
         logging.error(f"Erreur lors de la vérification ou création du dossier : {e}")
+        return False
+
+
+def Checkeleve(client, CmdId):
+    try:
+        if client._selected_child == "":
+            logging.error("Aucun élève sélectionné.")
+            return False
+        else:
+            chemin_fichier = "/var/www/html/plugins/ProJote/data"
+            if not os.path.exists(chemin_fichier):
+                logging.error(f"Le fichier {chemin_fichier} n'existe pas.")
+                return False
+            with open(f"{chemin_fichier}/{CmdId}/enfant.ProJote.json.txt", "r") as file:
+                data = json.load(file)
+                if data["Eleve"] != client._selected_child.name:
+                    logging.info(
+                        f"L'élève sélectionné ({client._selected_child.name}) ne correspond pas à celui dans le fichier ({data['Eleve']}), je modifie le fichier."
+                    )
+                    writedataPronotepy(client, chemin_fichier, CmdId)
+                else:
+                    logging.info(
+                        f"L'élève sélectionné est valide : {client._selected_child.name}"
+                    )
+                    logging.info(f"Le fichier {chemin_fichier} est à jour.")
+                return True
+    except Exception as e:
+        line_number = e.__traceback__.tb_lineno
+        logging.error(
+            "Une erreur est retournée sur le traitement de sélection d'élève-lig: %s; %s",
+            line_number,
+            e,
+        )
         return False
 
 
@@ -301,13 +339,13 @@ def Emploidutemps(client):
         # Transformation Json des emplois du temps (J,J+1 et next)
         # Récupération  emploi du temps du jour
         lessons_today = client.lessons(datetime.date.today())
-        lessons_today = sorted(lessons_today, key=lambda lesson: lesson.start)
         data = {
             "edt_aujourdhui": [],
             "edt_aujourdhui_debut": "",
             "edt_aujourdhui_fin": "",
             "edt_aujourdhui_cancel": 0,
         }
+        lessons_today = sorted(lessons_today, key=lambda lesson: lesson.start)
         if lessons_today:
             for lesson in lessons_today:
                 index = lessons_today.index(lesson)
@@ -335,9 +373,9 @@ def Emploidutemps(client):
         if lessons_tomorrow:
             for lesson in lessons_tomorrow:
                 index = lessons_tomorrow.index(lesson)
-                if not (
-                    lesson.start == lessons_tomorrow[index - 1].start
-                    and lesson.canceled == True
+                if (
+                    lesson.start != lessons_tomorrow[index - 1].start
+                    or lesson.canceled != True
                 ):
                     data["edt_demain"].append(build_cours_data(lesson))
                 if lesson.canceled == False and data["edt_demain_debut"] == "":
@@ -353,7 +391,7 @@ def Emploidutemps(client):
             lessons_nextday = client.lessons(
                 datetime.date.today() + datetime.timedelta(days=delta)
             )
-            delta = delta + 1
+            delta += 1
         lessons_nextday = sorted(lessons_nextday, key=lambda lesson: lesson.start)
         # JE compléte l'emploi du temps du prochain jours
         data["edt_prochainjour"] = []
@@ -363,18 +401,16 @@ def Emploidutemps(client):
         if lessons_nextday:
             for lesson in lessons_nextday:
                 index = lessons_nextday.index(lesson)
-                if not (
-                    lesson.start == lessons_nextday[index - 1].start
-                    and lesson.canceled == True
+                if (
+                    lesson.start != lessons_nextday[index - 1].start
+                    or lesson.canceled != True
                 ):
                     lesson_to_append = build_cours_data(lesson)
                     lesson_to_append["index"] = index
                     data["edt_prochainjour"].append(lesson_to_append)
 
                 if lesson.canceled == True:
-                    data["edt_prochainjour_cancel"] = (
-                        data["edt_prochainjour_cancel"] + 1
-                    )
+                    data["edt_prochainjour_cancel"] += 1
 
                 if lesson.canceled == False and data["edt_prochainjour_debut"] == "":
                     data["edt_prochainjour_debut"] = lesson.start.strftime("%H%M")
@@ -448,57 +484,54 @@ def evaluations(client):
         }
         if evaluations == []:
             return data
-        else:
-            for evaluation in evaluations:
+        for evaluation in evaluations:
 
-                def acquisition_to_dict(acq):
-                    # Si c'est déjà un dict, on le retourne
-                    if isinstance(acq, dict):
-                        return acq
-                    # Sinon, on extrait les attributs principaux
-                    return {
-                        "ordre": getattr(acq, "order", ""),
-                        "name": getattr(acq, "name", ""),
-                        "name_id": getattr(acq, "name_id", ""),
-                        "abbreviation": getattr(acq, "abbreviation", ""),
-                        "level": getattr(acq, "level", ""),
-                        "coefficient": getattr(acq, "coefficient", ""),
-                        "domain": getattr(acq, "domain", ""),
-                        "domain_id": getattr(acq, "domain_id", ""),
-                        "pillar": getattr(acq, "pillar", ""),
-                        "pillar_id": getattr(acq, "pillar_id", ""),
-                    }
+            def acquisition_to_dict(acq):
+                # Si c'est déjà un dict, on le retourne
+                if isinstance(acq, dict):
+                    return acq
+                # Sinon, on extrait les attributs principaux
+                return {
+                    "ordre": getattr(acq, "order", ""),
+                    "name": getattr(acq, "name", ""),
+                    "name_id": getattr(acq, "name_id", ""),
+                    "abbreviation": getattr(acq, "abbreviation", ""),
+                    "level": getattr(acq, "level", ""),
+                    "coefficient": getattr(acq, "coefficient", ""),
+                    "domain": getattr(acq, "domain", ""),
+                    "domain_id": getattr(acq, "domain_id", ""),
+                    "pillar": getattr(acq, "pillar", ""),
+                    "pillar_id": getattr(acq, "pillar_id", ""),
+                }
 
-                # Si c'est un dict, on convertit ses valeurs
-                if isinstance(evaluation.acquisitions, dict):
-                    acquisitions = {
-                        k: acquisition_to_dict(v)
-                        for k, v in evaluation.acquisitions.items()
-                    }
-                # Si c'est une liste
-                elif isinstance(evaluation.acquisitions, list):
-                    acquisitions = [
-                        acquisition_to_dict(a) for a in evaluation.acquisitions
-                    ]
-                else:
-                    acquisitions = evaluation.acquisitions
+            # Si c'est un dict, on convertit ses valeurs
+            if isinstance(evaluation.acquisitions, dict):
+                acquisitions = {
+                    k: acquisition_to_dict(v)
+                    for k, v in evaluation.acquisitions.items()
+                }
+            # Si c'est une liste
+            elif isinstance(evaluation.acquisitions, list):
+                acquisitions = [acquisition_to_dict(a) for a in evaluation.acquisitions]
+            else:
+                acquisitions = evaluation.acquisitions
 
-                data["evaluations"].append(
-                    {
-                        "id": evaluation.id,
-                        "nom": evaluation.name,
-                        "domaine": evaluation.domain,
-                        "professeur": evaluation.teacher,
-                        "Sujet": getattr(
-                            evaluation.subject, "name", str(evaluation.subject)
-                        ),
-                        "date": evaluation.date.strftime("%d/%m/%Y"),
-                        "acquisitions": acquisitions,
-                        "description": evaluation.description,
-                        "Paliers": evaluation.paliers,
-                        "coeff": evaluation.coefficient,
-                    }
-                )
+            data["evaluations"].append(
+                {
+                    "id": evaluation.id,
+                    "nom": evaluation.name,
+                    "domaine": evaluation.domain,
+                    "professeur": evaluation.teacher,
+                    "Sujet": getattr(
+                        evaluation.subject, "name", str(evaluation.subject)
+                    ),
+                    "date": evaluation.date.strftime("%d/%m/%Y"),
+                    "acquisitions": acquisitions,
+                    "description": evaluation.description,
+                    "Paliers": evaluation.paliers,
+                    "coeff": evaluation.coefficient,
+                }
+            )
         return data["evaluations"]
     except Exception as e:
         line_number = e.__traceback__.tb_lineno
@@ -512,156 +545,173 @@ def evaluations(client):
 def notes(client):
     try:
         # Récupération des notes
-        grades = client.current_period.grades
-        grades = sorted(grades, key=lambda grade: grade.date, reverse=True)
+        if grades != client.current_period.grades:
+            grades = sorted(grades, key=lambda grade: grade.date, reverse=True)
+            index_note = 0  # debut de la boucle des notes
+            limit_note = 11  # nombre max de note à récupérer + 1
+            # Transformation des notes en Json
+            data = {"note": [], "derniere_note": []}
+            for grade in grades:
+                index_note += 1
+                if index_note == limit_note:
+                    break
+                data["note"].append(
+                    {
+                        "id": grade.id,
+                        "date": grade.date.strftime("%d/%m/%Y"),
+                        "date_courte": grade.date.strftime("%d/%m"),
+                        "cours": grade.subject.name,
+                        "note": grade.grade,
+                        "sur": grade.out_of,
+                        "note_sur": grade.grade + "\u00a0/\u00a0" + grade.out_of,
+                        "coeff": grade.coefficient,
+                        "moyenne_classe": grade.average,
+                        "max": grade.max,
+                        "min": grade.min,
+                        "commentaire": grade.comment,
+                        "optionnel": grade.is_optionnal,
+                        "bonus": grade.is_bonus,
+                    }
+                )
+                # je récupére la derniére note
+            if index_note > 0:
+                data["derniere_note"].append(data["note"][0])
 
-        index_note = 0  # debut de la boucle des notes
-        limit_note = 11  # nombre max de note à afficher + 1
-
-        # Transformation des notes en Json
-        data = {"note": [], "derniere_note": []}
-        for grade in grades:
-            index_note += 1
-            if index_note == limit_note:
-                break
-            data["note"].append(
-                {
-                    "id": grade.id,
-                    "date": grade.date.strftime("%d/%m/%Y"),
-                    "date_courte": grade.date.strftime("%d/%m"),
-                    "cours": grade.subject.name,
-                    "note": grade.grade,
-                    "sur": grade.out_of,
-                    "note_sur": grade.grade + "\u00a0/\u00a0" + grade.out_of,
-                    "coeff": grade.coefficient,
-                    "moyenne_classe": grade.average,
-                    "max": grade.max,
-                    "min": grade.min,
-                    "commentaire": grade.comment,
-                    "optionnel": grade.is_optionnal,
-                    "bonus": grade.is_bonus,
-                }
-            )
-            # je récupére la derniére note
-        if index_note > 0:
-            data["derniere_note"].append(data["note"][0])
-
+        else:
+            logging.info("Aucune note trouvée pour la période en cours.")
+            data = {"note": [], "derniere_note": []}
         return data
     except Exception as e:
         line_number = e.__traceback__.tb_lineno
         logging.error(
-            "Une erreur est retournée sur le traitement des notes-lig: %s; %s",
+            "Une erreur est retournée sur le traitement des notes -lig: %s; %s",
             line_number,
             e,
         )
+
+
+import datetime
+import logging
+
+
+def process_homework(homework_list, data, key, longmax_devoir):
+    if not homework_list:
+        logging.info(f"Aucun devoir trouvé pour {key}.")
+        return
+
+    for homework in homework_list:
+        data[key].append(
+            {
+                "index": homework_list.index(homework),
+                "date": homework.date.strftime("%d/%m"),
+                "title": homework.subject.name,
+                "description": (
+                    homework.description.encode("utf-8").decode("unicode_escape")
+                )[:longmax_devoir],
+                "color": homework.background_color,
+                "done": homework.done,
+                "est_service_groupe": getattr(homework, "estServiceGroupe", None),
+            }
+        )
+
+
+import datetime
+import logging
+
+
+def process_homework(homework_list, data, key, longmax_devoir):
+    if not homework_list:
+        logging.info(f"Aucun devoir trouvé pour {key}.")
+        data[f"nb_{key}"] = 0
+        data[f"nb_{key}_F"] = 0
+        data[f"nb_{key}_NF"] = 0
+        return 0, 0, 0
+
+    Devoir = 0
+    Devoirfait = 0
+    Devoirnonfait = 0
+
+    for homework in homework_list:
+        data[key].append(
+            {
+                "index": homework_list.index(homework),
+                "date": homework.date.strftime("%d/%m"),
+                "title": homework.subject.name,
+                "description": (
+                    homework.description.encode("utf-8").decode("unicode_escape")
+                )[:longmax_devoir],
+                "color": homework.background_color,
+                "done": homework.done,
+                "est_service_groupe": getattr(homework, "estServiceGroupe", None),
+            }
+        )
+        Devoir += 1
+        if homework.done == 1:
+            Devoirfait += 1
+        else:
+            Devoirnonfait += 1
+
+    data[f"Nb_{key}"] = Devoir
+    data[f"Nb_{key}_F"] = Devoirfait
+    data[f"Nb_{key}_NF"] = Devoirnonfait
+
+    return Devoir, Devoirfait, Devoirnonfait
 
 
 def devoirs(client):
     try:
         data = {"devoir": [], "devoir_Demain": []}
-        Devoir = 0
-        Devoirfait = 0
-        Devoirnonfait = 0
-        # Récupération des devoirs
-        homework_today = client.homework(datetime.date.today())
-        longmax_devoir = 125  # nombre de caractère max dans la description des devoirs
+        longmax_devoir = 120
 
-        # Transformation des devoirs  en Json
-        # JE teste si homework_today est vide
-        if not homework_today:
-            logging.info("Aucun devoir trouvé pour aujourd'hui.")
-        else:
-            for homework in homework_today:
-
-                data["devoir"].append(
-                    {
-                        "index": homework_today.index(homework),
-                        "date": homework.date.strftime("%d/%m"),
-                        "title": homework.subject.name,
-                        "description": (
-                            homework.description.encode("utf-8").decode(
-                                "unicode_escape"
-                            )
-                        )[:longmax_devoir],
-                        "color": (homework.background_color),
-                        "done": homework.done,
-                        "est_service_groupe": getattr(
-                            homework, "estServiceGroupe", None
-                        ),
-                    }
-                )
-                Devoir = Devoir + 1
-                if homework.done == 1:
-                    Devoirfait = Devoirfait + 1
-                else:
-                    Devoirnonfait = Devoirnonfait + 1
-                data["nb_devoir"] = Devoir
-                data["nb_devoirF"] = Devoirfait
-                data["nb_devoirNF"] = Devoirnonfait
-
-        # Récupération  des devoirs  du prochain jour d'école (ça sert le weekend et les vacances)
-
-        Devoir = 0
-        Devoirfait = 0
-        Devoirnonfait = 0
-        delta = 1
-        homework_nextday = client.homework(
-            datetime.date.today() + datetime.timedelta(days=delta)
+        # Supposons que cette méthode récupère tous les devoirs pour une période donnée
+        all_homework = client.homework(
+            date_from=datetime.date.today(),
+            date_to=datetime.date.today() + datetime.timedelta(days=120),
         )
 
-        while not homework_nextday and delta < 120:
-            homework_nextday = client.homework(
-                datetime.date.today() + datetime.timedelta(days=delta)
-            )
-            logging.info(
-                "Je recherche des devoirs pour le prochain jour d'école + %s.", delta
-            )
-            delta = delta + 1
-        if not homework_nextday:
-            logging.info("Aucun devoir trouvé pour le prochain jour d'école.")
-        else:
-            logging.info("J'ai des devoirs trouvés pour le prochain jour d'école.")
-            homework_nextday = sorted(
-                homework_nextday, key=lambda homework: homework.date
-            )
-            nextdate = homework_nextday[0].date
-            for homework in homework_nextday:
-                if homework.date == nextdate:
-                    data["devoir_Demain"].append(
-                        {
-                            "index": homework_nextday.index(homework),
-                            "date": homework.date.strftime("%d/%m"),
-                            "title": homework.subject.name,
-                            "description": (
-                                homework.description.encode("utf-8").decode(
-                                    "unicode_escape"
-                                )
-                            )[:longmax_devoir],
-                            "color": homework.background_color,
-                            "done": homework.done,
-                            "est_service_groupe": getattr(
-                                homework, "estServiceGroupe", None
-                            ),
-                        }
-                    )
-                    Devoir = Devoir + 1
-                    if homework.done == 1:
-                        Devoirfait = Devoirfait + 1
-                    else:
-                        Devoirnonfait = Devoirnonfait + 1
+        if not all_homework:
+            logging.info("Aucun devoir trouvé pour la période spécifiée.")
+            for key in ["devoir", "devoir_Demain"]:
+                data[f"Nb_{key}"] = 0
+                data[f"Nb_{key}_F"] = 0
+                data[f"Nb_{key}_NF"] = 0
+                data[key] = []
+            return data
 
-            data["nb_devoir_Demain"] = Devoir
-            data["nb_devoirF_Demain"] = Devoirfait
-            data["nb_devoirNF_Demain"] = Devoirnonfait
+        # Filtrer les devoirs pour aujourd'hui
+        today = datetime.date.today()
+        homework_today = [hw for hw in all_homework if hw.date == today]
+
+        # Filtrer les devoirs pour le prochain jour d'école
+        delta = 1
+        next_school_day = None
+        while delta < 120:
+            next_day = today + datetime.timedelta(days=delta)
+            homework_nextday = [hw for hw in all_homework if hw.date == next_day]
+            if homework_nextday:
+                next_school_day = homework_nextday
+                break
+            delta += 1
+
+        # Traiter les devoirs pour aujourd'hui
+        process_homework(homework_today, data, "devoir", longmax_devoir)
+
+        # Traiter les devoirs pour le prochain jour d'école
+        if next_school_day:
+            process_homework(next_school_day, data, "devoir_Demain", longmax_devoir)
+        else:
+            logging.info("Aucun devoir trouvé pour le prochain jour d'école.")
 
         return data
+
     except Exception as e:
         line_number = e.__traceback__.tb_lineno
         logging.error(
-            "Une erreur est retournée sur le traitement des devoirs-lig: %s; %s",
+            "Une erreur est retournée sur le traitement des devoirs-ligne: %s; %s",
             line_number,
             e,
         )
+        return data
 
 
 def notifications(client):
@@ -853,46 +903,6 @@ def identites(clientinfo):
         logging.debug("Nom de l''identité nom  %s", clientinfo.name)
         logging.debug("Nom de l''identité Classe %s", clientinfo.class_name)
         logging.debug("Nom de l''identité Etablissement %s", clientinfo.establishment)
-        """
-            if hasattr(clientinfo, "email"):
-                identiteinfo["email"] = append(clientinfo.email)
-            else:
-                identiteinfo["email"] = ""
-
-        if clientinfo.ine_number:
-            identiteinfo["INE"] = append(clientinfo.ine_number)
-        else:
-            identiteinfo["INE"] = ""
-
-        if clientinfo.phone:
-            identiteinfo["Phone"] = clientinfo.phone
-        else:
-            identiteinfo["Phone"] = ""
-
-        if clientinfo.address:
-            (
-                identiteinfo["Addresse1"],
-                identiteinfo["Addresse2"],
-                identiteinfo["Addresse3"],
-                identiteinfo["Addresse4"],
-                identiteinfo["CP"],
-                identiteinfo["Province"],
-                identiteinfo["Ville"],
-            ) = clientinfo.adress
-        else:
-            identiteinfo["Addresse1"] = identiteinfo["Addresse2"] = identiteinfo[
-                "Addresse3"
-            ] = identiteinfo["Addresse4"] = identiteinfo["CP"] = identiteinfo[
-                "Province"
-            ] = identiteinfo[
-                "Ville"
-            ] = ""
-
-        if clientinfo.delegue:
-            identiteinfo["delegue"] = clientinfo.delegue
-        else:
-            identiteinfo["delegue"] = ""
-        """
         return IdentityInfo
     except Exception as e:
         line_number = e.__traceback__.tb_lineno
@@ -916,19 +926,17 @@ def GetTokenFromLogin(Account):
 
     # qrcode_data["url"] = last_part
     logging.debug("Les info du QRCode : %s", qrcode_data["url"])
-    Token_data = Account.qrcode_login(
+    return Account.qrcode_login(
         qrcode_data,
         "4321",
         uuid="ProJote",
     )
-    return Token_data
 
 
 def RenewToken(client):
     try:
         # Récupération des tokens
-        data = {"Token": []}
-        data["Token"] = client.export_credentials()
+        data = {"Token": client.export_credentials()}
         logging.debug("Les tokens sont : %s", data["Token"])
         return data["Token"]
     except Exception as e:
@@ -974,6 +982,7 @@ def Connectparent(pronote_url, login, password, ent, enfant):
             logging.debug("Listes des enfants trouvé du compte Parent : %s", child.name)
             listenfant.append(child.name)
         # Si pas d'enfant  par défault je prend le premier enfant
+        logging.debug("Je me connecte à l''enfant %s", enfant)
         if enfant == "":
             client.set_child(listenfant[0])
             logging.info("Je suis connecté à l'enfant par défault %s", listenfant[0])
@@ -981,7 +990,6 @@ def Connectparent(pronote_url, login, password, ent, enfant):
             # Pour mettre à jour la liste d'enfant, je vérifie toujorus la liste
             client.set_child(enfant)
             logging.info("Je suis connecté à l'enfant %s", enfant)
-
         return client, listenfant
     except Exception as e:
         line_number = e.__traceback__.tb_lineno
@@ -992,17 +1000,16 @@ def Connect(pronote_url, login, password, ent):
     if login == "":
         logging.error("Pas de login reçu sur le deamon")
 
-    if not pronote_url == "":
+    if pronote_url != "":
         if ent == "":
             if pronote_url.endswith(
                 ".index-education.net/pronote/eleve.html?login=true"
             ):
                 pronote_url = pronote_url[: -len("?login=true")]
                 logging.info("URL  modifiée :", pronote_url)
-        else:
-            if pronote_url.endswith(".index-education.net/pronote/eleve.html"):
-                pronote_url += "?login=true"
-                logging.info("URL  modifiée : %s", pronote_url)
+        elif pronote_url.endswith(".index-education.net/pronote/eleve.html"):
+            pronote_url += "?login=true"
+            logging.info("URL  modifiée : %s", pronote_url)
         logging.debug("L'url pour se connecter est  : %s", pronote_url)
     else:
         logging.error("pas d'URL reçu sur le deamon")
@@ -1022,7 +1029,7 @@ def Connect(pronote_url, login, password, ent):
         logging.error("Connection échouée :  %s", e)
 
 
-def read_socket():
+def read_socket():  # sourcery skip: extract-method, merge-dict-assign
     global JEEDOM_SOCKET_MESSAGE
     try:
         if not JEEDOM_SOCKET_MESSAGE.empty():
@@ -1040,16 +1047,15 @@ def read_socket():
                 message = json.loads(decoded_message)
             except json.JSONDecodeError as e:
                 logging.error("Erreur de décodage JSON : %s", e)
-                logging.debug("Notification en erreur : %s", stripped_message)
+                logging.debug("Notification en erreur : %s", raw_message)
                 return
 
-            logging.debug("Le MESSAGE reçu est  %s", message)
+            logging.debug("Le MESSAGE reçu est : %s", message)
             if message["apikey"] != _apikey:
                 logging.error("Invalid apikey from socket: %s", message)
-            # d'abord je me connecte
-            # Procédure de connection
-            # On test que l'on a bien les information de TOKEN
-
+            # ========================================================
+            #   1 : On se connecte avec le Token réçu par défault
+            # ========================================================
             # Vérifier que les informations de Token sont présentes et non vides
 
             required_keys = ["TokenId", "TokenUsername", "TokenPassword", "TokenUrl"]
@@ -1061,33 +1067,69 @@ def read_socket():
 
             if all_keys_present:
                 logging.debug(
-                    "Toutes les informations de Token sont présentes et non vides. JE me connecte avec le Token"
+                    "Toutes les informations de Token sont présentes et non vides. Je me connecte avec le Token"
                 )
-                if "parent.html" in message["TokenUrl"]:
-                    client = pronotepy.ParentClient.token_login(
-                        pronote_url=message["TokenUrl"],
-                        username=message["TokenUsername"],
-                        password=message["TokenPassword"],
-                        client_identifier=message["TokenId"],
-                        uuid="ProJote",
+                try:
+                    if "parent.html" in message["TokenUrl"]:
+                        client = pronotepy.ParentClient.token_login(
+                            pronote_url=message["TokenUrl"],
+                            username=message["TokenUsername"],
+                            password=message["TokenPassword"],
+                            client_identifier=message["TokenId"],
+                            uuid="ProJote",
+                        )
+                        # Je sélectionne l'enfant si il est spécifié
+                        if "enfant" in message and message["enfant"] != "":
+                            # Pour mettre à jour la liste d'enfant, je vérifie toujours la liste
+                            client.set_child(message["enfant"])
+                            logging.info(
+                                "Je suis connecté à l'enfant %s", message["enfant"]
+                            )
+                    else:
+                        client = pronotepy.Client.token_login(
+                            pronote_url=message["TokenUrl"],
+                            username=message["TokenUsername"],
+                            password=message["TokenPassword"],
+                            client_identifier=message["TokenId"],
+                            uuid="ProJote",
+                        )
+                except Exception as e:
+                    logging.error(
+                        "Token invalide, regénérer le QR CODE ou re valider le compte : %s",
+                        e,
                     )
-                else:
-                    client = pronotepy.Client.token_login(
-                        pronote_url=message["TokenUrl"],
-                        username=message["TokenUsername"],
-                        password=message["TokenPassword"],
-                        client_identifier=message["TokenId"],
-                        uuid="ProJote",
-                    )
-
+                    client = None
                 ### 05/01/2025 : A revalider si je dois doubler
-                credentials = client.export_credentials()
-                # client = pronotepy.Client.token_login(**credentials)
+                # A supprimer car doublon avec ligne 1155
+                # credentials = client.export_credentials()
+                if client is not None and client.logged_in:
+                    tokenconnected = "true"
+                else:
+                    logging.error("Connection avec le Token échouée ")
+                    required_keys = ["url", "login", "password"]
+                    all_Comptekeys_present = True
+                    for key in required_keys:
+                        if key not in message or not message[key].strip():
+                            logging.error(
+                                "Information de login manquante ou vide : %s", key
+                            )
+                            all_Comptekeys_present = False
+                    # sourcery skip: raise-specific-error
+                    raise Exception(
+                        "Connection avec le Token échouée et les inforamtions de login sont manquantes."
+                    )
+            else:
+                logging.info("Je me connecte via la compte et le mot de passe.")
+                required_keys = ["url", "login", "password"]
+                if (all_Comptekeys_present != True) or not all_Comptekeys_present:
+                    all_Comptekeys_present = True
+                    for key in required_keys:
+                        if key not in message or not message[key].strip():
+                            logging.error(
+                                "Information de login manquante ou vide : %s", key
+                            )
+                            all_Comptekeys_present = False
 
-                tokenconnected = "true"
-            # Si il manque des informations de Token, ou que l'on n'a pas réussi à se connecter avec le Token, on se connecte avec les informations de compte
-            if not all_keys_present:
-                logging.info("Je me connecte via la compte et le mot de passe")
                 if message["cas"] != "":
                     logging.debug("Cas/Ent reçu : %s", message["cas"])
                     ent = class_for_name("pronotepy.ent", message["cas"])
@@ -1095,7 +1137,9 @@ def read_socket():
                     ent = ""
                 # temp en attendant de revalider le champs$response dans PRojote.PHP et docn de finir QRCODE
 
-                if message["CptParent"] == "1":
+                if (message["CptParent"] == "1") or (
+                    "parent.html" in message["TokenUrl"]
+                ):
                     logging.info("Je me connecte en tant que parent")
                     ## connection en tant que parent
                     client, listenfant = Connectparent(
@@ -1116,75 +1160,26 @@ def read_socket():
                     )
                 # Maintenant que je suis connecté je vais chercher les informations de Token pour la prochaine fois
                 client = GetTokenFromLogin(client)
-                # Teste si l'url contient parent.html pour définir le compte parent
-                if "parent.html" in message["url"]:
-                    message["CptParent"] == "1"
-
-                # J'écris le fichier avec les infos de base
-                logging.debug("Je vais tester si nous sommes loggué")
+            # ==================================================================================
+            #  3 :  Je récupére les informations de l'élève
+            # ==================================================================================
             if client is not None and client.logged_in:
-                # J'écris le token pour la prochaine fois
-                writedataPronotepy(
-                    client, "/var/www/html/plugins/ProJote/data", message["CmdId"]
-                )
                 logging.debug("Nous sommes loggué")
-                # Je vais chercher les informations
+                # Je récupére les informations de l'élève
                 jsondata = {}
                 jsondata["CmdId"] = message["CmdId"]
-                # Liste enfant s'applique que au compte parent
-                ### A supprimer
-                if message["command"] == "Validate":
-                    logging.debug("Je valide que nous sommes connecté")
-                    ##Neutralisationdu champs cptype car qrcode non fonctionnel
-                    if message["cpttype"] == "compte" or message["cpttype"] == "":
-                        dossier = "/tmp/jeedom/ProJote/" + str(message["CmdId"]) + "/"
-                        verifdossier(dossier)
-                        if message["CptParent"] == "1":
-                            # Le but est de tester la connection et de mettre à jours les informations de l'éléve
-                            logging.debug("Je lance la commande de Validation")
-                            if len(listenfant) != 0:
-                                # j'écris dans un fichier la listes des enfants
-
-                                chemin_fichier = os.path.join(
-                                    dossier,
-                                    "listenfant.ProJote",
-                                )
-                                write_listenfant_to_file(listenfant, chemin_fichier)
-                                writedataPronotepy(
-                                    client._selected_child, dossier, message["CmdId"]
-                                )
-                                logging.debug(
-                                    "Je viens de mettre à jours le fichier pour un compte parent : %s",
-                                    chemin_fichier,
-                                )
-                            else:
-                                # J'écris le fichier avec les infos de base
-                                writedataPronotepy(
-                                    client.info, dossier, message["CmdId"]
-                                )
-
-                        else:
-                            writedataPronotepy(client.info, dossier, message["CmdId"])
-                            logging.debug(
-                                "Je viens de mettre à jours le fichier : %s",
-                                dossier,
-                            )
-
-                # là nous sommes vraiment en train de chercher les données du comptes
-                # Maintenant que je suis connecté je vais collecter les infos d'identités
+                jsondata["ConnectionDate"] = datetime.datetime.now().strftime(
+                    " %H:%M:%S %d/%m/%Y"
+                )
                 logging.debug(
                     "Validation Token %s",
                     tokenconnected,
-                    #
                 )
                 if (tokenconnected == "true") and (
                     "parent.html" in message["TokenUrl"]
                 ):
                     logging.debug("Le nom de l'élève %s", client._selected_child.name)
-
                     jsondata["Eleve"] = identites(client._selected_child)
-                    # Neutralisation car listenfant en erreur
-                    # jsondata["listenfant"] = listenfant
                     if (
                         client._selected_child.profile_picture
                         and client._selected_child.profile_picture.url
@@ -1194,10 +1189,10 @@ def read_socket():
                     jsondata["Eleve"] = identites(client.info)
                     if client.info.profile_picture and client.info.profile_picture.url:
                         jsondata["Photo"] = client.info.profile_picture.url
+
                 # je renew le token
                 logging.info("Je renew le Token")
                 jsondata["Token"] = RenewToken(client)
-
                 # J'ajoute l'emploi du temps
                 logging.info("Je récupére l'emploi du temps")
                 jsondata["Emploi_du_temps"] = Emploidutemps(client)
@@ -1228,7 +1223,9 @@ def read_socket():
                 # J'ajoutes l'ICAL
                 logging.info("Je récupére l'ICAL")
                 jsondata["Ical"] = ical(client)
-
+                # Je valide que le fichier équipement est à jours
+                # je lance la fonciton qui recherche si le nom de l'enfant à changer dans l'équipement
+                Checkeleve(client, message["CmdId"])
                 # J'envoie les données à Jeedom
                 logging.debug(
                     "Projoted.py :: Données JSON à envoyer : %s", json.dumps(jsondata)
@@ -1243,6 +1240,7 @@ def read_socket():
     except Exception as e:
         line_number = e.__traceback__.tb_lineno
         logging.error("Erreur d'éxécution du deamon : lig. %s -  %s", line_number, e)
+        jeedom_com.send_change_immediate(jsondata)
 
 
 def listen():
@@ -1266,29 +1264,17 @@ def handler(signum=None, frame=None):
 def shutdown():
     logging.debug("Shutdown")
     logging.debug("Removing PID file %s", _pidfile)
-    try:
+    with contextlib.suppress(Exception):
         os.remove(_pidfile)
-    except:
-        pass
-    try:
+    with contextlib.suppress(Exception):
         jeedom_socket.close()
-    except:
-        pass
     logging.debug("Exit 0")
     # sys.stdout.flush()
     os._exit(0)
 
 
-# ----------------------------------------------------------------------------
 # Ici est le script qui va écouter le socket. Mais la premiére chose qu'il va faire est de renvoyer sont PiD pour validation.
-_log_level = "error"
-_socket_port = 55369  # Coder la prise en charge du port configurer
 _socket_host = "localhost"
-_pidfile = "/tmp/ProJoted.pid"
-_apikey = ""
-_callback = ""
-_cycle = 0.3
-
 parser = argparse.ArgumentParser(description="Projoted Daemon for Jeedom plugin")
 parser.add_argument("--loglevel", help="Log Level for the daemon", type=str)
 parser.add_argument("--callback", help="Callback", type=str)
@@ -1298,19 +1284,12 @@ parser.add_argument("--pid", help="Pid file", type=str)
 parser.add_argument("--socketport", help="Port for Projote Deamon", type=str)
 args = parser.parse_args()
 
-if args.loglevel:
-    _log_level = args.loglevel
-if args.callback:
-    _callback = args.callback
-if args.apikey:
-    _apikey = args.apikey
-if args.pid:
-    _pidfile = args.pid
-if args.cycle:
-    _cycle = float(args.cycle)
-if args.socketport:
-    _socket_port = args.socketport
-
+_log_level = args.loglevel or "error"
+_callback = args.callback or ""
+_apikey = args.apikey or ""
+_pidfile = args.pid or "/tmp/ProJoted.pid"
+_cycle = float(args.cycle) if args.cycle else 0.3
+_socket_port = args.socketport or 55369
 _socket_port = int(_socket_port)
 _cycle = int(_cycle)
 
@@ -1336,7 +1315,7 @@ try:
         )
         shutdown()
 
-    logging.info("j'écris " + str(_pidfile))
+    logging.info(f"j'écris {str(_pidfile)}")
     jeedom_socket = jeedom_socket(port=_socket_port, address=_socket_host)
     listen()
 except Exception as e:

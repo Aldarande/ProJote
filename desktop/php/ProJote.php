@@ -204,7 +204,7 @@ sendVarToJS('eqLogicId', $eqLogic);
 									<label class="col-sm-4 control-label">{{Compte Parent}}<i class="fas fa-question-circle tooltips" title="{{Cochez si vous utilisez une compte parent, donc pas un compte élève}}"></i></label>
 									<input type="checkbox" id="Parent" class="eqLogicAttr form-control" data-l1key="configuration" data-l2key="CptParent">
 								</div>
-								<div class=" form-group">
+								<div class="form-group">
 									<label class="col-sm-4 control-label">{{Login du compte}}<i class="fas fa-question-circle tooltips" title="{{Renseignez le login pour vous connecter à Pronote}}"></i></label>
 									<input type="text" class="col-sm-6 eqLogicAttr form-control" data-l1key="configuration" data-l2key="login">
 								</div>
@@ -216,14 +216,9 @@ sendVarToJS('eqLogicId', $eqLogic);
 									<label class="col-sm-4 control-label">{{Url}}<i class="fas fa-question-circle tooltips" title="{{Renseignez l'adresse web pour vous connecter à Pronote}}"></i></label>
 									<input type="text" class="col-sm-6 eqLogicAttr form-control" data-l1key="configuration" data-l2key="url">
 								</div>
-								<div class="form-group listenfant" style="display:none;">
-									<label class="col-sm-4 control-label">{{Enfants}} <i class="fas fa-question-circle tooltips" title="{{Choisissez le nom de l'enfant}}"></i></label>
-									<select id="enfantList" class="col-sm-6 eqLogicAttr form-control" data-l1key="configuration" data-l2key="enfant">
 
-									</select>
-								</div>
 								<div class="form-group Validate">
-									<div class=" form-group">
+									<div class="form-group">
 										<div class="col-sm-6 col-sm-offset-4 control-label">
 											<a class="eqLogicAttr btn btn-sm btn-success eqLogicAction" id="bt_Validate"><i class="fas fa-check-circle"></i> {{Valider}}</a>
 										</div>
@@ -247,57 +242,19 @@ sendVarToJS('eqLogicId', $eqLogic);
 									</div>
 								</div>
 							</div>
+							<div class="form-group listenfant" style="display:none;">
+								<legend>
+									<i class="fas fa-users"></i> {{Liste des élèves}}
+								</legend>
+
+								<label class="col-sm-4 control-label">{{Enfants}} <i class="fas fa-question-circle tooltips" title="{{Choisissez le nom de l'enfant}}"></i></label>
+								<select id="enfantlist" class="col-sm-6 eqLogicAttr form-control" data-l1key="configuration" data-l2key="enfant">
+									<select id="enfantList" class="col-sm-6 eqLogicAttr form-control" data-l1key="configuration" data-l2key="enfant">
+									</select>
+							</div>
 							<div class="form-group text-center" id="error-message" style="color: red; font-weight: bold;text-align: center; margin: 0 auto;"></div>
 						</div>
-						<style>
-							.rectangle {
-								width: 200px;
-								height: 200px;
-								background-color: lightgray;
-								display: flex;
-								justify-content: center;
-								align-items: center;
-								cursor: pointer;
-							}
 
-							#error-message {
-								color: red;
-								font-weight: bold;
-								text-align: center;
-							}
-
-							.button {
-								padding: 10px;
-								/* background-color: white; */
-								cursor: pointer;
-							}
-
-							.fa-spin {
-								animation: fa-spin 2s infinite linear;
-							}
-
-							.fa-check {
-								color: green;
-							}
-
-							.fa-times {
-								color: red;
-							}
-
-							.hidden {
-								display: none;
-							}
-
-							@keyframes fa-spin {
-								0% {
-									transform: rotate(0deg);
-								}
-
-								100% {
-									transform: rotate(360deg);
-								}
-							}
-						</style>
 						<!-- Partie droite de l'onglet "Équipement" -->
 						<!-- Affiche un champ de commentaire par défaut mais vous pouvez y mettre ce que vous voulez -->
 						<div class="col-lg-6">
@@ -345,13 +302,13 @@ sendVarToJS('eqLogicId', $eqLogic);
 								<legend><i class="col-sm-1 fas fa-file-code"></i> {{Token Info}} </legend>
 								<div class="form-group">
 									<label class="col-sm-2 control-label">{{pronote_url}} :</label>
-									<a id="Token_pronote_url" class="col-sm-10 eqLogicAttr autogrow" data-l1key="configuration" data-l2key="Token_pronote_url"></a>
+									<span id="Token_pronote_url" class="col-sm-10 eqLogicAttr autogrow" data-l1key="configuration" data-l2key="Token_pronote_url"></span>
 								</div>
 								<div class="form-group">
 									<label class="col-sm-2 control-label">{{username}} :</label>
 									<span id="Token_username" class="col-sm-10 eqLogicAttr autogrow" data-l1key="configuration" data-l2key="Token_username"></span>
 								</div>
-								<div class=" form-group">
+								<div class="form-group">
 									<label class="col-sm-2 control-label">{{password}} :</label>
 									<span id="Token_password" class="col-sm-10 eqLogicAttr autogrow" data-l1key="configuration" data-l2key="Token_password"></span>
 								</div>
@@ -395,6 +352,54 @@ sendVarToJS('eqLogicId', $eqLogic);
 <!-- Inclusion du fichier javascript du core - NE PAS MODIFIER NI SUPPRIMER -->
 <?php include_file('core', 'plugin.template', 'js'); ?>
 <style>
+	.rectangle {
+		width: 200px;
+		height: 200px;
+		background-color: lightgray;
+		display: flex;
+		justify-content: center;
+		align-items: center;
+		cursor: pointer;
+	}
+
+	#error-message {
+		color: red;
+		font-weight: bold;
+		text-align: center;
+	}
+
+	.button {
+		padding: 10px;
+		/* background-color: white; */
+		cursor: pointer;
+	}
+
+	.fa-spin {
+		animation: fa-spin 2s infinite linear;
+	}
+
+	.fa-check {
+		color: green;
+	}
+
+	.fa-times {
+		color: red;
+	}
+
+	.hidden {
+		display: none;
+	}
+
+	@keyframes fa-spin {
+		0% {
+			transform: rotate(0deg);
+		}
+
+		100% {
+			transform: rotate(360deg);
+		}
+	}
+
 	.small-font {
 		font-size: 12px;
 		/* Ajustez la taille selon vos besoins */

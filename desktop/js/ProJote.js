@@ -22,6 +22,8 @@
 * Remplit le champs select avec la liste des enfants de l'équipement
 *********************************************************************/
 function getParameterByName(name, url) {
+  // sourcery skip: use-braces
+  // sourcery skip: dont-reassign-parameters
   if (!url) url = window.location.href;
   name = name.replace(/[\[\]]/g, '\\$&');
   var regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)'),
@@ -31,22 +33,10 @@ function getParameterByName(name, url) {
   return decodeURIComponent(results[2].replace(/\+/g, ' '));
 }
 
-// Gestion de l'affichage du champ listenfant en fonction de la case à cocher Parent
-$('#Parent').change(function () {
-  if ($(this).is(':checked')) {
-    $('.form-group.listenfant').show(); // Affiche la liste des enfants
-    //populateEnfantList(eqLogicId); // Met à jour la liste si nécessaire
-  } else {
-    $('.form-group.listenfant').hide(); // Cache la liste des enfants
-    //$('#enfantList').empty(); // Vide la liste des enfants
-  }
-});
-
 function loadProJoteData(eqLogicId) {
   if (eqLogicId) {
-
-    var filePath = '/plugins/ProJote/data/' + eqLogicId + '/enfant.ProJote.json.txt';
-    var profilePicturePath = '/plugins/ProJote/data/' + eqLogicId + '/profile_picture.jpg';
+    let filePath = '/plugins/ProJote/data/' + eqLogicId + '/enfant.ProJote.json.txt';
+    let profilePicturePath = '/plugins/ProJote/data/' + eqLogicId + '/profile_picture.jpg';
     console.log('ProJote.js:: emplacement du Fichier ' + filePath);
     // Vérifier la présence du fichier avant de tenter de récupérer les données
     $.get(filePath)
@@ -57,7 +47,7 @@ function loadProJoteData(eqLogicId) {
           console.log('ProJote.js:: données récupérées', data);
           if (data) {
             // Afficher les informations de l'élève
-            var localPicture = data.Local_Picture ? data.Local_Picture.replace('/var/www/html', '') : '';
+            let localPicture = data.Local_Picture ? data.Local_Picture.replace('/var/www/html', '') : '';
 
             if (data.Eleve && data.Eleve.trim() !== '') {
               $('#eleve-name').text(data.Eleve);
@@ -79,7 +69,7 @@ function loadProJoteData(eqLogicId) {
               $('#local-picture').attr('src', localPicture).show();
               // Je change le timestamp pour forcer la mise à joru de l'image.
               if ($('#local-picture').length) {
-                var newSrc = localPicture + '?' + new Date().getTime();
+                let newSrc = localPicture + '?' + new Date().getTime();
                 $('#local-picture').attr('src', newSrc).show();
               } else {
                 console.error('Element with id "local-picture" not found.');
@@ -96,6 +86,13 @@ function loadProJoteData(eqLogicId) {
               $('#Token_client_identifier').text(data.Token.client_identifier);
               $('.form-group.Token').show();
             }
+            if (data.Token.pronote_url && data.Token.pronote_url.includes('.parent.html')) {
+              // La chaîne contient .parent.html
+              console.log('ProJote.js:: Token_pronote_url contient .parent.html');
+              $('#Parent').prop('checked', true); // Coche la case Parent
+              $('.form-group.listenfant').show(); // Affiche le champ listenfant
+            }
+            populateEnfantList(eqLogicId); // Appeler la fonction pour peupler la liste des enfants
 
           } else {
             $('#error-message').text('Erreur : Le fichier JSON est invalide.');
@@ -118,7 +115,7 @@ function loadProJoteData(eqLogicId) {
             $('#profile-picture').attr('src', ''); // Réinitialiser l'image
           });
 
-        populateEnfantList(eqLogicId); // Appeler la fonction pour peupler la liste des enfants
+        //populateEnfantList(eqLogicId); // Appeler la fonction pour peupler la liste des enfants
 
       })
       .fail(function () {
@@ -147,7 +144,7 @@ function resetFields() {
   $('#eleve-classe').text('');
   $('#eleve-etablissement').text('');
   $('#local-picture').attr('src', '').hide();
-  $('#enfantList').empty(); // Vider la liste des enfants
+  $('#enfantlist').empty(); // Vider la liste des enfants
 }
 
 function populateEnfantList(eqLogicId) {
@@ -158,18 +155,18 @@ function populateEnfantList(eqLogicId) {
   }
   console.log('ProJote.js:: Liste des enfants affichée, récupération des enfants pour ID:', eqLogicId);
 
-  var filePath = '/plugins/ProJote/data/' + eqLogicId + '/enfant.ProJote.json.txt';
+  let filePath = '/plugins/ProJote/data/' + eqLogicId + '/enfant.ProJote.json.txt';
   $.getJSON(filePath, function (data) {
     if (data && data.Liste_Enfant) {
-      var enfants = JSON.parse(data.Liste_Enfant); // Transformer la chaîne en tableau
-      var $enfantList = $('#enfantList');
+      let enfants = JSON.parse(data.Liste_Enfant); // Transformer la chaîne en tableau
+      let $enfantList = $('#enfantlist');
       $enfantList.empty(); // Vider la liste existante
-      var eleveName = $('#eleve-name').text().trim();
-      var found = false;
+      let eleveName = $('#eleve-name').text().trim();
+      let found = false;
       if (Array.isArray(enfants)) {
         enfants.forEach(function (enfant) {
-          var enfantTrim = enfant.trim();
-          var selected = '';
+          let enfantTrim = enfant.trim();
+          let selected = '';
           if (enfantTrim === eleveName) {
             selected = ' selected';
             found = true;
@@ -185,12 +182,12 @@ function populateEnfantList(eqLogicId) {
       }
     } else {
       $('#error-message').text('Erreur : Liste_Enfant non trouvée ou fichier JSON invalide');
-      $('#enfantList').empty();
+      $('#enfantlist').empty();
     }
   }).fail(function (jqXHR, textStatus, errorThrown) {
     console.log('ProJote.js:: erreur lors de la récupération de la liste des enfants', textStatus, errorThrown);
     $('#error-message').text('Erreur : Le fichier n\'existe pas à l\'emplacement spécifié : ' + filePath);
-    $('#enfantList').empty();
+    $('#enfantlist').empty();
   });
 }
 
@@ -201,14 +198,14 @@ function htmlspecialchars(str) {
 $(document).ready(function () {
   // Ajouter un gestionnaire d'événements click pour les cartes d'équipement
   $('.eqLogicDisplayCard').on('click', function () {
-    var eqLogicId = $(this).attr('data-eqlogic_id'); // Récupérer l'ID de l'équipement depuis l'attribut data
+    let eqLogicId = $(this).attr('data-eqlogic_id'); // Récupérer l'ID de l'équipement depuis l'attribut data
     console.log('ProJote.js:: Detection du click pour ', eqLogicId);
     loadProJoteData(eqLogicId);
     //populateEnfantList(eqLogicId); // Appeler la fonction pour peupler la liste des enfants
   });
 
   // Vérifier si un équipement est déjà sélectionné lors du chargement de la page
-  var eqLogicIdFromUrl = getParameterByName('id');
+  let eqLogicIdFromUrl = getParameterByName('id');
   if (eqLogicIdFromUrl) {
     console.log('ProJote.js:: Chargement des données pour ', eqLogicIdFromUrl);
     loadProJoteData(eqLogicIdFromUrl);
@@ -223,27 +220,73 @@ $(document).ready(function () {
       $('.form-group.listenfant').hide();
     }
   });
-
 });
+
 /*********************************************************************
 * Ajoutez un gestionnaire d'événements change pour le champ "AUTH"
 *********************************************************************/
 
 $('[data-l1key="configuration"][data-l2key="AUTH"]').on('change', function () {
   // Récupère la valeur sélectionnée
-  var selectedAuth = $(this).val();
+  //let selectedAuth = $(this).val();
   // Masque tous les divs
   $('.form-group.Login, .form-group.QRCode').hide();
   // Affiche le div correspondant à la valeur sélectionnée
-  if (selectedAuth === 'Login') {
+  if ($(this).val() === 'Login') {
     $('.form-group.Login').show();
-  } else if (selectedAuth === 'QRCode') {
+  } else if ($(this).val() === 'QRCode') {
     $('.form-group.QRCode').show();
   }
 });
 // Trigger le changement pour afficher le div correspondant à la valeur par défaut
 $('[data-l1key="configuration"][data-l2key="AUTH"]').trigger('change');
 
+/*****************************************************
+ * Gestion de l'affichage du champ listenfant
+ *****************************************************/
+$('#enfantlist').on('focus', function () {
+  // Ton script ici
+  console.log('Le select enfantlist a été déplié');
+  // Par exemple, tu peux rappeler populateEnfantList ou autre
+  populateEnfantList(getParameterByName('id'));
+});
+// quand un enfant est choisit
+$('#enfantlist').on('change', function () {
+  // Récupérer la valeur sélectionnée
+  let selectedEnfant = $(this).val();
+  console.log('Enfant sélectionné :', selectedEnfant);
+  // Mettre à jour le champ NomEleve avec la valeur sélectionnée
+  document.querySelector('[data-l2key="enfant"]').value = selectedEnfant;
+  // Afficher un message ou effectuer une action si nécessaire
+
+  //compare avec le valeur de la commande info NomEleve
+  let currentNomEleve = document.querySelector('[id="eleve-name"]').value;
+
+  if (currentNomEleve !== selectedEnfant) {
+    console.log('Le nom de l\'élève a changé pour : ', selectedEnfant);
+    $.ajax({
+      type: "POST", // Méthode de transmission des données au fichier php
+      url: "/plugins/ProJote/core/ajax/ProJote.ajax.php", // URL du script PHP AJAX
+
+      data: {
+        action: "ChangeEnfant", // Action à exécuter dans le script PHP        
+        nomeleve: selectedEnfant,
+        eqlogic: $('.eqLogicAttr[data-l1key=id]').value(),
+      },
+      dataType: 'json',
+      global: false,
+      error: function (request, status, error) {
+        // Gestion des erreurs
+        console.error("AJAX Error:", request, status, error);
+      },
+      success: function () {
+        // Traitement de la réponse JSON
+        console.log("AJAX Success: Enfant changé avec succès");
+      }
+    });
+
+  }
+});
 
 /*******************************************************
 * Ajout de l'événement de clic sur le bouton Valider
@@ -255,7 +298,7 @@ $('#bt_Validate').on('click', function () {
   let Login = document.querySelector('[data-l2key="login"]').value;
   let Password = document.querySelector('[data-l2key="password"]').value;
   let CasEnt = document.querySelector('[data-l2key="CasEnt"]').value;
-  let NomEleve = document.querySelector('[data-l2key="enfant"]').value;
+  let selectedEnfant = document.querySelector('[data-l2key="enfant"]').value;
   // Afficher le sablier
   document.querySelector('.form-group.Login .fa-hourglass-half').classList.remove('hidden');
   document.querySelector('.form-group.Login .fa-check').classList.add('hidden');
@@ -281,7 +324,7 @@ $('#bt_Validate').on('click', function () {
       login: Login,
       password: Password,
       ent: CasEnt,
-      nomeleve: NomEleve, //|| "Inconnu"
+      nomeleve: selectedEnfant,
       eqlogic: $('.eqLogicAttr[data-l1key=id]').value(),
     },
 
@@ -304,7 +347,7 @@ $('#bt_Validate').on('click', function () {
         setTimeout(function () {
           document.querySelector('.form-group.Login .fa-check').classList.add('hidden');
         }, 10000); // 10000 millisecondes = 10 secondes
-        var eqLogicIdFromUrl = getParameterByName('id');
+        let eqLogicIdFromUrl = getParameterByName('id');
         if (eqLogicIdFromUrl) {
           console.log('ProJote.js:: Chargement des données pour ', eqLogicIdFromUrl);
           loadProJoteData(eqLogicIdFromUrl);
@@ -328,13 +371,13 @@ $('#bt_Validate').on('click', function () {
  ***************************************/
 
 document.querySelector('.rectangle').addEventListener('paste', function (e) {
-  var items = e.clipboardData.items;
-  for (var i = 0; i < items.length; i++) {
+  let { items } = e.clipboardData;
+  for (let i = 0; i < items.length; i++) {
     if (items[i].type.indexOf('image') !== -1) {
-      var blob = items[i].getAsFile();
-      var reader = new FileReader();
+      let blob = items[i].getAsFile();
+      let reader = new FileReader();
       reader.onload = function (event) {
-        var imageData = event.target.result;
+        let imageData = event.target.result;
         handleImage(imageData);
       };
       reader.readAsDataURL(blob);
@@ -342,10 +385,10 @@ document.querySelector('.rectangle').addEventListener('paste', function (e) {
   }
 });
 document.getElementById('fileInput').addEventListener('change', function (e) {
-  var file = e.target.files[0];
-  var reader = new FileReader();
+  let file = e.target.files[0];
+  let reader = new FileReader();
   reader.onload = function (event) {
-    var imageData = event.target.result;
+    let imageData = event.target.result;
     handleImage(imageData);
   };
   reader.readAsDataURL(file);
@@ -353,10 +396,10 @@ document.getElementById('fileInput').addEventListener('change', function (e) {
 document.querySelector('.rectangle').addEventListener('drop', function (e) {
   e.preventDefault();
   e.stopPropagation();
-  var file = e.dataTransfer.files[0];
-  var reader = new FileReader();
+  let file = e.dataTransfer.files[0];
+  let reader = new FileReader();
   reader.onload = function (event) {
-    var imageData = event.target.result;
+    let imageData = event.target.result;
     handleImage(imageData);
   };
   reader.readAsDataURL(file);
@@ -392,7 +435,7 @@ function sendImageToServer(code, pin) {
         setTimeout(function () {
           document.querySelector('.form-group.QRCode .fa-check').classList.add('hidden');
         }, 10000); // 10000 millisecondes = 10 secondes
-        var eqLogicIdFromUrl = getParameterByName('id');
+        let eqLogicIdFromUrl = getParameterByName('id');
         if (eqLogicIdFromUrl) {
           console.log('ProJote.js:: Chargement des données pour ', eqLogicIdFromUrl);
           loadProJoteData(eqLogicIdFromUrl);
@@ -420,14 +463,14 @@ function sendImageToServer(code, pin) {
 
 function resizeImage(imageData, width, height) {
   return new Promise((resolve, reject) => {
-    var img = new Image();
+    let img = new Image();
     img.onload = function () {
-      var canvas = document.createElement('canvas');
+      let canvas = document.createElement('canvas');
       canvas.width = width;
       canvas.height = height;
-      var ctx = canvas.getContext('2d');
+      let ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, width, height);
-      var resizedImageData = canvas.toDataURL('image/png');
+      let resizedImageData = canvas.toDataURL('image/png');
       resolve(resizedImageData);
     };
     img.onerror = function () {
@@ -438,23 +481,23 @@ function resizeImage(imageData, width, height) {
 }
 
 function displayImage(imageData) {
-  var img = document.createElement('img');
+  let img = document.createElement('img');
   img.src = imageData;
   img.style.border = '5px solid #90EE90'; // Couleur du cadre en vert clair
-  var rectangle = document.querySelector('.rectangle');
+  let rectangle = document.querySelector('.rectangle');
   if (rectangle) {
     rectangle.innerHTML = '';
     // Créez un élément div pour contenir l'image et le texte
-    var container = document.createElement('div');
+    let container = document.createElement('div');
     container.style.position = 'relative';
     rectangle.appendChild(container);
     // Ajoutez l'image à l'élément div
     container.appendChild(img);
     // Ajoutez ce gestionnaire d'événements pour afficher une fenêtre de demande de code PIN
     img.addEventListener('click', function () {
-      var pin = prompt('Veuillez entrer votre code PIN de 4 chiffres :');
+      let pin = prompt('Veuillez entrer votre code PIN de 4 chiffres :');
       // Vérifiez le code PIN ici
-      var pinRegex = /^\d{4}$/;
+      let pinRegex = /^\d{4}$/;
       if (pinRegex.test(pin)) {
         // Le code PIN est valide
         console.log('Code PIN valide :', pin);
@@ -470,25 +513,25 @@ function displayImage(imageData) {
 
 function handleImage(imageData) {
   // Demande le code PIN à l'utilisateur
-  var pin = prompt('Veuillez entrer votre code PIN de 4 chiffres :');
+  let pin = prompt('Veuillez entrer votre code PIN de 4 chiffres :');
   // Vérifie que le code PIN saisi par l'utilisateur contient exactement 4 chiffres
-  var pinRegex = /^\d{4}$/;
+  let pinRegex = /^\d{4}$/;
   if (!pinRegex.test(pin)) {
     alert('Code PIN invalide. Veuillez entrer un code PIN de 4 chiffres.');
     return;
   }
   // Si le code PIN est valide, continue le traitement de l'image
   resizeImage(imageData, 200, 200).then(function (resizedImageData) {
-    var img = new Image();
+    let img = new Image();
     img.onload = function () {
       // Décoder le code QR à partir de l'image
-      var canvas = document.createElement('canvas');
+      let canvas = document.createElement('canvas');
       canvas.width = img.width;
       canvas.height = img.height;
-      var ctx = canvas.getContext('2d');
+      let ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0);
-      var imageData = ctx.getImageData(0, 0, img.width, img.height);
-      var code = jsQR(imageData.data, imageData.width, imageData.height);
+      let imageData = ctx.getImageData(0, 0, img.width, img.height);
+      let code = jsQR(imageData.data, imageData.width, imageData.height);
       // Si le code QR est décodé avec succès, afficher les données
       if (code) {
         console.log('Données du QR code :', code.data);
@@ -530,11 +573,11 @@ $("#table_cmd").sortable({
  *  Fonction pour trier les lignes de la table par ID croissant
  **************************************************************/
 function sortTableById(_cmd) {
-  var table = document.getElementById('table_cmd').getElementsByTagName('tbody')[0];
-  var rows = table.getElementsByTagName('tr');
-  var sortedRows = Array.from(rows).sort((a, b) => {
-    var idA = parseInt(a.getAttribute('data-cmd_id'));
-    var idB = parseInt(b.getAttribute('data-cmd_id'));
+  let table = document.getElementById('table_cmd').getElementsByTagName('tbody')[0];
+  let rows = table.getElementsByTagName('tr');
+  let sortedRows = Array.from(rows).sort((a, b) => {
+    let idA = parseInt(a.getAttribute('data-cmd_id'));
+    let idB = parseInt(b.getAttribute('data-cmd_id'));
     return idA - idB;
   });
   // Supprimer les lignes existantes de la table
@@ -551,13 +594,13 @@ function sortTableById(_cmd) {
 ******************************************************************=*/
 function addCmdToTable(_cmd) {
   if (!isset(_cmd)) {
-    var _cmd = { configuration: {} }
+    let _cmd = { configuration: {} }
   }
   if (!isset(_cmd.configuration)) {
     _cmd.configuration = {}
   }
   sortTableById();
-  var tr = '<tr class="cmd" data-cmd_id="' + init(_cmd.id) + '">'
+  let tr = '<tr class="cmd" data-cmd_id="' + init(_cmd.id) + '">'
   tr += '<td class="hidden-xs">'
   tr += '<span class="cmdAttr" data-l1key="id"></span>'
   tr += '</td>'
@@ -579,7 +622,7 @@ function addCmdToTable(_cmd) {
   tr += '<label class="checkbox-inline"><input type="checkbox" class="cmdAttr" data-l1key="isVisible" checked/>{{Afficher}}</label> '
 
   // Liste des logicalId à exclure
-  const excludedLogicalIds = [
+  let excludedLogicalIds = [
     'edt_prochainjour',
     'edt_aujourdhui',
     'devoir',
@@ -620,7 +663,7 @@ function addCmdToTable(_cmd) {
   tr += '<i class="fas fa-minus-circle pull-right cmdAction cursor" data-action="remove" title="{{Supprimer la commande}}"></i></td>'
   tr += '</tr>'
   $('#table_cmd tbody').append(tr)
-  var tr = $('#table_cmd tbody tr').last()
+  let Ntr = $('#table_cmd tbody tr').last()
   jeedom.eqLogic.buildSelectCmd({
     id: $('.eqLogicAttr[data-l1key=id]').value(),
     filter: { type: 'info' },
@@ -628,9 +671,9 @@ function addCmdToTable(_cmd) {
       $('#div_alert').showAlert({ message: error.message, level: 'danger' })
     },
     success: function (result) {
-      tr.find('.cmdAttr[data-l1key=value]').append(result)
-      tr.setValues(_cmd, '.cmdAttr')
-      jeedom.cmd.changeType(tr, init(_cmd.subType))
+      Ntr.find('.cmdAttr[data-l1key=value]').append(result)
+      Ntr.setValues(_cmd, '.cmdAttr')
+      jeedom.cmd.changeType(Ntr, init(_cmd.subType))
     }
   })
 }

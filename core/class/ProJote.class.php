@@ -175,12 +175,6 @@ class ProJote extends eqLogic
       log::add(__CLASS__, 'debug', ' ' . __FUNCTION__ . " Je ne fais rien, l'heure de récupération est définie à $hour_cron heure");
       return;
     }
-    if ($heure % 2 == 1 && $heure != $hour_cron) {
-      $msg = " Je ne fais rien à cette heure-ci... $heure heure, prochain essaie dans une heure";
-      log::add(__CLASS__, 'debug', ' ' . __FUNCTION__ . $msg);
-      return;
-    }
-
 
     $eqLogics = self::byType(__CLASS__, true);
     if (count($eqLogics) == 0) {
@@ -192,7 +186,11 @@ class ProJote extends eqLogic
         log::add(__CLASS__, 'warning', $eqLogic->getHumanName() . ' Equipement invalide ou non synchronisé ');
         continue;
       } */
-      $eqLogic->UpdateInfoPronote(__FUNCTION__);
+      if ($eqLogic instanceof ProJote) {
+        $eqLogic->UpdateInfoPronote(__FUNCTION__);
+      } else {
+        log::add(__CLASS__, 'warning', 'L\'équipement n\'est pas une instance de ProJote : ' . $eqLogic->getHumanName());
+      }
     }
   }
 
@@ -264,12 +262,12 @@ class ProJote extends eqLogic
       "Nb_absences" => array("Nombre d'absence", 'info', 'numeric', "", 0, 1, "GENERIC_INFO", 'core::badge', 'core::badge'),
       "Nb_punitions" => array("Nombre de punitions", 'info', 'numeric', "", 0, 1, "GENERIC_INFO", 'core::badge', 'core::badge'),
       "Nb_retard" => array("Nombre de retard", 'info', 'numeric', "", 0, 1, "GENERIC_INFO", 'core::badge', 'core::badge'),
-      "Nb_devoir" => array("Nombre de Devoir", 'info', 'numeric', "", 0, 1, "GENERIC_INFO", 'core::badge', 'core::badge'),
-      "Nb_devoirNF" => array("Nombre de Devoir non fait", 'info', 'numeric', "", 0, 1, "GENERIC_INFO", 'core::badge', 'core::badge'),
-      "Nb_devoirF" => array("Nombre de Devoir fait", 'info', 'numeric', "", 0, 1, "GENERIC_INFO", 'core::badge', 'core::badge'),
-      "Nb_devoir_Demain" => array("Nombre de Devoir pour le prochain jour", 'info', 'numeric', "", 0, 1, "GENERIC_INFO", 'core::badge', 'core::badge'),
-      "Nb_devoirNF_Demain" => array("Nombre de Devoir non fait pour le prochain jour", 'info', 'numeric', "", 0, 1, "GENERIC_INFO", 'core::badge', 'core::badge'),
-      "Nb_devoirF_Demain" => array("Nombre de Devoir fait pour le prochain jour", 'info', 'numeric', "", 0, 1, "GENERIC_INFO", 'core::badge', 'core::badge'),
+      "Nb_devoir" => array("Nombre de devoir", 'info', 'numeric', "", 0, 1, "GENERIC_INFO", 'core::badge', 'core::badge'),
+      "Nb_devoir_NF" => array("Nombre de devoir non fait", 'info', 'numeric', "", 0, 1, "GENERIC_INFO", 'core::badge', 'core::badge'),
+      "Nb_devoir_F" => array("Nombre de devoir fait", 'info', 'numeric', "", 0, 1, "GENERIC_INFO", 'core::badge', 'core::badge'),
+      "Nb_devoir_Demain" => array("Nombre de devoir pour le prochain jour", 'info', 'numeric', "", 0, 1, "GENERIC_INFO", 'core::badge', 'core::badge'),
+      "Nb_devoir_Demain_NF" => array("Nombre de devoir non fait pour le prochain jour", 'info', 'numeric', "", 0, 1, "GENERIC_INFO", 'core::badge', 'core::badge'),
+      "Nb_devoir_Demain_F" => array("Nombre de devoir fait pour le prochain jour", 'info', 'numeric', "", 0, 1, "GENERIC_INFO", 'core::badge', 'core::badge'),
       "edt_aujourdhui_debut" => array("Heure de début Aujourd'hui", 'info', 'string', "", 0, 1, "GENERIC_TIME", 'core::badge', 'core::badge'),
       "edt_aujourdhui_fin" => array("Heure de fin Aujourd'hui", 'info', 'string', "", 0, 1, "GENERIC_DATE ", 'core::badge', 'core::badge'),
       "edt_aujourdhui_cancel" => array("Nombre de cours annulé Aujourd'hui", 'info', 'numeric', "cours", 0, 1, "GENERIC_INFO", 'core::badge', 'core::badge'),
@@ -305,8 +303,10 @@ class ProJote extends eqLogic
       list($name, $type, $subtype, $unit, $hist, $visible, $generic_type, $template_dashboard, $template_mobile) = $data;
       $cmd = $this->getCmd(null, $id);
       if (!is_object($cmd)) {
+        //Je teste si la commande existe déjà, si oui je ne la crée pas
+        // sinon je la crée
+        log::add('ProJote', 'debug', 'Sauvegarde : Création de la commande : ' . $id . '-' . $name);
         $cmd = $this->getCmd(null, $id);
-        $cmd = new ProJoteCmd();
         $cmd->setName($name);
         $cmd->setEqLogic_id($this->getId());
         $cmd->setType($type);
@@ -318,11 +318,12 @@ class ProJote extends eqLogic
         $cmd->setDisplay('generic_type', $generic_type);
         $cmd->setTemplate('dashboard', $template_dashboard);
         $cmd->setTemplate('mobile', $template_mobile);
+        if ($generic_type == "GENERIC_ACTION") {
+          $cmd = new ProJoteCmd();
+        }
         $cmd->save();
       }
     }
-    //Je crée les entrer pour le TOKEN de l'utilisateur
-
   }
 
   // Fonction exécutée automatiquement avant la suppression de l'équipement
@@ -333,31 +334,25 @@ class ProJote extends eqLogic
   {
     $eqId = $this->getId();
     $dataDir = '/var/www/html/plugins/ProJote/data/' . $eqId;
-
     // Fonction récursive pour supprimer un dossier et tous ses fichiers et sous-dossiers
     function deleteDirectory($dir)
     {
       if (!file_exists($dir)) {
         return true;
       }
-
       if (!is_dir($dir)) {
         return unlink($dir);
       }
-
       foreach (scandir($dir) as $item) {
         if ($item == '.' || $item == '..') {
           continue;
         }
-
         if (!deleteDirectory($dir . DIRECTORY_SEPARATOR . $item)) {
           return false;
         }
       }
-
       return rmdir($dir);
     }
-
     // Supprimer le dossier correspondant à l'EqID
     if (deleteDirectory($dataDir)) {
       log::add('ProJote', 'info', 'Le dossier ' . $dataDir . ' a été supprimé avec succès.');
@@ -436,20 +431,20 @@ class ProJote extends eqLogic
     $TokenPassword = (is_object($cmdTokenPassword = $this->getCmd(null, 'TokenPassword'))) ? $cmdTokenPassword->execCmd() : '';
     $TokenUrl = (is_object($cmdTokenUrl = $this->getCmd(null, 'TokenUrl'))) ? $cmdTokenUrl->execCmd() : '';
     $enfant = $this->getConfiguration("enfant", "");
-    $values = array('command' => $command, 'cpttype' => $Cpttype, 'apikey' => $apikey, 'cas' => $CAS, 'CptParent' => $CptParent, 'login' => $login, 'password' => $password, 'url' => $url, 'enfant' => $enfant, 'CmdId' => $CmdId, 'TokenId' => $TokenId, 'TokenUsername' => $TokenUsername, 'TokenPassword' => $TokenPassword, 'TokenUrl' => $TokenUrl);
+    $log = log::convertLogLevel(log::getLogLevel(__CLASS__));
+    $values = array('command' => $command, 'cpttype' => $Cpttype, 'apikey' => $apikey, 'cas' => $CAS, 'CptParent' => $CptParent, 'login' => $login, 'password' => $password, 'url' => $url, 'enfant' => $enfant, 'CmdId' => $CmdId, 'TokenId' => $TokenId, 'TokenUsername' => $TokenUsername, 'TokenPassword' => $TokenPassword, 'TokenUrl' => $TokenUrl, 'Log' => $log);
     $values = json_encode($values);
     if (log::convertLogLevel(log::getLogLevel(__CLASS__)) == "debug") {
       log::add(__CLASS__, 'debug', $values);
     }
     $socket = socket_create(AF_INET, SOCK_STREAM, 0);
     socket_connect($socket, '127.0.0.1', config::byKey('socketport', __CLASS__, '55369'));
-    log::add(__CLASS__, 'debug', 'Envoie au demon Python des infos Pronotes');
+    log::add(__CLASS__, 'debug', 'Envoie au demon Python des infos Pronotes : ' . $values);
     socket_write($socket, $values, strlen($values));
     socket_close($socket);
   }
 
   //Aldarande : 04/01/2025
-
   public function ReadEnfantToken()
   {
     $eqLogicId = $this->getId();
@@ -503,6 +498,19 @@ class ProJote extends eqLogic
     }
     $output = True;
     return $output;
+  }
+
+  public function SwitchEleve($value)
+  {
+    $eqLogicId = $this->getId();
+    $eqLogic = eqLogic::byId($eqLogicId);
+    if (isset($value) && $eqLogic->getCmd(null, 'Nom_Eleve')) {
+      $eqLogic->checkAndUpdateCmd('Nom_Eleve', $value);
+      return TRUE;
+    } else {
+      log::add('ProJote', 'debug', 'Class SwitchEleve:: Impossible de changer l\'éleve, la valeur est vide ou la commande n\'existe pas.');
+      return FALSE;
+    }
   }
 }
 
