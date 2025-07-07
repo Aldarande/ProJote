@@ -26,10 +26,8 @@ try:
         try:
             # load the module, will raise ImportError if module cannot be loaded
             m = importlib.import_module(module_name)
-            # get the class, will raise AttributeError if class cannot be found
-            c = getattr(m, class_name)
-            return c
-        except:
+            return getattr(m, class_name)
+        except Exception:
             return None
 
     def Connectparent(pronote_url, login, password, ent, enfant):
@@ -95,17 +93,16 @@ try:
         if login == "":
             logging.error("Pas de login reçu sur le deamon")
 
-        if not pronote_url == "":
+        if pronote_url != "":
             if ent == "":
                 if pronote_url.endswith(
                     ".index-education.net/pronote/eleve.html?login=true"
                 ):
                     pronote_url = pronote_url[: -len("?login=true")]
                     logging.info("URL  modifiée :", pronote_url)
-            else:
-                if pronote_url.endswith(".index-education.net/pronote/eleve.html"):
-                    pronote_url += "?login=true"
-                    logging.info("URL  modifiée : %s", pronote_url)
+            elif pronote_url.endswith(".index-education.net/pronote/eleve.html"):
+                pronote_url += "?login=true"
+                logging.info("URL  modifiée : %s", pronote_url)
             logging.debug("L'url pour se connecter est  : %s", pronote_url)
         else:
             logging.error("pas d'URL reçu sur le deamon")
@@ -142,11 +139,7 @@ try:
             uuid="ProJote",
         )
 
-        # exit(1)  # the client has failed to log in
-        # je nettoie l'URL
-
-        # Génération des données de connexion
-        CTS = {
+        return {
             "Token_URL": Token_data.pronote_url,
             "Token_username": Token_data.username,
             "Token_Password": Token_data.password,
@@ -154,7 +147,6 @@ try:
             "pin": "4321",
             "uuid": "ProJote",
         }
-        return CTS
 
     def verifdossier(chemin_dossier):
         """
@@ -185,11 +177,22 @@ try:
             response = requests.get(url)
             # Vérifier si la requête a réussi (code de statut 200)
             if response.status_code == 200:
-                # Ouvrir un fichier en mode écriture binaire
-                with open(filepath, "wb") as f:
-                    # Écrire le contenu de l'image dans le fichier
-                    f.write(response.content)
-                return True
+                # J'aimerai un valider que l'image récupérée via url est bien différente de l'image de filepath
+                if os.path.exists(filepath):
+                    with open(filepath, "rb") as f:
+                        existing_image = f.read()
+                    if existing_image == response.content:
+                        logging.info(
+                            "L'image est déjà à jour, pas besoin de la télécharger."
+                        )
+
+                    else:
+                        # Ouvrir un fichier en mode écriture binaire
+                        logging.info("L'image est différente,je la télécharge.")
+                        with open(filepath, "wb") as f:
+                            # Écrire le contenu de l'image dans le fichier
+                            f.write(response.content)
+                    return True
             else:
                 # Afficher un message d'erreur si la requête a échoué
                 logging.error(
@@ -208,9 +211,9 @@ try:
             nom_fichier = "enfant.ProJote.json.txt"
             # nom_fichier = nom_fichier.replace(" ", "")
             eqid = str(eqid)
-            chemin_fichier = dossier + "/" + eqid
+            chemin_fichier = f"{dossier}/{eqid}"
             verifdossier(chemin_fichier)
-            chemin_fichier = os.path.join(dossier + "/" + eqid, nom_fichier)
+            chemin_fichier = os.path.join(f"{dossier}/{eqid}", nom_fichier)
             logging.debug("voici les informations d'écriture : %s", chemin_fichier)
             # Lire le fichier pour récupérer les données existantes
             existing_data = {}
@@ -228,10 +231,11 @@ try:
                 "Date": str(datetime.datetime.now()),
                 "Name": client.info.name,
                 "Token": client.export_credentials(),
-                # "Raw_login": client.info.raw_resource,
             }
             if client._selected_child:
-                logging.debug("Je recherche l'enfants : ")
+                logging.debug(
+                    "Je recherche l'enfants : %s", client._selected_child.name
+                )
                 # Je retourne la liste d'enfants du compte parent
                 client.listenfant = []
                 for child in client.children:
@@ -259,21 +263,16 @@ try:
                 data["Etablissement"] = client.info.establishment
                 # Recherche de l'image et téléchargement
                 # Télécharger l'image localement
-            image_filepath = os.path.join(dossier + "/" + eqid, "profile_picture.jpg")
+            image_filepath = os.path.join(f"{dossier}/{eqid}", "profile_picture.jpg")
             if client._selected_child:
                 if download_image(
                     client._selected_child.profile_picture.url, image_filepath
                 ):
-                    data["Local_Picture"] = (
-                        dossier + "/" + eqid + "/profile_picture.jpg"
-                    )
+                    data["Local_Picture"] = f"{dossier}/{eqid}/profile_picture.jpg"
+            elif download_image(client.info.profile_picture.url, image_filepath):
+                data["Local_Picture"] = f"{dossier}/{eqid}/profile_picture.jpg"
             else:
-                if download_image(client.info.profile_picture.url, image_filepath):
-                    data["Local_Picture"] = (
-                        dossier + "/" + eqid + "/profile_picture.jpg"
-                    )
-                else:
-                    logging.error("Erreur lors du téléchargement de l'image")
+                logging.error("Erreur lors du téléchargement de l'image")
             # Écrire les données au format JSON dans un fichier
             with open(chemin_fichier, "w") as fichier:
                 json.dump(data, fichier, indent=4)
@@ -377,8 +376,7 @@ try:
             # Je crée le fichier pou le Token.
             writedataPronotepy(Account, "/var/www/html/plugins/ProJote/data", EqID)
 
-
 except Exception as e:
     line_number = e.__traceback__.tb_lineno
-    logging.error("An error occurred: lig.", line_number, e)
+    logging.error("Ecriture du fichier échoué : lig.%s - %s", line_number, e)
     sys.exit(1)
