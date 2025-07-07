@@ -439,7 +439,7 @@ class ProJote extends eqLogic
     $values = array('command' => $command, 'cpttype' => $Cpttype, 'apikey' => $apikey, 'cas' => $CAS, 'CptParent' => $CptParent, 'login' => $login, 'password' => $password, 'url' => $url, 'enfant' => $enfant, 'CmdId' => $CmdId, 'TokenId' => $TokenId, 'TokenUsername' => $TokenUsername, 'TokenPassword' => $TokenPassword, 'TokenUrl' => $TokenUrl);
     $values = json_encode($values);
     if (log::convertLogLevel(log::getLogLevel(__CLASS__)) == "debug") {
-      log::add(__CLASS__, 'debug', $value);
+      log::add(__CLASS__, 'debug', $values);
     }
     $socket = socket_create(AF_INET, SOCK_STREAM, 0);
     socket_connect($socket, '127.0.0.1', config::byKey('socketport', __CLASS__, '55369'));
