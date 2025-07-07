@@ -89,14 +89,12 @@
                 // Récupération des données JSON
                 const competencesData = _options.value;
                 try {
+                    // Si la valeur est vide, on affiche un message pars de compétences.
+                    if (!competencesData || competencesData.trim() === '') {
+                        cmd.querySelector('.value').innerHTML = '<div style="color:gray;">Aucune compétence disponible</div>';
+                        return;
+                    }
                     const competences = JSON.parse(competencesData);
-
-                    // Afficher la première date si dispo
-                    //if (Array.isArray(competences) && competences.length > 0 && competences[0].date_debut_format) {
-                    //    cmd.querySelector('#date-competence-#id#').textContent = competences[0].date_debut_format;
-                    //}
-
-                    // Générer le HTML
                     const competencesHTML = Array.isArray(competences) ? competences.map(comp => `
                         <div class="competence-item" style="margin-bottom:14px; padding:10px; border-radius:6px; background:rgba(255,255,255,0.07);">
                             <div class="competence-nom" style="font-weight:bold; font-size:1.1em;">${comp.nom ?? ''}</div>

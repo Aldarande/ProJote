@@ -81,7 +81,6 @@ try {
     $url = $data['url'];
     $eqLogicId = init('eqlogic');
     log::add('ProJote', 'debug', 'Ajax::info QRCODE ' . $jeton . ' ' . $login . ' ' . $url . ' ' . $pin . ' pour eqid : ' . $eqLogicId);
-
     $command = system::getCmdPython3('ProJote') .  '/var/www/html/plugins/ProJote/resources/ProJoted/QRConnect.py';
     $command .= ' --Jeton ' . escapeshellarg($jeton);
     $command .= ' --QRLogin ' . escapeshellarg($login);
@@ -90,11 +89,8 @@ try {
     $command .= ' --Eqid ' . $eqLogicId;
     $command .= ' --Loglevel ' . (log::convertLogLevel(log::getLogLevel("ProJote")));
     $command .= ' >> ' . log::getPathToLog('ProJote') . ' 2>&1 ';
-
     log::add('ProJote', 'debug', 'Ajax::info QRCODE cmd ' . $command);
     exec($command, $output, $return_var);
-
-
     if ($return_var === 0) {
       // Mise à jour des informations collectées depuis le fichier
       $eqLogic = eqLogic::byId($eqLogicId);
@@ -105,9 +101,24 @@ try {
     } else {
       ajax::error('Erreur lors de l\'exécution du script Python. Vérifiez les logs.');
     }
-    //
-    // Affichage des infos du compte
-    //
+  } elseif ($action == "EnfantChange") {
+    log::add('ProJote', 'debug', "Ajax::Changement de l'enfant");
+    $dataJson = init('data');
+    $data = json_decode($dataJson, true);
+    if ($data === null) {
+      ajax::error('Invalid JSON data.');
+      return;
+    }
+    $nomeleve = $data['nomeleve'];
+    $eqLogicId = init('eqlogic');
+    log::add('ProJote', 'debug', 'Ajax::info Change Enfant ' . $nomeleve . ' pour eqid : ' . $eqLogicId);
+
+    // Mise à jour des informations collectées depuis le fichier
+    $eqLogic = eqLogic::byId($eqLogicId);
+    log::add('ProJote', 'debug', 'Ajax:: eqLogicId = ' . $eqLogicId);
+    // Appeler la fonction ReadEnfantToken pour lire et décoder le fichier JSON
+    $data = $eqLogic->SwitchEleve($data['nomeleve']);
+    ajax::success($data);
   } else {
     // Si aucune action correspondante n'a été trouvée
     throw new Exception(__('Aucune méthode correspondante à', __FILE__) . ' : ' . init('action'));
