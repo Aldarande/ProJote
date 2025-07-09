@@ -307,6 +307,7 @@ class ProJote extends eqLogic
         // sinon je la crée
         log::add('ProJote', 'debug', 'Sauvegarde : Création de la commande : ' . $id . '-' . $name);
         $cmd = $this->getCmd(null, $id);
+        $cmd = new ProJoteCmd();
         $cmd->setName($name);
         $cmd->setEqLogic_id($this->getId());
         $cmd->setType($type);
@@ -318,22 +319,17 @@ class ProJote extends eqLogic
         $cmd->setDisplay('generic_type', $generic_type);
         $cmd->setTemplate('dashboard', $template_dashboard);
         $cmd->setTemplate('mobile', $template_mobile);
-        if ($generic_type == "GENERIC_ACTION") {
-          $cmd = new ProJoteCmd();
-        }
         $cmd->save();
       }
     }
   }
 
   // Fonction exécutée automatiquement avant la suppression de l'équipement
-  public function preRemove() {}
-
-  // Fonction exécutée automatiquement après la suppression de l'équipement
-  public function postRemove()
+  public function preRemove()
   {
-    $eqId = $this->getId();
-    $dataDir = '/var/www/html/plugins/ProJote/data/' . $eqId;
+    $eqLogicId = $this->getId();
+    log::add('ProJote', 'debug', 'Suppression de l\'EqID : ' . $eqLogicId);
+    $dataDir = '/var/www/html/plugins/ProJote/data/' . $eqLogicId;
     // Fonction récursive pour supprimer un dossier et tous ses fichiers et sous-dossiers
     function deleteDirectory($dir)
     {
@@ -360,6 +356,9 @@ class ProJote extends eqLogic
       log::add('ProJote', 'error', 'Erreur lors de la suppression du dossier ' . $dataDir);
     }
   }
+
+  // Fonction exécutée automatiquement après la suppression de l'équipement
+  public function postRemove() {}
 
 
   /* Permet de crypter/décrypter automatiquement des champs de configuration des équipements

@@ -1099,26 +1099,20 @@ def read_socket():  # sourcery skip: extract-method, merge-dict-assign
                         e,
                     )
                     client = None
-                ### 05/01/2025 : A revalider si je dois doubler
-                # A supprimer car doublon avec ligne 1155
-                # credentials = client.export_credentials()
-                if client is not None and client.logged_in:
-                    tokenconnected = "true"
-                else:
-                    logging.error("Connection avec le Token échouée ")
-                    required_keys = ["url", "login", "password"]
-                    all_Comptekeys_present = True
-                    for key in required_keys:
-                        if key not in message or not message[key].strip():
-                            logging.error(
-                                "Information de login manquante ou vide : %s", key
-                            )
-                            all_Comptekeys_present = False
-                    # sourcery skip: raise-specific-error
-                    raise Exception(
-                        "Connection avec le Token échouée et les inforamtions de login sont manquantes."
-                    )
+
+            if client is not None and client.logged_in:
+                tokenconnected = "true"
             else:
+                logging.error("Connection avec le Token échouée ")
+                required_keys = ["url", "login", "password"]
+                all_Comptekeys_present = True
+                for key in required_keys:
+                    if key not in message or not message[key].strip():
+                        logging.error(
+                            "Information de login manquante ou vide : %s", key
+                        )
+                        all_Comptekeys_present = False
+
                 logging.info("Je me connecte via la compte et le mot de passe.")
                 required_keys = ["url", "login", "password"]
                 if (all_Comptekeys_present != True) or not all_Comptekeys_present:
