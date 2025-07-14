@@ -177,7 +177,7 @@ try:
             response = requests.get(url)
             # Vérifier si la requête a réussi (code de statut 200)
             if response.status_code == 200:
-
+                # J'aimerai un valider que l'image récupérée via url est bien différente de l'image de filepath
                 if os.path.exists(filepath):
                     with open(filepath, "rb") as f:
                         existing_image = f.read()
@@ -185,19 +185,14 @@ try:
                         logging.info(
                             "L'image est déjà à jour, pas besoin de la télécharger."
                         )
+
                     else:
                         # Ouvrir un fichier en mode écriture binaire
                         logging.info("L'image est différente,je la télécharge.")
                         with open(filepath, "wb") as f:
                             # Écrire le contenu de l'image dans le fichier
                             f.write(response.content)
-                else:
-                    # Ouvrir un fichier en mode écriture binaire
-                    logging.info("L'image existe pas, je la télécharge.")
-                    with open(filepath, "wb") as f:
-                        # Écrire le contenu de l'image dans le fichier
-                        f.write(response.content)
-                return True
+                    return True
             else:
                 # Afficher un message d'erreur si la requête a échoué
                 logging.error(
@@ -358,6 +353,7 @@ try:
             logging.info("URL : %s", Account.pronote_url)
             logging.info("Password : %s", Account.password)
             logging.info("ENT : %s", Account.ent)
+            logging.info("Picture : %s", Account.info.profile_picture)
             # je requête le QR code
             Pin = "4321"
             Qrcode_data = Account.request_qr_code_data(Pin)
