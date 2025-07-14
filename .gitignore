@@ -1,0 +1,11 @@
+# Ignore data directory
+data/
+Parle en francais/
+
+# Ignore Python virtual environment directory
+resources/python_venv
+.vscode/
+.venv/
+.cspell/
+plugin_info/ProJote_icon.png
+resources/ProJoted\jeedom/__pycache__
