@@ -77,7 +77,6 @@ try:
             logging.info("Client connecté")
             # Je crée le fichier pou le Token.
             writedataPronotepy(Account, "/var/www/html/plugins/ProJote/data", EqID)
-
 except Exception as e:
     line_number = e.__traceback__.tb_lineno
     print("An error occurred: line ", line_number, e)

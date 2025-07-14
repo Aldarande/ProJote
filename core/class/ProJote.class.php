@@ -544,8 +544,8 @@ class ProJoteCmd extends cmd
       case 'refresh': // LogicalId de la commande rafraîchir que l’on a créé dans la méthode Postsave de la classe vdm .
         //Aldarande - 18/02/2024 : Changement à faire si apres
         $eqlogic->UpdateInfoPronote($options); //On lance la fonction UpdateInfoPronote() pour récupérer les infos 
-        $date = date("d-m-Y H:i:s"); // transfert la date d'éxécution dans la variable $date 
-        $eqlogic->checkAndUpdateCmd('LastLogin', $date); //on met à jour la commande avec le LogicalId "LastLogin"  de l'eqlogic avec la variable $date 
+        //$date = date("d-m-Y H:i:s"); // transfert la date d'éxécution dans la variable $date 
+        //$eqlogic->checkAndUpdateCmd('LastLogin', $date); //on met à jour la commande avec le LogicalId "LastLogin"  de l'eqlogic avec la variable $date 
         break;
     }
   }

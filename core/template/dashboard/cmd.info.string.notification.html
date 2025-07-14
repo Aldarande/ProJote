@@ -54,28 +54,33 @@
         jeedom.cmd.addUpdateFunction('#id#', function (_options) {
             if (is_object(cmd = document.querySelector('.cmd[data-cmd_uid="#uid#"]'))) {
                 const notifData = _options.value;
-                try {
-                    const notifications = JSON.parse(notifData);
-                    const notifHTML = Array.isArray(notifications) ? notifications.map(notif => `
-            <div class="notif-item">
-                <div class="notif-sujet">${notif.sujet ?? ''}</div>
-                <div class="notif-categorie-auteur">
-                    <span class="notif-categorie">${notif.categorie ?? ''}</span>
-                    <span class="notif-sep"> | </span>
-                    <span class="notif-auteur">${notif.auteur ?? ''}</span>
+                if (!notifData || notifData.trim() === '' || notifData === '[]') {
+                    cmd.querySelector('.value').innerHTML = '<div style="color:gray;">Pas de notifications</div>';
+                    return;
+                } else {
+                    try {
+                        const notifications = JSON.parse(notifData);
+                        const notifHTML = Array.isArray(notifications) ? notifications.map(notif => `
+                <div class="notif-item">
+                    <div class="notif-sujet">${notif.sujet ?? ''}</div>
+                    <div class="notif-categorie-auteur">
+                        <span class="notif-categorie">${notif.categorie ?? ''}</span>
+                        <span class="notif-sep"> | </span>
+                        <span class="notif-auteur">${notif.auteur ?? ''}</span>
+                    </div>
+                    <div class="notif-bottom-row">
+                        <span class="notif-date">${notif.creation ?? ''}</span>
+                        <span class="notif-lu">
+                            ${notif.lu ? '<i class="fas fa-envelope-open"></i>' : '<i class="fas fa-envelope"></i>'}
+                        </span>
+                    </div>
                 </div>
-                <div class="notif-bottom-row">
-                    <span class="notif-date">${notif.creation ?? ''}</span>
-                    <span class="notif-lu">
-                        ${notif.lu ? '<i class="fas fa-envelope-open"></i>' : '<i class="fas fa-envelope"></i>'}
-                    </span>
-                </div>
-            </div>
-                    `).join('') : '<div style="color:gray;">Aucune notification</div>';
-                    cmd.querySelector('.value').innerHTML = notifHTML;
-                } catch (e) {
-                    cmd.querySelector('.value').innerHTML = '<div style="color:#FF4500;">Erreur de données de notification</div>';
-                    console.error("Erreur lors du parsing des données JSON :", e);
+                        `).join('') : '<div style="color:gray;">Aucune notification</div>';
+                        cmd.querySelector('.value').innerHTML = notifHTML;
+                    } catch (e) {
+                        cmd.querySelector('.value').innerHTML = '<div style="color:#FF4500;">Erreur de données de notification</div>';
+                        console.error("Erreur lors du parsing des données JSON :", e);
+                    }
                 }
             }
         });

@@ -60,32 +60,37 @@
             if (is_object(cmd = document.querySelector('.cmd[data-cmd_uid="#uid#"]'))) {
                 // Récupération des données JSON
                 const absencesData = _options.value;
-                try {
-                    const absences = JSON.parse(absencesData);
+                if (!absencesData || absencesData.trim() === '' || absencesData === '[]' || absencesData == "Pas d'absence retourné" || absencesData == "Pas de dernière absence retournée") {
+                    cmd.querySelector('.value').innerHTML = '<div style="color:gray;">Pas d\'absences</div>';
+                    return;
+                }
+                else {
+                    try {
+                        const absences = JSON.parse(absencesData);
+                        // Afficher la première date si dispo
+                        //if (Array.isArray(absences) && absences.length > 0 && absences[0].date_debut_format) {
+                        //    cmd.querySelector('#date-absence-#id#').textContent = absences[0].date_debut_format;
+                        //}
 
-                    // Afficher la première date si dispo
-                    //if (Array.isArray(absences) && absences.length > 0 && absences[0].date_debut_format) {
-                    //    cmd.querySelector('#date-absence-#id#').textContent = absences[0].date_debut_format;
-                    //}
-
-                    // Générer le HTML
-                    const absencesHTML = Array.isArray(absences) ? absences.map(abs => `
-                        <div class="absence-item">
-                            <div class="absence-date">Du ${abs.date_debut ?? ''} au ${abs.date_fin ?? ''}</div>
-                            <div class="absence-raison">${abs.raison ?? ''}</div>
-                            <div class="absence-details">
-                                ${abs.nb_heures ? abs.nb_heures + ' - ' : ''}${abs.nb_jours ? abs.nb_jours + ' jour(s)' : ''}
+                        // Générer le HTML
+                        const absencesHTML = Array.isArray(absences) ? absences.map(abs => `
+                            <div class="absence-item">
+                                <div class="absence-date">Du ${abs.date_debut ?? ''} au ${abs.date_fin ?? ''}</div>
+                                <div class="absence-raison">${abs.raison ?? ''}</div>
+                                <div class="absence-details">
+                                    ${abs.nb_heures ? abs.nb_heures + ' - ' : ''}${abs.nb_jours ? abs.nb_jours + ' jour(s)' : ''}
+                                </div>
+                                <div class="${abs.justifie ? 'absence-justifie' : 'absence-nonjustifie'}">
+                                    ${abs.justifie ? 'Justifiée' : 'Non justifiée'}
+                                </div>
                             </div>
-                            <div class="${abs.justifie ? 'absence-justifie' : 'absence-nonjustifie'}">
-                                ${abs.justifie ? 'Justifiée' : 'Non justifiée'}
-                            </div>
-                        </div>
-                    `).join('') : '<div style="color:gray;">Aucune absence</div>';
+                        `).join('') : '<div style="color:gray;">Aucune absence</div>';
 
-                    cmd.querySelector('.value').innerHTML = absencesHTML;
-                } catch (e) {
-                    cmd.querySelector('.value').innerHTML = '<div style="color:red;">Erreur de données absences</div>';
-                    console.error("Erreur lors du parsing des données JSON :", e, absencesData);
+                        cmd.querySelector('.value').innerHTML = absencesHTML;
+                    } catch (e) {
+                        cmd.querySelector('.value').innerHTML = '<div style="color:red;">Erreur de données absences</div>';
+                        console.error("Erreur lors du parsing des données JSON :", e, absencesData);
+                    }
                 }
             }
         });

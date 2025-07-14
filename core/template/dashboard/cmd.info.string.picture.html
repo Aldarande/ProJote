@@ -19,9 +19,16 @@
                 var fallbackUrl = '/plugins/ProJote/data/#eqLogic_id#/profile_picture.jpg'; // <-- Remplace par ton URL de secours
 
                 // Fonction de fallback si l'image ne charge pas
+                var triedFallback = false;
                 img.onerror = function () {
-                    if (img.src !== fallbackUrl) {
+                    if (!triedFallback && img.src !== fallbackUrl) {
                         img.src = fallbackUrl;
+                        triedFallback = true;
+                    } else {
+                        // Optionnel : afficher une image par défaut ou masquer l'image
+                        img.style.display = 'none';
+                        // envoie un message à la console pour indiquer que l'image n'a pas pu être chargée
+                        console.warn('Image could not be loaded, using fallback URL:', fallbackUrl);
                     }
                 };
 

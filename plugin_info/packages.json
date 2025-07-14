@@ -1,27 +1,27 @@
 {
-  "pre-install": {},
-  "apt": {
-    "python3-pyudev": {},
-    "python3-requests": {},
-    "python3-dev": {}
-  },
-  "pip3": {
-    "pronotepy": {
-      "reinstall": true
+    "pre-install": {},
+    "apt": {
+        "python3-pyudev": {},
+        "python3-requests": {},
+        "python3-dev": {}
     },
-    "autoslot": {},
-    "cryptography": {},
-    "pycryptodome": {
-      "version": "3.20.0",
-      "reinstall": true
+    "pip3": {
+        "pronotepy": {
+            "reinstall": true
+        },
+        "autoslot": {},
+        "cryptography": {},
+        "pycryptodome": {
+            "version": "3.20.0",
+            "reinstall": true
+        },
+        "requests": {},
+        "beautifulsoup4": {},
+        "serial": {},
+        "pyudev": {}
     },
-    "requests": {},
-    "beautifulsoup4": {},
-    "serial": {},
-    "pyudev": {}
-  },
-  "npm": {},
-  "yarn": {},
-  "plugin": {},
-  "post-install": {}
+    "npm": {},
+    "yarn": {},
+    "plugin": {},
+    "post-install": {}
 }

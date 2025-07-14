@@ -88,47 +88,49 @@
             if (is_object(cmd = document.querySelector('.cmd[data-cmd_uid="#uid#"]'))) {
                 // Récupération des données JSON
                 const competencesData = _options.value;
-                try {
-                    // Si la valeur est vide, on affiche un message pars de compétences.
-                    if (!competencesData || competencesData.trim() === '') {
-                        cmd.querySelector('.value').innerHTML = '<div style="color:gray;">Aucune compétence disponible</div>';
-                        return;
-                    }
-                    const competences = JSON.parse(competencesData);
-                    const competencesHTML = Array.isArray(competences) ? competences.map(comp => `
-                        <div class="competence-item" style="margin-bottom:14px; padding:10px; border-radius:6px; background:rgba(255,255,255,0.07);">
-                            <div class="competence-nom" style="font-weight:bold; font-size:1.1em;">${comp.nom ?? ''}</div>
-                            <div class="competence-meta" style="font-size:0.95em; color:#666; font-style:italic; margin-bottom:4px;">
-                            ${comp.Sujet ?? ''}${comp.professeur ? ' - ' + comp.professeur : ''}${comp.date ? ' - ' + comp.date : ''}
-                            </div>
-                            <div class="competence-acquisitions">
-                            ${(Array.isArray(comp.acquisitions) && comp.acquisitions.length > 0) ? comp.acquisitions.map(acq => `
-                                <span class="acq-abbr" data-color="${acq.abbreviation ?? ''}">
-                                ${acq.abbreviation ?? ''}
-                                    <span class="acq-tooltip">
-                                        <div class="acq-tooltip-level" style="color:inherit;">${acq.level ?? ''}</div>
-                                        <div class="acq-tooltip-name" style="color:inherit;">${acq.name ?? ''}</div>
-                                        <div class="acq-tooltip-domain" style="color:inherit;">${acq.domain ?? ''}</div>
+                if (!competencesData || competencesData.trim() === '' || competencesData === '[]' || competencesData == "Pas de compétences retournée" || competencesData == "Pas de notification retournée") {
+                    cmd.querySelector('.value').innerHTML = '<div style="color:gray;">Pas de compétences</div>';
+                    return;
+                }
+                else {
+                    try {
+                        // Si la valeur est vide, on affiche un message pars de compétences.
+                        const competences = JSON.parse(competencesData);
+                        const competencesHTML = Array.isArray(competences) ? competences.map(comp => `
+                            <div class="competence-item" style="margin-bottom:14px; padding:10px; border-radius:6px; background:rgba(255,255,255,0.07);">
+                                <div class="competence-nom" style="font-weight:bold; font-size:1.1em;">${comp.nom ?? ''}</div>
+                                <div class="competence-meta" style="font-size:0.95em; color:#666; font-style:italic; margin-bottom:4px;">
+                                ${comp.Sujet ?? ''}${comp.professeur ? ' - ' + comp.professeur : ''}${comp.date ? ' - ' + comp.date : ''}
+                                </div>
+                                <div class="competence-acquisitions">
+                                ${(Array.isArray(comp.acquisitions) && comp.acquisitions.length > 0) ? comp.acquisitions.map(acq => `
+                                    <span class="acq-abbr" data-color="${acq.abbreviation ?? ''}">
+                                    ${acq.abbreviation ?? ''}
+                                        <span class="acq-tooltip">
+                                            <div class="acq-tooltip-level" style="color:inherit;">${acq.level ?? ''}</div>
+                                            <div class="acq-tooltip-name" style="color:inherit;">${acq.name ?? ''}</div>
+                                            <div class="acq-tooltip-domain" style="color:inherit;">${acq.domain ?? ''}</div>
+                                        </span>
                                     </span>
-                                </span>
-                            `).join('') : '<span style="color:#aaa;">Aucune acquisition</span>'}
+                                `).join('') : '<span style="color:#aaa;">Aucune acquisition</span>'}
+                                </div>
+                                ${comp.description ? `<div class="competence-desc" style="font-size:0.95em; color:#888; margin-top:4px;">${comp.description}</div>` : ''}
+                                <!-- ${Array.isArray(comp.Paliers) && comp.Paliers.length > 0 ? `<div class="competence-palier" style="font-size:0.9em; color:#1976d2; margin-top:2px;">${comp.Paliers.join(', ')}</div>` : ''} -->
                             </div>
-                            ${comp.description ? `<div class="competence-desc" style="font-size:0.95em; color:#888; margin-top:4px;">${comp.description}</div>` : ''}
-                            <!-- ${Array.isArray(comp.Paliers) && comp.Paliers.length > 0 ? `<div class="competence-palier" style="font-size:0.9em; color:#1976d2; margin-top:2px;">${comp.Paliers.join(', ')}</div>` : ''} -->
-                        </div>
-                    `).join('') : '<div style="color:gray;">Aucune compétence</div>';
+                        `).join('') : '<div style="color:gray;">Aucune compétence</div>';
 
-                    cmd.querySelector('.value').innerHTML = competencesHTML;
+                        cmd.querySelector('.value').innerHTML = competencesHTML;
 
-                    cmd.querySelectorAll('.acq-abbr').forEach(el => {
-                        const color = getComputedStyle(el).color;
-                        el.querySelectorAll('.acq-tooltip-level, .acq-tooltip-name, .acq-tooltip-domain').forEach(child => {
-                            child.style.color = color;
+                        cmd.querySelectorAll('.acq-abbr').forEach(el => {
+                            const color = getComputedStyle(el).color;
+                            el.querySelectorAll('.acq-tooltip-level, .acq-tooltip-name, .acq-tooltip-domain').forEach(child => {
+                                child.style.color = color;
+                            });
                         });
-                    });
-                } catch (e) {
-                    cmd.querySelector('.value').innerHTML = '<div style="color:red;">Erreur de données competences</div>';
-                    console.error("Erreur lors du parsing des données JSON :", e, competencesData);
+                    } catch (e) {
+                        cmd.querySelector('.value').innerHTML = '<div style="color:red;">Erreur de données competences</div>';
+                        console.error("Erreur lors du parsing des données JSON :", e, competencesData);
+                    }
                 }
             }
         });
