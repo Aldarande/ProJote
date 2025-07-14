@@ -77,31 +77,35 @@
             if (is_object(cmd = document.querySelector('.cmd[data-cmd_uid="#uid#"]'))) {
                 // Récupération des données JSON
                 const devoirsData = _options.value;
-                try {
-                    const devoirs = JSON.parse(devoirsData);
-
-                    // Afficher la première date si dispo
-                    //if (Array.isArray(devoirs) && devoirs.length > 0 && devoirs[0].date) {
-                    //    cmd.querySelector('#date-devoir-#id#').textContent = devoirs[0].date;
-                    //}
-
-                    // Générer le HTML
-                    const devoirsHTML = Array.isArray(devoirs) ? devoirs.map(devoir => `                        
-                        <div class="devoir-item">
-                            <div class="color-band" style="background-color: ${devoir.color}"></div>
-                            <div class="devoir-date">${devoir.date ?? ''}</div>
-                            <div class="devoir-title">${devoir.title ?? ''}</div>
-                            <div class="devoir-description">${wrapText(decodeUTF8(devoir.description ?? ''), 40)}</div>        
-                            <div class="${devoir.done ? 'devoir-done' : 'devoir-todo'}">
-                                ${devoir.done ? 'Fait' : 'À faire'}
+                if (!devoirsData || devoirsData.trim() === '' || devoirsData === '[]') {
+                    cmd.querySelector('.value').innerHTML = '<div style="color:gray;">Pas de devoir</div>';
+                    return;
+                }
+                else {
+                    try {
+                        const devoirs = JSON.parse(devoirsData);
+                        // Afficher la première date si dispo
+                        //if (Array.isArray(devoirs) && devoirs.length > 0 && devoirs[0].date) {
+                        //    cmd.querySelector('#date-devoir-#id#').textContent = devoirs[0].date;
+                        //}
+                        // Générer le HTML
+                        const devoirsHTML = Array.isArray(devoirs) ? devoirs.map(devoir => `                        
+                            <div class="devoir-item">
+                                <div class="color-band" style="background-color: ${devoir.color}"></div>
+                                <div class="devoir-date">${devoir.date ?? ''}</div>
+                                <div class="devoir-title">${devoir.title ?? ''}</div>
+                                <div class="devoir-description">${wrapText(decodeUTF8(devoir.description ?? ''), 40)}</div>        
+                                <div class="${devoir.done ? 'devoir-done' : 'devoir-todo'}">
+                                    ${devoir.done ? 'Fait' : 'À faire'}
+                                </div>
                             </div>
-                        </div>
-                    `).join('') : '<div style="color:gray;">Aucun devoir</div>';
+                        `).join('') : '<div style="color:gray;">Aucun devoir</div>';
 
-                    cmd.querySelector('.value').innerHTML = devoirsHTML;
-                } catch (e) {
-                    cmd.querySelector('.value').innerHTML = '<div style="color:red;">Erreur de données devoirs</div>';
-                    console.error("Erreur lors du parsing des données JSON :", e);
+                        cmd.querySelector('.value').innerHTML = devoirsHTML;
+                    } catch (e) {
+                        cmd.querySelector('.value').innerHTML = '<div style="color:red;">Erreur de données devoirs</div>';
+                        console.error("Erreur lors du parsing des données JSON :", e);
+                    }
                 }
             }
         });

@@ -1,2 +1,3 @@
 # ProJote
-Jeedom plug-in for retrieving pronote information via PronotePy
+
+Jeedom plug-in for retrieving pronote information via API Wapper PronotePy

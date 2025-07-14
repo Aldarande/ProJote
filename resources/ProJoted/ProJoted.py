@@ -463,13 +463,18 @@ def Emploidutemps(client):
 
 def menus(client):
     try:
+        data = {"Menu": []}
         # Récupération des menus
         menu_today = client.menus(datetime.date.today())
-        data = {"Menu": []}
-        # Transformation des menu en json
-        for menu in menu_today:
-            data["Menu"].append(build_menu_data(menu))
-
+        if not menu_today == []:
+            # On trie les menus par date
+            menu_today = sorted(menu_today, key=lambda m: m.date)
+            # Transformation des menu en json
+            for menu in menu_today:
+                data["Menu"].append(build_menu_data(menu))
+        else:
+            logging.info("Aucun menu trouvé pour la date du jour.")
+            time.sleep(5)
         return data["Menu"]
     except Exception as e:
         logging.error("Un erreur est retourné sur le traitement des Menus: %s", e)
@@ -540,19 +545,21 @@ def evaluations(client):
             line_number,
             e,
         )
+        time.sleep(5)
 
 
 def notes(client):
     try:
-        # Récupération des notes
-        if grades != client.current_period.grades:
+        data = {"note": [], "derniere_note": []}
+        grades = client.current_period.grades
+        if not grades == []:
             grades = sorted(grades, key=lambda grade: grade.date, reverse=True)
             index_note = 0  # debut de la boucle des notes
             limit_note = 11  # nombre max de note à récupérer + 1
             # Transformation des notes en Json
-            data = {"note": [], "derniere_note": []}
             for grade in grades:
                 index_note += 1
+                # Attention je ne prend que 11 notes pour éviter de surcharger le système et bloquer l'adresse IP
                 if index_note == limit_note:
                     break
                 data["note"].append(
@@ -576,7 +583,6 @@ def notes(client):
                 # je récupére la derniére note
             if index_note > 0:
                 data["derniere_note"].append(data["note"][0])
-
         else:
             logging.info("Aucune note trouvée pour la période en cours.")
             data = {"note": [], "derniere_note": []}
@@ -588,10 +594,8 @@ def notes(client):
             line_number,
             e,
         )
-
-
-import datetime
-import logging
+        time.sleep(5)
+        return {"note": [], "derniere_note": []}
 
 
 def process_homework(homework_list, data, key, longmax_devoir):
@@ -662,7 +666,6 @@ def devoirs(client):
     try:
         data = {"devoir": [], "devoir_Demain": []}
         longmax_devoir = 120
-
         # Supposons que cette méthode récupère tous les devoirs pour une période donnée
         all_homework = client.homework(
             date_from=datetime.date.today(),
@@ -676,6 +679,7 @@ def devoirs(client):
                 data[f"Nb_{key}_F"] = 0
                 data[f"Nb_{key}_NF"] = 0
                 data[key] = []
+            time.sleep(5)
             return data
 
         # Filtrer les devoirs pour aujourd'hui
@@ -692,18 +696,14 @@ def devoirs(client):
                 next_school_day = homework_nextday
                 break
             delta += 1
-
         # Traiter les devoirs pour aujourd'hui
         process_homework(homework_today, data, "devoir", longmax_devoir)
-
         # Traiter les devoirs pour le prochain jour d'école
         if next_school_day:
             process_homework(next_school_day, data, "devoir_Demain", longmax_devoir)
         else:
             logging.info("Aucun devoir trouvé pour le prochain jour d'école.")
-
         return data
-
     except Exception as e:
         line_number = e.__traceback__.tb_lineno
         logging.error(
@@ -711,36 +711,40 @@ def devoirs(client):
             line_number,
             e,
         )
+        time.sleep(5)
         return data
 
 
 def notifications(client):
     try:
-        # Récupération des notifications
-        notification_eleve = client.information_and_surveys()
-        notification_eleve = sorted(
-            notification_eleve,
-            key=lambda information_and_survey: information_and_survey.start_date,
-            reverse=True,
-        )
         data = {"Notification": [], "dernier_Notification": []}
         # Récupération des notifications
-        for notif in notification_eleve:
-            data["Notification"].append(
-                {
-                    "sujet": (notif.title),
-                    "auteur": (notif.author),
-                    "creation": (notif.creation_date).strftime("%d/%m"),
-                    "message": (notif.content),
-                    "categorie": (notif.category),
-                    "lu": (notif.read),
-                }
+        notification_eleve = client.information_and_surveys()
+        if not notification_eleve == []:
+            notification_eleve = sorted(
+                notification_eleve,
+                key=lambda information_and_survey: information_and_survey.start_date,
+                reverse=True,
             )
-            # récupération du dernier message
-        if data["Notification"]:
-            data["dernier_Notification"] = (
-                [data["Notification"][0]] if data["Notification"] else []
-            )
+            # Récupération des notifications
+            for notif in notification_eleve:
+                data["Notification"].append(
+                    {
+                        "sujet": (notif.title),
+                        "auteur": (notif.author),
+                        "creation": (notif.creation_date).strftime("%d/%m"),
+                        "message": (notif.content),
+                        "categorie": (notif.category),
+                        "lu": (notif.read),
+                    }
+                )
+                # récupération du dernier message
+            if data["Notification"]:
+                data["dernier_Notification"] = (
+                    [data["Notification"][0]] if data["Notification"] else []
+                )
+            else:
+                time.sleep(5)
         return data
     except Exception as e:
         logging.error(
@@ -750,30 +754,33 @@ def notifications(client):
 
 def retards(client):
     try:
+        data = {"retard": [], "dernier_retard": [], "nb_retard": 0}
         # recupération des retards
         retards = client.current_period.delays
-        # tri des retards par date décroissante
-        retards = sorted(retards, key=lambda delay: delay.date, reverse=True)
-        data = {"retard": [], "dernier_retard": [], "nb_retard": 0}
-        nbretard = 0
-        # Récupération des retards pour la période en cours
-        for retard in retards:
-            data["retard"].append(
-                {
-                    "id": retard.id,
-                    "date": retard.date.strftime("%d/%m/%y %H:%M"),
-                    "justifie": retard.justified,
-                    "nb_minutes": retard.minutes,
-                    "justification": retard.justification,
-                    "raison": str(retard.reasons)[2:-2],
-                }
-            )
-            nbretard = nbretard + 1
-        data["nb_retard"] = nbretard
-        # récupération du denrier retard
-        data["dernier_retard"] = [data["retard"][0]] if data["retard"] else []
-        # transformation des retards en Json
+        if not retards == []:
+            # tri des retards par date décroissante
+            retards = sorted(retards, key=lambda delay: delay.date, reverse=True)
 
+            nbretard = 0
+            # Récupération des retards pour la période en cours
+            for retard in retards:
+                data["retard"].append(
+                    {
+                        "id": retard.id,
+                        "date": retard.date.strftime("%d/%m/%y %H:%M"),
+                        "justifie": retard.justified,
+                        "nb_minutes": retard.minutes,
+                        "justification": retard.justification,
+                        "raison": str(retard.reasons)[2:-2],
+                    }
+                )
+                nbretard = nbretard + 1
+            data["nb_retard"] = nbretard
+            # récupération du denrier retard
+            data["dernier_retard"] = [data["retard"][0]] if data["retard"] else []
+            # transformation des retards en Json
+        else:
+            time.sleep(5)
         return data
     except Exception as e:
         line_number = e.__traceback__.tb_lineno
@@ -786,44 +793,43 @@ def retards(client):
 
 def absences(client):
     try:
-        # Récupération  des absences pour l'année
-        # absences = [period.absences for period in client.periods]
         # Récupération  des absences pour la période en cours
-        absences = client.current_period.absences
-        absences = sorted(absences, key=lambda absence: absence.from_date, reverse=True)
-
-        # Transformation des absences en Json
         data = {"absence": [], "nb_absences": 0, "derniere_absence": []}
-
-        nbabsences = 0
-        for absence in absences:
-            data["absence"].append(
-                {
-                    "id": absence.id,
-                    "date_debut": absence.from_date.strftime("%d/%m/%y %H:%M"),
-                    "date_fin": absence.to_date.strftime("%d/%m/%y %H:%M"),
-                    "justifie": absence.justified,
-                    "nb_heures": absence.hours,
-                    "nb_jours": absence.days,
-                    "raison": str(absence.reasons)[2:-2],
-                }
+        absences = client.current_period.absences
+        if not absences == []:
+            absences = sorted(
+                absences, key=lambda absence: absence.from_date, reverse=True
             )
-            nbabsences = nbabsences + 1
-        data["nb_absences"] = nbabsences
-        # Je récupére la derniére absence
-        data["derniere_absence"].append(
-            {
-                "id": absences[nbabsences - 1].id,
-                "date_debut": absences[nbabsences - 1].from_date.strftime(
-                    "%d/%m/%y %H:%M"
-                ),
-                "date_fin": absences[nbabsences - 1].to_date.strftime("%d/%m/%y %H:%M"),
-                "justifie": absences[nbabsences - 1].justified,
-                "nb_heures": absences[nbabsences - 1].hours,
-                "nb_jours": absences[nbabsences - 1].days,
-                "raison": str(absences[nbabsences - 1].reasons)[2:-2],
-            }
-        )
+            nbabsences = 0
+            for absence in absences:
+                data["absence"].append(
+                    {
+                        "id": absence.id,
+                        "date_debut": absence.from_date.strftime("%d/%m/%y %H:%M"),
+                        "date_fin": absence.to_date.strftime("%d/%m/%y %H:%M"),
+                        "justifie": absence.justified,
+                        "nb_heures": absence.hours,
+                        "nb_jours": absence.days,
+                        "raison": str(absence.reasons)[2:-2],
+                    }
+                )
+                nbabsences += 1
+            data["nb_absences"] = nbabsences
+            # Je récupére la derniére absence
+            if nbabsences > 0:
+                data["derniere_absence"].append(
+                    {
+                        "id": absences[0].id,
+                        "date_debut": absences[0].from_date.strftime("%d/%m/%y %H:%M"),
+                        "date_fin": absences[0].to_date.strftime("%d/%m/%y %H:%M"),
+                        "justifie": absences[0].justified,
+                        "nb_heures": absences[0].hours,
+                        "nb_jours": absences[0].days,
+                        "raison": str(absences[0].reasons)[2:-2],
+                    }
+                )
+            else:
+                time.sleep(5)
         return data
     except Exception as e:
         line_number = e.__traceback__.tb_lineno
@@ -832,55 +838,58 @@ def absences(client):
             line_number,
             e,
         )
+        time.sleep(5)
+        return data
 
 
 def punitions(client):
     try:
         # Récupération des punitions
-        punitions = client.current_period.punishments
-        # Transformation des punition   en Json
         data = {"punition": [], "derniere_punition": [], "Nb_Punitions": 0}
-        if punitions == []:
-            return data
-        data["derniere_punition"].append(
-            {
-                "id": punitions[0].id,
-                "type": punitions[0].nature,
-                "raison": punitions[0].reasons,
-                "donneur": punitions[0].giver,
-                "date": punitions[0].given.strftime("%d/%m/%Y"),
-                "date_court": punitions[0].given.strftime("%d/%m"),
-                "circonstances": punitions[0].circumstances,
-                "exclusion": punitions[0].exclusion,
-                "duree": int(punitions[0].duration.total_seconds() // 60),
-            }
-        )
-        nbpunition = 0
-        for punition in punitions:
-            data["punition"].append(
+        punitions = client.current_period.punishments
+        if not punitions == []:
+            data["derniere_punition"].append(
                 {
-                    "id": punition.id,
-                    "type": punition.nature,
-                    "raison": punition.reasons,
-                    "donneur": punition.giver,
-                    "date": punition.given.strftime("%d/%m/%Y"),
-                    "date_court": punition.given.strftime("%d/%m"),
-                    "circonstances": punition.circumstances,
-                    "exclusion": punition.exclusion,
-                    "duree": int(punition.duration.total_seconds() // 60),
+                    "id": punitions[0].id,
+                    "type": punitions[0].nature,
+                    "raison": punitions[0].reasons,
+                    "donneur": punitions[0].giver,
+                    "date": punitions[0].given.strftime("%d/%m/%Y"),
+                    "date_court": punitions[0].given.strftime("%d/%m"),
+                    "circonstances": punitions[0].circumstances,
+                    "exclusion": punitions[0].exclusion,
+                    "duree": int(punitions[0].duration.total_seconds() // 60),
                 }
             )
-            nbpunition = nbpunition + 1
-        data["Nb_Punitions"] = nbpunition
+            nbpunition = 0
+            for punition in punitions:
+                data["punition"].append(
+                    {
+                        "id": punition.id,
+                        "type": punition.nature,
+                        "raison": punition.reasons,
+                        "donneur": punition.giver,
+                        "date": punition.given.strftime("%d/%m/%Y"),
+                        "date_court": punition.given.strftime("%d/%m"),
+                        "circonstances": punition.circumstances,
+                        "exclusion": punition.exclusion,
+                        "duree": int(punition.duration.total_seconds() // 60),
+                    }
+                )
+                nbpunition = nbpunition + 1
+            data["Nb_Punitions"] = nbpunition
+        else:
+            time.sleep(5)
         return data
     except Exception as e:
         logging.error("Un erreur est retourné sur le traitement des Punissions: %s", e)
+        time.sleep(5)
+        return data
 
 
 def ical(client):
     # Récupération des coordonnées ICAL
     try:
-
         jsondata = {"ICAL": client.export_ical()}
     except Exception as e:
         jsondata = {"ICAL": ""}
@@ -891,7 +900,6 @@ def ical(client):
 def identites(clientinfo):
     # Le but est de collecter toutes les informations concernant l'identité de l'élève
     try:
-
         data = {"identiteinfo": []}
         # Création du dictionnaire d'informations d'identité avec des valeurs non vides
         IdentityInfo = {
@@ -915,16 +923,6 @@ def identites(clientinfo):
 
 def GetTokenFromLogin(Account):
     qrcode_data = Account.request_qr_code_data("4321")
-    # Étape 1 : Extraire la partie de l'URL jusqu'à `/pronote/`
-    ## We need to change url because
-    # base_url = qrcode_data["url"].split("?login=true")[0]
-    # base_url = qrcode_data["url"].split("/pronote/")[0] + "/pronote/"
-
-    # Étape 2 : Extraire la dernière partie de l'URL qui commence par `mobile.`
-
-    # last_part = base_url.split("parent.html")[0] + "mobile.parent.html"
-
-    # qrcode_data["url"] = last_part
     logging.debug("Les info du QRCode : %s", qrcode_data["url"])
     return Account.qrcode_login(
         qrcode_data,
@@ -1057,14 +1055,12 @@ def read_socket():  # sourcery skip: extract-method, merge-dict-assign
             #   1 : On se connecte avec le Token réçu par défault
             # ========================================================
             # Vérifier que les informations de Token sont présentes et non vides
-
             required_keys = ["TokenId", "TokenUsername", "TokenPassword", "TokenUrl"]
             all_keys_present = True
             for key in required_keys:
                 if key not in message or not message[key].strip():
                     logging.error("Information de Token manquante ou vide : %s", key)
                     all_keys_present = False
-
             if all_keys_present:
                 logging.debug(
                     "Toutes les informations de Token sont présentes et non vides. Je me connecte avec le Token"
@@ -1099,20 +1095,26 @@ def read_socket():  # sourcery skip: extract-method, merge-dict-assign
                         e,
                     )
                     client = None
-
-            if client is not None and client.logged_in:
-                tokenconnected = "true"
+                ### 05/01/2025 : A revalider si je dois doubler
+                # A supprimer car doublon avec ligne 1155
+                # credentials = client.export_credentials()
+                if client is not None and client.logged_in:
+                    tokenconnected = "true"
+                else:
+                    logging.error("Connection avec le Token échouée ")
+                    required_keys = ["url", "login", "password"]
+                    all_Comptekeys_present = True
+                    for key in required_keys:
+                        if key not in message or not message[key].strip():
+                            logging.error(
+                                "Information de login manquante ou vide : %s", key
+                            )
+                            all_Comptekeys_present = False
+                    # sourcery skip: raise-specific-error
+                    Exception(
+                        "Connection avec le Token échouée et les inforamtions de login sont manquantes."
+                    )
             else:
-                logging.error("Connection avec le Token échouée ")
-                required_keys = ["url", "login", "password"]
-                all_Comptekeys_present = True
-                for key in required_keys:
-                    if key not in message or not message[key].strip():
-                        logging.error(
-                            "Information de login manquante ou vide : %s", key
-                        )
-                        all_Comptekeys_present = False
-
                 logging.info("Je me connecte via la compte et le mot de passe.")
                 required_keys = ["url", "login", "password"]
                 if (all_Comptekeys_present != True) or not all_Comptekeys_present:
@@ -1129,8 +1131,6 @@ def read_socket():  # sourcery skip: extract-method, merge-dict-assign
                     ent = class_for_name("pronotepy.ent", message["cas"])
                 else:
                     ent = ""
-                # temp en attendant de revalider le champs$response dans PRojote.PHP et docn de finir QRCODE
-
                 if (message["CptParent"] == "1") or (
                     "parent.html" in message["TokenUrl"]
                 ):
@@ -1183,10 +1183,12 @@ def read_socket():  # sourcery skip: extract-method, merge-dict-assign
                     jsondata["Eleve"] = identites(client.info)
                     if client.info.profile_picture and client.info.profile_picture.url:
                         jsondata["Photo"] = client.info.profile_picture.url
-
                 # je renew le token
                 logging.info("Je renew le Token")
                 jsondata["Token"] = RenewToken(client)
+                # Je valide que le fichier équipement est à jours
+                # je lance la foncton qui recherche si le nom de l'enfant à changer dans l'équipement
+                Checkeleve(client, message["CmdId"])
                 # J'ajoute l'emploi du temps
                 logging.info("Je récupére l'emploi du temps")
                 jsondata["Emploi_du_temps"] = Emploidutemps(client)
@@ -1217,16 +1219,12 @@ def read_socket():  # sourcery skip: extract-method, merge-dict-assign
                 # J'ajoutes l'ICAL
                 logging.info("Je récupére l'ICAL")
                 jsondata["Ical"] = ical(client)
-                # Je valide que le fichier équipement est à jours
-                # je lance la fonciton qui recherche si le nom de l'enfant à changer dans l'équipement
-                Checkeleve(client, message["CmdId"])
                 # J'envoie les données à Jeedom
                 logging.debug(
                     "Projoted.py :: Données JSON à envoyer : %s", json.dumps(jsondata)
                 )
                 jeedom_com.send_change_immediate(jsondata)
                 logging.info("Fin de récupération d'info depuis Projoted.py")
-
             else:
                 echo = "Le compte n'est pas loggué"
                 logging.error(echo)
@@ -1308,7 +1306,6 @@ try:
             "Network communication issues. Please fixe your Jeedom network configuration."
         )
         shutdown()
-
     logging.info(f"j'écris {str(_pidfile)}")
     jeedom_socket = jeedom_socket(port=_socket_port, address=_socket_host)
     listen()

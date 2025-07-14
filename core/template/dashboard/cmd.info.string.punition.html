@@ -96,27 +96,33 @@
         jeedom.cmd.addUpdateFunction('#id#', function (_options) {
             if (is_object(cmd = document.querySelector('.cmd[data-cmd_uid="#uid#"]'))) {
                 const punissionData = _options.value;
-                try {
-                    const punissions = JSON.parse(punissionData);
-                    const punissionHTML = Array.isArray(punissions) ? punissions.map(punission => `
-                    <div class="punission-item">
-                        <div class="color-band" style="background-color: #8B0000"></div>
-                        <div class="punission-type" style="font-weight: bold;">${punission.type ?? ''}</div>
-                        <div class="punission-minutes">
-                        ${punission.duree ? punission.duree + ' min' : ''}
-                        </div>     
-                        <div class="punission-justification">${punission.justification ?? ''}</div>
-                        <div class="punission-circonstances">${punission.circonstances ?? ''}</div>
-                        <div class="punission-bottom-row">
-                        <div class="punission-raison"> ${Array.isArray(punission.raison) ? punission.raison.join(', ') : (punission.raison ?? '')}</div>
+                if (!punissionData || punissionData.trim() === '' || punissionData === '[]') {
+                    cmd.querySelector('.value').innerHTML = '<div style="color:gray;">Aucune punition</div>';
+                    return;
+                }
+                else {
+                    try {
+                        const punissions = JSON.parse(punissionData);
+                        const punissionHTML = Array.isArray(punissions) ? punissions.map(punission => `
+                        <div class="punission-item">
+                            <div class="color-band" style="background-color: #8B0000"></div>
+                            <div class="punission-type" style="font-weight: bold;">${punission.type ?? ''}</div>
+                            <div class="punission-minutes">
+                            ${punission.duree ? punission.duree + ' min' : ''}
+                            </div>     
+                            <div class="punission-justification">${punission.justification ?? ''}</div>
+                            <div class="punission-circonstances">${punission.circonstances ?? ''}</div>
+                            <div class="punission-bottom-row">
+                            <div class="punission-raison"> ${Array.isArray(punission.raison) ? punission.raison.join(', ') : (punission.raison ?? '')}</div>
+                            </div>
+                            <div class="punission-donneur">${punission.donneur ?? ''}</div>
                         </div>
-                        <div class="punission-donneur">${punission.donneur ?? ''}</div>
-                    </div>
-                    `).join('') : '<div style="color:gray;">Aucune punition</div>';
-                    cmd.querySelector('.value').innerHTML = punissionHTML;
-                } catch (e) {
-                    cmd.querySelector('.value').innerHTML = '<div style="color:#8B0000;">Erreur de données punission</div>';
-                    console.error("Erreur lors du parsing des données JSON :", e);
+                        `).join('') : '<div style="color:gray;">Aucune punition</div>';
+                        cmd.querySelector('.value').innerHTML = punissionHTML;
+                    } catch (e) {
+                        cmd.querySelector('.value').innerHTML = '<div style="color:#8B0000;">Erreur de données punission</div>';
+                        console.error("Erreur lors du parsing des données JSON :", e);
+                    }
                 }
             }
         });
