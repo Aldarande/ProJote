@@ -75,7 +75,7 @@ try:
             logging.debug(f"QRConnect.py :: {Account}")
         if Account.logged_in:
             logging.info("Client connecté")
-            # Je crée le fichier pou le Token.
+            # Je crée le fichier pour le Token.
             writedataPronotepy(Account, "/var/www/html/plugins/ProJote/data", EqID)
 except Exception as e:
     line_number = e.__traceback__.tb_lineno
