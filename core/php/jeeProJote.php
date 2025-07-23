@@ -27,6 +27,23 @@ try {
     log::add('ProJote', 'info', 'EqLogic : ' . print_r($result['CmdId'], true));
     $eqLogic = eqLogic::byId($result['CmdId']);
 
+    if (!is_object($eqLogic)) {
+        log::add('ProJote', 'error', 'EqLogic non trouvé pour CmdId : ' . $result['CmdId']);
+        die();
+    }
+    log::add('ProJote', 'debug', 'EqLogic trouvé : ' . $eqLogic->getHumanName());
+    // Vérifie si l'EqLogic est actif
+    if (!$eqLogic->getIsEnable()) {
+        log::add('ProJote', 'error', 'EqLogic désactivé : ' . $eqLogic->getHumanName());
+        die();
+    }
+    //Je met à jours la date de dernière communication
+    //Mise à jour du nom de l'élève
+    if (isset($result['ConnectionDate']) && $eqLogic->getCmd(null, 'LastLogin')) {
+        log::add('ProJote', 'debug', 'Champ reçu : LastLogin - Valeur reçue : ' . $result['ConnectionDate']);
+        $eqLogic->checkAndUpdateCmd('LastLogin', $result['ConnectionDate']);
+    }
+
     // Vérifie si des informations d'élève sont présentes
     if (is_array($result["eleve"][0])) {
         // Parcourt toutes les clés possibles
@@ -212,7 +229,7 @@ try {
         log::add('ProJote', 'debug', 'Champ reçu : notifications - Valeur reçue : ' . json_encode($result["Competences"]));
         $eqLogic->checkAndUpdateCmd('competences', json_encode($result["Competences"]));
     } else {
-        $eqLogic->checkAndUpdateCmd('competences', "Pas de notification retournée");
+        $eqLogic->checkAndUpdateCmd('competences', "Pas de compétences retournée");
     }
     if (is_array($result["Token"])) {
         // Correspondance des clés JSON avec les commandes Jeedom
@@ -249,14 +266,14 @@ try {
     }
     // Je recherche devoir
     if (isset($result['Devoirs']['devoir']) && $eqLogic->getCmd(null, 'devoir')) {
-        log::add('ProJote', 'debug', 'Champ reçu : devoirs - Valeur reçue : ' . json_encode($result['Devoirs']['devoir'],));
+        log::add('ProJote', 'debug', 'Champ reçu : devoirs - Valeur reçue : ' . json_encode($result['Devoirs']['devoir'], JSON_PRETTY_PRINT));
         $eqLogic->checkAndUpdateCmd('devoir', json_encode($result['Devoirs']['devoir'],));
     } else {
         $eqLogic->checkAndUpdateCmd('devoir', "Pas de devoirs retourné");
     }
     // Je recherche devoir_Demain
     if (isset($result['Devoirs']['devoir_Demain']) && $eqLogic->getCmd(null, 'devoir_Demain')) {
-        log::add('ProJote', 'debug', 'Champ reçu : devoirs - Valeur reçue : ' . json_encode($result['Devoirs']['devoir_Demain'],));
+        log::add('ProJote', 'debug', 'Champ reçu : devoirs - Valeur reçue : ' . json_encode($result['Devoirs']['devoir_Demain'], JSON_PRETTY_PRINT));
         $eqLogic->checkAndUpdateCmd('devoir_Demain', json_encode($result['Devoirs']['devoir_Demain'],));
     } else {
         $eqLogic->checkAndUpdateCmd('devoir_Demain', "Pas de devoir pour demain retourné");
@@ -273,7 +290,7 @@ try {
         log::add('ProJote', 'debug', 'Champ reçu : derniere_absence - Valeur reçue : ' . json_encode($result['Absences']['derniere_absence'],));
         $eqLogic->checkAndUpdateCmd('derniere_absence', json_encode($result['Absences']['derniere_absence'],));
     } else {
-        $eqLogic->checkAndUpdateCmd('derniere_absence', "Pas de dernière absence retourné");
+        $eqLogic->checkAndUpdateCmd('derniere_absence', "Pas de dernière absence retournée");
     }
 } catch (Exception $e) {
     log::add('ProJote', 'error', displayException($e));

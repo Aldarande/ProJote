@@ -24,50 +24,55 @@
         jeedom.cmd.addUpdateFunction('#id#', function (_options) {
             if (is_object(cmd = document.querySelector('.cmd[data-cmd_uid="#uid#"]'))) {
                 const noteData = _options.value;
-                try {
-                    const notes = JSON.parse(noteData);
-                    const noteHTML = Array.isArray(notes) ? notes.map(note => {
-                        // Conversion sécurisée des notes avec virgule
-                        let noteVal = parseFloat((note.note ?? '').toString().replace(',', '.'));
-                        let surVal = parseFloat((note.sur ?? '').toString().replace(',', '.'));
-                        let greenHeight = (!isNaN(noteVal) && !isNaN(surVal) && surVal > 0) ? (noteVal / surVal * 100) : 0;
-                        return `
-                            <div class="note-item" style="position:relative;  margin-bottom:10px;">
-                                <!-- Bande rouge sur toute la hauteur -->
-                                <div style="background:red; width:10px; height:100%; position:absolute; left:0; top:0; border-radius:5px 0 0 5px; z-index:0;"></div>
-                                <!-- Bande verte, hauteur proportionnelle à la note -->
-                                <div style="
-                                    background:#4caf50;
-                                    width:10px;
-                                    height:${greenHeight}%;
-                                    position:absolute;
-                                    left:0;
-                                    bottom:0;
-                                    border-radius:0 0 0 5px; /* arrondi seulement en bas à gauche */
-                                    z-index:1;
-                                "></div>
-                                <div style="margin-left:16px; position:relative; z-index:2;">
-                                    <div class="cours" style="font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block;">
-                                    ${note.cours ?? ''}
+                if (!noteData || noteData.trim() === '' || noteData === '[]' || noteData === 'Pas de notes retournées' || noteData === 'Pas de dernière note retournée') {
+                    cmd.querySelector('.value').innerHTML = '<div style="color:gray;">Pas de cours</div>';
+                    return;
+                } else {
+                    try {
+                        const notes = JSON.parse(noteData);
+                        const noteHTML = Array.isArray(notes) ? notes.map(note => {
+                            // Conversion sécurisée des notes avec virgule
+                            let noteVal = parseFloat((note.note ?? '').toString().replace(',', '.'));
+                            let surVal = parseFloat((note.sur ?? '').toString().replace(',', '.'));
+                            let greenHeight = (!isNaN(noteVal) && !isNaN(surVal) && surVal > 0) ? (noteVal / surVal * 100) : 0;
+                            return `
+                                <div class="note-item" style="position:relative;  margin-bottom:10px;">
+                                    <!-- Bande rouge sur toute la hauteur -->
+                                    <div style="background:red; width:10px; height:100%; position:absolute; left:0; top:0; border-radius:5px 0 0 5px; z-index:0;"></div>
+                                    <!-- Bande verte, hauteur proportionnelle à la note -->
+                                    <div style="
+                                        background:#4caf50;
+                                        width:10px;
+                                        height:${greenHeight}%;
+                                        position:absolute;
+                                        left:0;
+                                        bottom:0;
+                                        border-radius:0 0 0 5px; /* arrondi seulement en bas à gauche */
+                                        z-index:1;
+                                    "></div>
+                                    <div style="margin-left:16px; position:relative; z-index:2;">
+                                        <div class="cours" style="font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block;">
+                                        ${note.cours ?? ''}
+                                        </div>
+                                        <div class="date_note" style="font-size:0.8em;">${note.date ?? ''}</div>
+                                        <div class="note" style="font-size:1.1em;font-style:italic;">
+                                            ${(note.note ?? '')}${note.sur ? ' / ' + note.sur : ''}
+                                        </div>
+                                        <div class="commentaire" style="font-size:0.9em; color:gray;">
+                                            ${note.commentaire ?? ''}
+                                        </div>
+                                        <div class="optionnel-bonus" style="font-size:0.9em; color:gray;">
+                                        ${note.optionnel ? 'optionnel' : ''} ${note.bonus ? 'bonus' : ''}
+                                        </div>  
                                     </div>
-                                    <div class="date_note" style="font-size:0.8em;">${note.date ?? ''}</div>
-                                    <div class="note" style="font-size:1.1em;font-style:italic;">
-                                        ${(note.note ?? '')}${note.sur ? ' / ' + note.sur : ''}
-                                    </div>
-                                    <div class="commentaire" style="font-size:0.9em; color:gray;">
-                                        ${note.commentaire ?? ''}
-                                    </div>
-                                    <div class="optionnel-bonus" style="font-size:0.9em; color:gray;">
-    ${note.optionnel ? 'optionnel' : ''} ${note.bonus ? 'bonus' : ''}
-</div>  
                                 </div>
-                            </div>
-                        `;
-                    }).join('') : '<div style="color:gray;">Aucun note</div>';
-                    cmd.querySelector('.value').innerHTML = noteHTML;
-                } catch (e) {
-                    cmd.querySelector('.value').innerHTML = '<div style="color:red;">Erreur de données note</div>';
-                    console.error("Erreur lors du parsing des données JSON :", e);
+                            `;
+                        }).join('') : '<div style="color:gray;">Aucun note</div>';
+                        cmd.querySelector('.value').innerHTML = noteHTML;
+                    } catch (e) {
+                        cmd.querySelector('.value').innerHTML = '<div style="color:red;">Erreur de données note</div>';
+                        console.error("Erreur lors du parsing des données JSON :", e);
+                    }
                 }
             }
         });

@@ -63,29 +63,31 @@
         jeedom.cmd.addUpdateFunction('#id#', function (_options) {
             if (is_object(cmd = document.querySelector('.cmd[data-cmd_uid="#uid#"]'))) {
                 cmd.querySelector('.content-xs').setAttribute('title', '{{Date de valeur}}: ' + _options.valueDate + '<br>{{Date de collecte}}: ' + _options.collectDate);
-
                 // Exemple de données JSON que vous pourriez recevoir
                 const coursesData = _options.value;
-
-                try {
-                    // Parser les données JSON
-                    const courses = JSON.parse(coursesData);
-
-                    // Vérifier si les données sont bien un tableau
-                    if (Array.isArray(courses)) {
-                        // Générer le HTML pour l'emploi du temps
-                        const scheduleHTML = generateScheduleHTML(courses);
-                        // affiche la valeur de courses[0].date dans le tooltip de cmd.querySelector('.content-xs')
-                        if (courses.length > 0 && courses[0].date) {
-                            cmd.querySelector('#date-cours-#id#').textContent = courses[0].date;
+                if (!coursesData || coursesData.trim() === '' || coursesData === '[]') {
+                    cmd.querySelector('.value').innerHTML = '<div style="color:gray;">Pas de cours</div>';
+                    return;
+                } else {
+                    try {
+                        // Parser les données JSON
+                        const courses = JSON.parse(coursesData);
+                        // Vérifier si les données sont bien un tableau
+                        if (Array.isArray(courses)) {
+                            // Générer le HTML pour l'emploi du temps
+                            const scheduleHTML = generateScheduleHTML(courses);
+                            // affiche la valeur de courses[0].date dans le tooltip de cmd.querySelector('.content-xs')
+                            if (courses.length > 0 && courses[0].date) {
+                                cmd.querySelector('#date-cours-#id#').textContent = courses[0].date;
+                            }
+                            // Insérer le HTML généré dans l'élément .value
+                            cmd.querySelector('.value').innerHTML = scheduleHTML;
+                        } else {
+                            console.error("Les données récupérées ne sont pas un tableau.");
                         }
-                        // Insérer le HTML généré dans l'élément .value
-                        cmd.querySelector('.value').innerHTML = scheduleHTML;
-                    } else {
-                        console.error("Les données récupérées ne sont pas un tableau.");
+                    } catch (e) {
+                        console.error("Erreur lors du parsing des données JSON :", e);
                     }
-                } catch (e) {
-                    console.error("Erreur lors du parsing des données JSON :", e);
                 }
             }
         });

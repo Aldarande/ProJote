@@ -83,29 +83,35 @@
     jeedom.cmd.addUpdateFunction('#id#', function (_options) {
       if (is_object(cmd = document.querySelector('.cmd[data-cmd_uid="#uid#"]'))) {
         const retardData = _options.value;
-        try {
-          const retards = JSON.parse(retardData);
-          const retardHTML = Array.isArray(retards) ? retards.map(retard => `
-            <div class="retard-item">
-              <div class="color-band" style="background-color: ${retard.justifie ? 'green' : '#FF4500'}"></div>
-              <div class="retard-date">Retard du ${retard.date ?? ''}</div>              
-              <div class="retard-minutes">
-                ${retard.nb_minutes ? retard.nb_minutes + ' min' : ''}
-              </div>
-              <div class="retard-justification">${retard.justification ?? ''}</div>
-              <div class="retard-raison">Raison : ${retard.raison ?? ''}</div>     
-              <div class="retard-justifie"> Justifié : 
-              ${retard.justifie
-              ? '<i class="fas fa-check" style="color:green;"></i>'
-              : '<i class="fas fa-times" style="color:#FF4500;"></i>'
-            }
-</div>         
-            </div >
-          `).join('') : '<div style="color:gray;">Aucun retard</div>';
-          cmd.querySelector('.value').innerHTML = retardHTML;
-        } catch (e) {
-          cmd.querySelector('.value').innerHTML = '<div style="color:#FF4500;">Erreur de données retard</div>';
-          console.error("Erreur lors du parsing des données JSON :", e);
+        if (!retardData || retardData.trim() === '' || retardData === '[]') {
+          cmd.querySelector('.value').innerHTML = '<div style="color:gray;">Aucun retard</div>';
+          return;
+        }
+        else {
+          try {
+            const retards = JSON.parse(retardData);
+            const retardHTML = Array.isArray(retards) ? retards.map(retard => `
+              <div class="retard-item">
+                <div class="color-band" style="background-color: ${retard.justifie ? 'green' : '#FF4500'}"></div>
+                <div class="retard-date">Retard du ${retard.date ?? ''}</div>              
+                <div class="retard-minutes">
+                  ${retard.nb_minutes ? retard.nb_minutes + ' min' : ''}
+                </div>
+                <div class="retard-justification">${retard.justification ?? ''}</div>
+                <div class="retard-raison">Raison : ${retard.raison ?? ''}</div>     
+                <div class="retard-justifie"> Justifié : 
+                ${retard.justifie
+                ? '<i class="fas fa-check" style="color:green;"></i>'
+                : '<i class="fas fa-times" style="color:#FF4500;"></i>'
+              }
+              </div>         
+              </div >
+            `).join('') : '<div style="color:gray;">Aucun retard</div>';
+            cmd.querySelector('.value').innerHTML = retardHTML;
+          } catch (e) {
+            cmd.querySelector('.value').innerHTML = '<div style="color:#FF4500;">Erreur de données retard</div>';
+            console.error("Erreur lors du parsing des données JSON :", e);
+          }
         }
       }
     });
