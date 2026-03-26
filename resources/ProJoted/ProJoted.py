@@ -1131,11 +1131,13 @@ def download_photo(client, eqLogicId, tokenconnected, message):
 
         if is_parent:
             if client._selected_child and client._selected_child.profile_picture:
+                # DEBUG TEMPORAIRE : dump complet du raw_resource pour analyser les champs photo
+                logging.info(
+                    "DEBUG raw_resource enfant : %s",
+                    client._selected_child.raw_resource,
+                )
                 child_n = client._selected_child.raw_resource.get("N", "")
                 if "#" in str(child_n):
-                    # Pronote 2024+ : FichiersExternes nécessite des cookies web.
-                    # On ne renonce pas : on tente quand même via la session API,
-                    # la stratégie 3 (cookies session) peut suffire.
                     logging.info(
                         "Photo parent Pronote 2024+ (N=%s…) — "
                         "FichiersExternes peut nécessiter une session web. Tentative quand même.",
