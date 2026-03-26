@@ -117,7 +117,11 @@
         <a href="#login">&nbsp;&nbsp;&nbsp;Méthode Login</a>
         <a href="#qrcode">&nbsp;&nbsp;&nbsp;Méthode QR Code</a>
         <a href="#utilisation">Utilisation</a>
-        <a href="#Version">Version</a>
+        <a href="#Version">Historique Versions</a>
+        <a href="#faq">❓ FAQ</a>
+        <a href="#security">🔐 Sécurité</a>
+        <a href="#troubleshooting">🛠️ Dépannage</a>
+        <a href="#support">📞 Support</a>
     </div>
 
     <div class="content">
@@ -364,14 +368,193 @@
             Donc avant toute demande, vous devez valider que l'information recherchée est présente.
         </p>
 
-        <h1 id="Version">Version</h1>
+        <h1 id="Version">Historique des Versions</h1>
+        <table class="table-offset">
+            <thead>
+                <tr>
+                    <th style="border: 1px solid black; padding: 8px;">Version</th>
+                    <th style="border: 1px solid black; padding: 8px;">Date</th>
+                    <th style="border: 1px solid black; padding: 8px;">Changements</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="border: 1px solid black; padding: 8px;">0.8</td>
+                    <td style="border: 1px solid black; padding: 8px;">Février 2024</td>
+                    <td style="border: 1px solid black; padding: 8px;">
+                        ✅ Stabilisation générale<br>
+                        ✅ Amélioration gestion tokens<br>
+                        ✅ Support multi-enfants pour parents<br>
+                        ✅ Optimisations performances
+                    </td>
+                </tr>
+                <tr>
+                    <td style="border: 1px solid black; padding: 8px;">0.5.2</td>
+                    <td style="border: 1px solid black; padding: 8px;">Janvier 2024</td>
+                    <td style="border: 1px solid black; padding: 8px;">
+                        🔧 Correction de bugs<br>
+                        🔧 Améliorations QR Code
+                    </td>
+                </tr>
+                <tr>
+                    <td style="border: 1px solid black; padding: 8px;">0.5</td>
+                    <td style="border: 1px solid black; padding: 8px;">Décembre 2023</td>
+                    <td style="border: 1px solid black; padding: 8px;">
+                        ✨ Ajout connexion par QR Code<br>
+                        ✨ Nouvelle interface de configuration
+                    </td>
+                </tr>
+                <tr>
+                    <td style="border: 1px solid black; padding: 8px;">0.0.2</td>
+                    <td style="border: 1px solid black; padding: 8px;">Novembre 2023</td>
+                    <td style="border: 1px solid black; padding: 8px;">Mise à jour documentation</td>
+                </tr>
+                <tr>
+                    <td style="border: 1px solid black; padding: 8px;">0.0.1</td>
+                    <td style="border: 1px solid black; padding: 8px;">Octobre 2023</td>
+                    <td style="border: 1px solid black; padding: 8px;">Première version officielle</td>
+                </tr>
+                <tr>
+                    <td style="border: 1px solid black; padding: 8px;">Alpha</td>
+                    <td style="border: 1px solid black; padding: 8px;">Septembre 2023</td>
+                    <td style="border: 1px solid black; padding: 8px;">Phase de test initiale</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h1>❓ FAQ</h1>
+
+        <h2>Puis-je utiliser ce plugin avec un compte parent?</h2>
+        <p>Oui! Le plugin supporte complètement les comptes parents. Lors de la configuration, sélectionnez le type de
+            compte "Parent" et choisissez l'enfant à suivre. Vous pouvez créer plusieurs équipements pour suivre
+            plusieurs enfants.</p>
+
+        <h2>Comment changer mon mot de passe stocké?</h2>
+        <p>Modifiez simplement l'équipement en mettant à jour les identifiants et cliquez sur "Sauvegarde". Les nouveaux
+            identifiants remplacent les anciens. Le mot de passe est chiffré en AES-256.</p>
+
+        <h2>Les données sont-elles envoyées en ligne?</h2>
+        <p>Non. Toutes les données restent locales sur votre installation Jeedom. Aucune télémétrie, aucun appel externe
+            au serveur d'auteur. Seule la connexion vers le serveur Pronote de votre établissement est effectuée.</p>
+
+        <h2>Quel est l'intervalle de synchronisation minimum?</h2>
+        <p>Par défaut, la synchronisation se fait toutes les heures en cron. L'intervalle minimum recommandé est de 5
+            minutes pour ne pas surcharger les serveurs Pronote. Vous pouvez aussi forcer une actualisation manuelle
+            avec la commande "Rafraîchir".</p>
+
+        <h2>Le démon refuse de démarrer, que faire?</h2>
+        <p>Vérifiez :</p>
         <ul>
-            <li>Version Alpha : Première diffusion pour test</li>
-            <li>0.0.1 : Mise en ligne de la première version</li>
-            <li>0.0.2 : Mise à jour de la documentation et du change log</li>
-            <li>0.5 : Ajout de la connexion par QR Code</li>
-            <li>0.5.2 : Correction de bugs</li>
+            <li>Que Python 3.7+ est installé : <code>python3 --version</code></li>
+            <li>Que l'environnement virtuel est créé :
+                <code>ls -la /var/www/html/plugins/ProJote/resources/python_venv</code></li>
+            <li>Que le port 55369 est libre : <code>netstat -tuln | grep 55369</code></li>
+            <li>Les permissions du dossier : <code>sudo chown www-data:www-data -R /var/www/html/plugins/ProJote</code>
+            </li>
+            <li>Les logs : Aller dans Administration > Logs > ProJote</li>
         </ul>
+
+        <h2>Que faire si l'authentification échoue?</h2>
+        <p>Vérifiez :</p>
+        <ul>
+            <li>Que vos identifiants sont corrects (testez sur pronote.net)</li>
+            <li>Que le type CAS/ENT est bon (essayez "Aucun" si doute)</li>
+            <li>L'URL Pronote est correcte (format : https://xxxxx.index-education.net/pronote/...)</li>
+            <li>Si QR Code : que le PIN est bien entré (4 chiffres)</li>
+            <li>Relancez l'authentification (supprimer/recréer l'équipement)</li>
+        </ul>
+
+        <h1>🔐 Sécurité</h1>
+        <p><strong>⚠️ Points importants :</strong></p>
+        <ul>
+            <li><strong>Tokens stockés localement</strong> : Les tokens d'authentification sont sauvegardés dans
+                <code>/data/[equipmentId]/</code>, jamais synchronisés au cloud.</li>
+            <li><strong>Mot de passe chiffré</strong> : Les mots de passe sont chiffrés en AES-256 avec une clé dérivée.
+            </li>
+            <li><strong>HTTPS recommandé</strong> : Accédez toujours à Jeedom en HTTPS, particulièrement pour éviter les
+                interceptions.</li>
+            <li><strong>Port socket local</strong> : Le port 55369 ne communique qu'en localhost (127.0.0.1).</li>
+            <li><strong>Logs sensibles</strong> : En cas de problème, vérifiez les logs car ils peuvent contenir des
+                données sensibles. Ne partagez jamais vos logs publiquement sans les anonymiser.</li>
+            <li><strong>Permissions fichiers</strong> : Assurez-vous que les dossiers de données sont accessibles
+                uniquement par www-data.</li>
+        </ul>
+
+        <h1>🛠️ Dépannage Avancé</h1>
+
+        <h2>Activer le mode debug</h2>
+        <p>Pour activer les logs détaillés :</p>
+        <ol>
+            <li>Allez dans <strong>Administration</strong> → <strong>Configuration</strong> → <strong>Logs</strong></li>
+            <li>Sélectionnez <strong>debug</strong> pour le niveau global</li>
+            <li>Relancez le démon ProJote</li>
+            <li>Consultez les logs dans <strong>Administration</strong> → <strong>Logs</strong> →
+                <strong>ProJote</strong></li>
+        </ol>
+
+        <h2>Erreurs courantes et solutions</h2>
+        <table class="table-offset">
+            <thead>
+                <tr>
+                    <th style="border: 1px solid black; padding: 8px;">Erreur</th>
+                    <th style="border: 1px solid black; padding: 8px;">Solution</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="border: 1px solid black; padding: 8px;">"Le démon n'est pas démarré"</td>
+                    <td style="border: 1px solid black; padding: 8px;">Allez dans Plugins → ProJote → Démon et cliquez
+                        sur "Relancer"</td>
+                </tr>
+                <tr>
+                    <td style="border: 1px solid black; padding: 8px;">"Port déjà utilisé"</td>
+                    <td style="border: 1px solid black; padding: 8px;">Changez le port dans Configuration (ex: 55370) ou
+                        tuez le processus : <code>sudo kill $(lsof -t -i :55369)</code></td>
+                </tr>
+                <tr>
+                    <td style="border: 1px solid black; padding: 8px;">"Impossible de lancer le démon"</td>
+                    <td style="border: 1px solid black; padding: 8px;">Vérifiez Python, l'environnement virtuel, et les
+                        permissions. Consultez les logs.</td>
+                </tr>
+                <tr>
+                    <td style="border: 1px solid black; padding: 8px;">"Erreur d'authentification"</td>
+                    <td style="border: 1px solid black; padding: 8px;">Testez vos identifiants sur pronote.net, vérifiez
+                        l'URL et le type CAS/ENT</td>
+                </tr>
+                <tr>
+                    <td style="border: 1px solid black; padding: 8px;">"Timeout socket"</td>
+                    <td style="border: 1px solid black; padding: 8px;">Relancez le démon, vérifiez la connectivité
+                        réseau et Pronote</td>
+                </tr>
+                <tr>
+                    <td style="border: 1px solid black; padding: 8px;">"Fichier JSON introuvable"</td>
+                    <td style="border: 1px solid black; padding: 8px;">Vérifiez les permissions du dossier
+                        <code>/data</code>, relancez une authentification</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h1>📞 Support & Contribution</h1>
+        <p><strong>Besoin d'aide?</strong></p>
+        <ul>
+            <li>📖 <a href="../../README.md" target="_blank">README.md</a> - Guide complet d'installation et usage</li>
+            <li>🐛 <a href="https://github.com/aldarande/ProJote/issues" target="_blank">Issues GitHub</a> - Signaler un
+                bug</li>
+            <li>💬 <a href="https://community.jeedom.com/" target="_blank">Community Jeedom</a> - Discussions</li>
+            <li>📧 <a href="https://github.com/aldarande" target="_blank">Auteur GitHub</a> - Aldarande</li>
+        </ul>
+
+        <p><strong>Contribution?</strong> Les pull requests sont les bienvenues! N'hésitez pas à proposer des
+            améliorations.</p>
+
+        <h1>📝 Notes Importantes</h1>
+        <p class="highlight">⚠️ <strong>Le plugin récupère UNIQUEMENT les informations présentes dans Pronote.</strong>
+            Si une information n'est pas disponible sur le site Pronote, elle ne remontera pas dans le plugin. Avant
+            toute demande de support, validez que l'information est bien présente sur votre compte Pronote.</p>
+
+        <p><strong>💡 Conseil :</strong> Pour un suivi optimal, configurez un cron toutes les 6-8 heures pendant les
+            heures de classe. La synchronisation est automatiquement désactivée entre 22h et 4h du matin.</p>
+
         <br>
         <br>
         <br>

@@ -12,6 +12,14 @@
 # You should have received a copy of the GNU General Public License
 # along with Jeedom. If not, see <http://www.gnu.org/licenses/>.
 
+### Sources ###
+# API WRAPPER PronotePy :  https://github.com/bain3/pronotepy
+# API WRAPPER Documentation : https://pronotepy.readthedocs.io/en/stable/
+# Plugin Jeedom Dev : https://doc.jeedom.com/fr_FR/dev/
+# Plugin Jeedom Deamon Dev : https://doc.jeedom.com/fr_FR/dev/daemon_plugin
+# Pluugin Jeedom Template : https://github.com/jeedom/plugin-template
+### ###
+
 
 import contextlib
 
@@ -28,10 +36,51 @@ try:
     import base64
     import binascii
     import importlib
+    import requests
 
     # import du Plugin Principal
     import pronotepy
     from pronotepy.ent import *
+    import pronotepy.dataClasses
+
+    # Monkey patch : Correction à la volée pour gérer l'absence de noteMax/noteMin/estBonus
+    _original_grade_init = pronotepy.dataClasses.Grade.__init__
+
+    def _patched_grade_init(self, json_data):
+        if "noteMax" not in json_data:
+            json_data["noteMax"] = {"V": ""}
+        if "noteMin" not in json_data:
+            json_data["noteMin"] = {"V": ""}
+        if "coefficient" not in json_data:
+            json_data["coefficient"] = {"V": "1"}
+        if "commentaire" not in json_data:
+            json_data["commentaire"] = {"V": ""}
+        if "estBonus" not in json_data:
+            json_data["estBonus"] = {"V": False}
+        if "estFacultatif" not in json_data:
+            json_data["estFacultatif"] = {"V": False}
+        if "estRamenerSur20" not in json_data:
+            json_data["estRamenerSur20"] = {"V": False}
+        _original_grade_init(self, json_data)
+
+    pronotepy.dataClasses.Grade.__init__ = _patched_grade_init
+
+    # Monkey patch : html_parse — remplace <br> par un espace avant de supprimer les balises
+    # Sans ce patch, "Faire ex 1<br>Apprendre la leçon" devient "Faire ex 1Apprendre la leçon"
+    import re as _re
+    from html import unescape as _unescape
+
+    @staticmethod
+    def _patched_html_parse(html_text: str) -> str:
+        if not html_text:
+            return ""
+        text = _re.sub(r'<br\s*/?>', ' ', html_text, flags=_re.IGNORECASE)
+        text = _re.sub(r'<[^>]+>', '', text)
+        text = _unescape(text)
+        text = _re.sub(r'  +', ' ', text).strip()
+        return text
+
+    pronotepy.dataClasses.Util.html_parse = _patched_html_parse
 
     from LoginConnect import writedataPronotepy
 
@@ -53,7 +102,69 @@ except ImportError as e:
         e,
     )
     sys.exit(1)
-    sys.exit(1)
+
+
+# Dictionnaire global pour tracker les tentatives échouées de connexion
+# Utilise pour implémenter un "circuit breaker" et éviter les boucles infinies
+failed_attempts = {}  # Format: {eqLogicId: {"count": N, "timestamp": time.time()}}
+
+# Variable globale pour stocker les info de connexion Jeedom
+_callback_url = None
+_apikey_global = None
+
+
+def send_jeedom_message(message, message_type="error"):
+    """
+    Envoie un message au centre de messages Jeedom.
+
+    Args:
+        message: Le texte du message à afficher
+        message_type: Type de message ('error', 'warning', 'info')
+    """
+    global _callback_url, _apikey_global
+
+    if not _callback_url or not _apikey_global:
+        logging.warning("URL Jeedom ou API key non disponible pour envoyer un message")
+        return False
+
+    try:
+        # Construire l'URL pour ajouter un message au centre de messages
+        # _callback_url format: http://172.17.0.2:80/plugins/ProJote/core/php/jeeProJote.php
+        # Target URL: http://172.17.0.2:80/plugins/message/core/php/message.action.php
+
+        # Extraire l'URL de base (schéma + host)
+        # Exemples: http://172.17.0.2:80 ou http://localhost
+        url_parts = _callback_url.split("/")
+        # Récupérer schéma:// + host + port
+        base_url = "/".join(url_parts[:3])  # http://172.17.0.2:80
+
+        # Construire le URL du centre de messages
+        message_action_url = f"{base_url}/plugins/message/core/php/message.action.php"
+
+        params = {
+            "apikey": _apikey_global,
+            "action": "add",
+            "message": message,
+            "type": message_type,
+        }
+
+        logging.debug(f"Envoi du message Jeedom vers: {message_action_url}")
+
+        # Envoyer la requête GET (plus simple pour Jeedom)
+        response = requests.get(message_action_url, params=params, timeout=5)
+
+        if response.status_code == 200:
+            logging.info(f"Message Jeedom envoyé avec succès: {message[:50]}...")
+            return True
+        else:
+            logging.warning(
+                f"Erreur lors de l'envoi du message Jeedom: {response.status_code}"
+            )
+            return False
+
+    except Exception as e:
+        logging.warning(f"Erreur lors de l'envoi du message Jeedom: {e}")
+        return False
 
 
 # Fonction de chiffrage et déchiffrage
@@ -165,17 +276,6 @@ def Checkeleve(client, CmdId):
 
 def class_for_name(module_name, class_name):
     try:
-        # load the module, will raise ImportError if module cannot be loaded
-        m = importlib.import_module(module_name)
-        return getattr(m, class_name)
-    except e:
-        # ModuleNotFoundError will be a subclass of OSError
-        logging.error("Error importing module %s: %s", module_name, e)
-        return None
-
-
-def class_for_name(module_name, class_name):
-    try:
         # Load the module, will raise ImportError if module cannot be loaded
         m = importlib.import_module(module_name)
         return getattr(m, class_name)
@@ -191,7 +291,10 @@ def class_for_name(module_name, class_name):
 def cours_affiche_from_lesson(lesson_data):
     if lesson_data.detention == True:
         return "RETENUE"
-    return lesson_data.subject.name if lesson_data.subject else "autre"
+    try:
+        return lesson_data.subject.name if lesson_data.subject else "Repas"
+    except Exception:
+        return "Repas"
 
 
 def build_menu_data(menu):
@@ -269,10 +372,13 @@ def build_cours_data(lesson_data):
     }
 
 
-def download_image(url, filepath):
+def download_image(url, filepath, session=None):
     try:
         # Effectuer une requête HTTP pour récupérer le contenu de l'image
-        response = requests.get(url)
+        if session:
+            response = session.get(url)
+        else:
+            response = requests.get(url)
         # Vérifier si la requête a réussi (code de statut 200)
         if response.status_code == 200:
             # Ouvrir un fichier en mode écriture binaire
@@ -434,9 +540,13 @@ def Emploidutemps(client):
                     data["edt_date_specific"].append(lesson_to_append)
 
         # Récupération  emploi du temps global de la période en cours
-        lessons_full = client.lessons(
-            client.current_period.start, datetime.date.today()
-        )
+        try:
+            lessons_full = client.lessons(
+                client.current_period.start, datetime.date.today()
+            )
+        except Exception as e:
+            logging.error(f"Erreur lors de l'accès à l'emploi du temps global : {e}")
+            lessons_full = []
         lessons_full = sorted(lessons_full, key=lambda lesson: lesson.start)
 
         # data["edt_period_full"] = []
@@ -453,12 +563,10 @@ def Emploidutemps(client):
                     data["edt_Cours_canceled"] += 1
         return data
     except Exception as e:
-        line_number = e.__traceback__.tb_lineno
-        logging.error(
-            "Une erreur est retournée sur le traitement de l'emploi du temps-lig: %s; %s",
-            line_number,
-            e,
-        )
+        line_number = e.__traceback__.tb_lineno if e.__traceback__ else "unknown"
+        error_msg = f"Erreur lors de la récupération de l'emploi du temps : ligne {line_number} - {str(e)}"
+        logging.error(error_msg)
+        return {"error": error_msg}
 
 
 def menus(client):
@@ -483,7 +591,14 @@ def menus(client):
 def evaluations(client):
     try:
         # Récupération des évaluations
-        evaluations = client.current_period.evaluations
+        try:
+            evaluations = client.current_period.evaluations
+        except Exception as e:
+            logging.error(f"Erreur lors de l'accès aux évaluations : {e}")
+            return {
+                "evaluations": [],
+                "error": f"Erreur d'accès aux évaluations : {str(e)}",
+            }
         data = {
             "evaluations": [],
         }
@@ -521,22 +636,24 @@ def evaluations(client):
             else:
                 acquisitions = evaluation.acquisitions
 
-            data["evaluations"].append(
-                {
-                    "id": evaluation.id,
-                    "nom": evaluation.name,
-                    "domaine": evaluation.domain,
-                    "professeur": evaluation.teacher,
-                    "Sujet": getattr(
-                        evaluation.subject, "name", str(evaluation.subject)
-                    ),
-                    "date": evaluation.date.strftime("%d/%m/%Y"),
-                    "acquisitions": acquisitions,
-                    "description": evaluation.description,
-                    "Paliers": evaluation.paliers,
-                    "coeff": evaluation.coefficient,
-                }
-            )
+                try:
+                    sujet_name = getattr(evaluation.subject, "name", "Inconnu")
+                except Exception:
+                    sujet_name = "Inconnu"
+                data["evaluations"].append(
+                    {
+                        "id": evaluation.id,
+                        "nom": evaluation.name,
+                        "domaine": evaluation.domain,
+                        "professeur": evaluation.teacher,
+                        "Sujet": sujet_name,
+                        "date": evaluation.date.strftime("%d/%m/%Y"),
+                        "acquisitions": acquisitions,
+                        "description": evaluation.description,
+                        "Paliers": evaluation.paliers,
+                        "coeff": evaluation.coefficient,
+                    }
+                )
         return data["evaluations"]
     except Exception as e:
         line_number = e.__traceback__.tb_lineno
@@ -549,81 +666,95 @@ def evaluations(client):
 
 
 def notes(client):
+    """
+    Récupère toutes les notes de l'année scolaire (toutes périodes) et les formate en JSON.
+    """
     try:
-        data = {"note": [], "derniere_note": []}
-        grades = client.current_period.grades
-        if not grades == []:
-            grades = sorted(grades, key=lambda grade: grade.date, reverse=True)
-            index_note = 0  # debut de la boucle des notes
-            limit_note = 11  # nombre max de note à récupérer + 1
-            # Transformation des notes en Json
-            for grade in grades:
-                index_note += 1
-                # Attention je ne prend que 11 notes pour éviter de surcharger le système et bloquer l'adresse IP
-                if index_note == limit_note:
-                    break
+        data = {"note": [], "derniere_note": [], "moyennes_periodes": []}
+
+        try:
+            all_periods = client.periods
+        except Exception as e:
+            logging.error(f"Erreur lors de l'accès aux périodes : {e}")
+            return {"note": [], "derniere_note": [], "error": str(e)}
+
+        all_grades = []
+        for period in all_periods:
+            try:
+                period_grades = period.grades
+                period_name = getattr(period, "name", "")
+                for grade in (period_grades or []):
+                    all_grades.append((grade, period_name))
+            except Exception as e:
+                logging.warning(f"Impossible de lire les notes de la période {getattr(period, 'name', '?')} : {e}")
+
+            # Moyennes générales par période (élève + classe)
+            try:
+                moy_eleve = getattr(period, "overall_average", "") or ""
+                moy_classe = getattr(period, "class_overall_average", "") or ""
+                if moy_eleve or moy_classe:
+                    data["moyennes_periodes"].append({
+                        "periode": getattr(period, "name", ""),
+                        "moyenne_eleve": str(moy_eleve),
+                        "moyenne_classe": str(moy_classe),
+                    })
+            except Exception:
+                pass
+
+        if all_grades:
+            # Tri toutes périodes confondues, du plus récent au plus ancien
+            all_grades = sorted(
+                all_grades,
+                key=lambda x: getattr(x[0], "date", datetime.date.min),
+                reverse=True,
+            )
+
+            for grade, period_name in all_grades:
+                cours_name = "Inconnu"
+                if hasattr(grade, "subject") and grade.subject:
+                    cours_name = getattr(grade.subject, "name", "Inconnu")
+
+                note_value   = getattr(grade, "grade", "")
+                out_of_value = getattr(grade, "out_of", "")
+                note_sur     = f"{note_value}\u00a0/\u00a0{out_of_value}" if note_value and out_of_value else ""
+                grade_date   = getattr(grade, "date", None) or datetime.date.today()
+
                 data["note"].append(
                     {
-                        "id": grade.id,
-                        "date": grade.date.strftime("%d/%m/%Y"),
-                        "date_courte": grade.date.strftime("%d/%m"),
-                        "cours": grade.subject.name,
-                        "note": grade.grade,
-                        "sur": grade.out_of,
-                        "note_sur": grade.grade + "\u00a0/\u00a0" + grade.out_of,
-                        "coeff": grade.coefficient,
-                        "moyenne_classe": grade.average,
-                        "max": grade.max,
-                        "min": grade.min,
-                        "commentaire": grade.comment,
-                        "optionnel": grade.is_optionnal,
-                        "bonus": grade.is_bonus,
+                        "id": getattr(grade, "id", ""),
+                        "periode": period_name,
+                        "date": grade_date.strftime("%d/%m/%Y"),
+                        "date_courte": grade_date.strftime("%d/%m"),
+                        "cours": cours_name,
+                        "note": note_value,
+                        "sur": out_of_value,
+                        "note_sur": note_sur,
+                        "coeff": getattr(grade, "coefficient", "1"),
+                        "moyenne_classe": getattr(grade, "average", ""),
+                        "max": getattr(grade, "max", ""),
+                        "min": getattr(grade, "min", ""),
+                        "commentaire": getattr(grade, "comment", ""),
+                        "optionnel": getattr(grade, "is_optionnal", False),
+                        "bonus": getattr(grade, "is_bonus", False),
                     }
                 )
-                # je récupére la derniére note
-            if index_note > 0:
+
+            if data["note"]:
                 data["derniere_note"].append(data["note"][0])
         else:
-            logging.info("Aucune note trouvée pour la période en cours.")
-            data = {"note": [], "derniere_note": []}
+            logging.info("Aucune note trouvée pour l'année scolaire.")
+
         return data
     except Exception as e:
-        line_number = e.__traceback__.tb_lineno
-        logging.error(
-            "Une erreur est retournée sur le traitement des notes -lig: %s; %s",
-            line_number,
-            e,
-        )
-        time.sleep(5)
-        return {"note": [], "derniere_note": []}
+        line_number = e.__traceback__.tb_lineno if e.__traceback__ else "unknown"
+        error_msg = f"Erreur lors de la récupération des notes : ligne {line_number} - {str(e)}"
+        logging.error(error_msg)
+        logging.debug(traceback.format_exc())
+        return {"note": [], "derniere_note": [], "error": error_msg}
 
 
-def process_homework(homework_list, data, key, longmax_devoir):
-    if not homework_list:
-        logging.info(f"Aucun devoir trouvé pour {key}.")
-        return
 
-    for homework in homework_list:
-        data[key].append(
-            {
-                "index": homework_list.index(homework),
-                "date": homework.date.strftime("%d/%m"),
-                "title": homework.subject.name,
-                "description": (
-                    homework.description.encode("utf-8").decode("unicode_escape")
-                )[:longmax_devoir],
-                "color": homework.background_color,
-                "done": homework.done,
-                "est_service_groupe": getattr(homework, "estServiceGroupe", None),
-            }
-        )
-
-
-import datetime
-import logging
-
-
-def process_homework(homework_list, data, key, longmax_devoir):
+def process_homework(homework_list, data, key):
     if not homework_list:
         logging.info(f"Aucun devoir trouvé pour {key}.")
         data[f"nb_{key}"] = 0
@@ -636,17 +767,39 @@ def process_homework(homework_list, data, key, longmax_devoir):
     Devoirnonfait = 0
 
     for homework in homework_list:
+        try:
+            title = (
+                getattr(homework.subject, "name", "Inconnu")
+                if homework.subject
+                else "Inconnu"
+            )
+        except Exception:
+            title = "Inconnu"
+
+        # Description : Util.html_parse est patché pour préserver les espaces inter-mots
+        description = homework.description or ""
+
+        # Pièces jointes et liens
+        fichiers = []
+        try:
+            for f in homework.files:
+                fichiers.append({
+                    "nom": f.name,
+                    "url": f.url,
+                    "type": f.type,  # 0 = lien externe, 1 = fichier Pronote
+                })
+        except Exception:
+            pass
+
         data[key].append(
             {
                 "index": homework_list.index(homework),
                 "date": homework.date.strftime("%d/%m"),
-                "title": homework.subject.name,
-                "description": (
-                    homework.description.encode("utf-8").decode("unicode_escape")
-                )[:longmax_devoir],
+                "title": title,
+                "description": description,
                 "color": homework.background_color,
                 "done": homework.done,
-                "est_service_groupe": getattr(homework, "estServiceGroupe", None),
+                "fichiers": fichiers,
             }
         )
         Devoir += 1
@@ -665,7 +818,7 @@ def process_homework(homework_list, data, key, longmax_devoir):
 def devoirs(client):
     try:
         data = {"devoir": [], "devoir_Demain": []}
-        longmax_devoir = 120
+
         # Supposons que cette méthode récupère tous les devoirs pour une période donnée
         all_homework = client.homework(
             date_from=datetime.date.today(),
@@ -697,10 +850,10 @@ def devoirs(client):
                 break
             delta += 1
         # Traiter les devoirs pour aujourd'hui
-        process_homework(homework_today, data, "devoir", longmax_devoir)
+        process_homework(homework_today, data, "devoir")
         # Traiter les devoirs pour le prochain jour d'école
         if next_school_day:
-            process_homework(next_school_day, data, "devoir_Demain", longmax_devoir)
+            process_homework(next_school_day, data, "devoir_Demain")
         else:
             logging.info("Aucun devoir trouvé pour le prochain jour d'école.")
         return data
@@ -755,32 +908,36 @@ def notifications(client):
 def retards(client):
     try:
         data = {"retard": [], "dernier_retard": [], "nb_retard": 0}
-        # recupération des retards
-        retards = client.current_period.delays
-        if not retards == []:
-            # tri des retards par date décroissante
-            retards = sorted(retards, key=lambda delay: delay.date, reverse=True)
+        try:
+            all_periods = client.periods
+        except Exception as e:
+            logging.error(f"Erreur lors de l'accès aux périodes (retards) : {e}")
+            return {"retard": [], "dernier_retard": [], "nb_retard": 0, "error": str(e)}
 
-            nbretard = 0
-            # Récupération des retards pour la période en cours
-            for retard in retards:
+        all_retards_map = {}
+        for period in all_periods:
+            try:
+                for d in (period.delays or []):
+                    all_retards_map[d.id] = d
+            except Exception as e:
+                logging.warning(f"Impossible de lire les retards de la période {getattr(period, 'name', '?')} : {e}")
+
+        all_retards = list(all_retards_map.values())
+        if all_retards:
+            all_retards = sorted(all_retards, key=lambda delay: delay.date, reverse=True)
+            for retard in all_retards:
                 data["retard"].append(
                     {
                         "id": retard.id,
                         "date": retard.date.strftime("%d/%m/%y %H:%M"),
                         "justifie": retard.justified,
                         "nb_minutes": retard.minutes,
-                        "justification": retard.justification,
-                        "raison": str(retard.reasons)[2:-2],
+                        "justification": retard.justification or "",
+                        "raison": ", ".join(retard.reasons) if retard.reasons else "",
                     }
                 )
-                nbretard = nbretard + 1
-            data["nb_retard"] = nbretard
-            # récupération du denrier retard
-            data["dernier_retard"] = [data["retard"][0]] if data["retard"] else []
-            # transformation des retards en Json
-        else:
-            time.sleep(5)
+            data["nb_retard"] = len(data["retard"])
+            data["dernier_retard"] = [data["retard"][0]]
         return data
     except Exception as e:
         line_number = e.__traceback__.tb_lineno
@@ -793,43 +950,38 @@ def retards(client):
 
 def absences(client):
     try:
-        # Récupération  des absences pour la période en cours
         data = {"absence": [], "nb_absences": 0, "derniere_absence": []}
-        absences = client.current_period.absences
-        if not absences == []:
-            absences = sorted(
-                absences, key=lambda absence: absence.from_date, reverse=True
-            )
-            nbabsences = 0
-            for absence in absences:
+        try:
+            all_periods = client.periods
+        except Exception as e:
+            logging.error(f"Erreur lors de l'accès aux périodes (absences) : {e}")
+            return {"absence": [], "nb_absences": 0, "derniere_absence": [], "error": str(e)}
+
+        all_absences_map = {}
+        for period in all_periods:
+            try:
+                for a in (period.absences or []):
+                    all_absences_map[a.id] = a
+            except Exception as e:
+                logging.warning(f"Impossible de lire les absences de la période {getattr(period, 'name', '?')} : {e}")
+
+        all_absences = list(all_absences_map.values())
+        if all_absences:
+            all_absences = sorted(all_absences, key=lambda a: a.from_date, reverse=True)
+            for absence in all_absences:
                 data["absence"].append(
                     {
                         "id": absence.id,
                         "date_debut": absence.from_date.strftime("%d/%m/%y %H:%M"),
                         "date_fin": absence.to_date.strftime("%d/%m/%y %H:%M"),
                         "justifie": absence.justified,
-                        "nb_heures": absence.hours,
-                        "nb_jours": absence.days,
-                        "raison": str(absence.reasons)[2:-2],
+                        "nb_heures": absence.hours or "",
+                        "nb_jours": absence.days or 0,
+                        "raison": ", ".join(absence.reasons) if absence.reasons else "",
                     }
                 )
-                nbabsences += 1
-            data["nb_absences"] = nbabsences
-            # Je récupére la derniére absence
-            if nbabsences > 0:
-                data["derniere_absence"].append(
-                    {
-                        "id": absences[0].id,
-                        "date_debut": absences[0].from_date.strftime("%d/%m/%y %H:%M"),
-                        "date_fin": absences[0].to_date.strftime("%d/%m/%y %H:%M"),
-                        "justifie": absences[0].justified,
-                        "nb_heures": absences[0].hours,
-                        "nb_jours": absences[0].days,
-                        "raison": str(absences[0].reasons)[2:-2],
-                    }
-                )
-            else:
-                time.sleep(5)
+            data["nb_absences"] = len(data["absence"])
+            data["derniere_absence"] = [data["absence"][0]]
         return data
     except Exception as e:
         line_number = e.__traceback__.tb_lineno
@@ -844,57 +996,205 @@ def absences(client):
 
 def punitions(client):
     try:
-        # Récupération des punitions
         data = {"punition": [], "derniere_punition": [], "Nb_Punitions": 0}
-        punitions = client.current_period.punishments
-        if not punitions == []:
-            data["derniere_punition"].append(
-                {
-                    "id": punitions[0].id,
-                    "type": punitions[0].nature,
-                    "raison": punitions[0].reasons,
-                    "donneur": punitions[0].giver,
-                    "date": punitions[0].given.strftime("%d/%m/%Y"),
-                    "date_court": punitions[0].given.strftime("%d/%m"),
-                    "circonstances": punitions[0].circumstances,
-                    "exclusion": punitions[0].exclusion,
-                    "duree": int(punitions[0].duration.total_seconds() // 60),
+        try:
+            all_periods = client.periods
+        except Exception as e:
+            logging.error(f"Erreur lors de l'accès aux périodes (punitions) : {e}")
+            return {"punition": [], "derniere_punition": [], "Nb_Punitions": 0, "error": str(e)}
+
+        all_punitions_map = {}
+        for period in all_periods:
+            try:
+                for p in (period.punishments or []):
+                    all_punitions_map[p.id] = p
+            except Exception as e:
+                logging.warning(f"Impossible de lire les punitions de la période {getattr(period, 'name', '?')} : {e}")
+
+        import datetime as _dt
+        def _punition_sort_key(p):
+            g = p.given
+            if isinstance(g, _dt.datetime):
+                return g.date()
+            return g if isinstance(g, _dt.date) else _dt.date.min
+
+        punitions = sorted(all_punitions_map.values(), key=_punition_sort_key, reverse=True) if all_punitions_map else []
+        if punitions:
+
+            def format_punition(p):
+                # Créneaux planifiés (ex : retenues programmées)
+                schedule = []
+                for s in (p.schedule or []):
+                    try:
+                        start_str = s.start.strftime("%d/%m %H:%M") if hasattr(s.start, "strftime") else str(s.start)
+                        duree_min = int(s.duration.total_seconds() // 60) if s.duration else None
+                        schedule.append({"start": start_str, "duree": duree_min})
+                    except Exception:
+                        pass
+                return {
+                    "id": p.id,
+                    "type": p.nature,
+                    "raison": ", ".join(p.reasons) if p.reasons else "",
+                    "donneur": p.giver,
+                    "date": p.given.strftime("%d/%m/%Y") if hasattr(p.given, "strftime") else str(p.given),
+                    "date_court": p.given.strftime("%d/%m") if hasattr(p.given, "strftime") else str(p.given),
+                    "circonstances": p.circumstances or "",
+                    "exclusion": p.exclusion,
+                    "pendant_cours": p.during_lesson,
+                    "travail": p.homework or "",
+                    "duree": int(p.duration.total_seconds() // 60) if p.duration else 0,
+                    "schedule": schedule,
                 }
-            )
+
             nbpunition = 0
             for punition in punitions:
-                data["punition"].append(
-                    {
-                        "id": punition.id,
-                        "type": punition.nature,
-                        "raison": punition.reasons,
-                        "donneur": punition.giver,
-                        "date": punition.given.strftime("%d/%m/%Y"),
-                        "date_court": punition.given.strftime("%d/%m"),
-                        "circonstances": punition.circumstances,
-                        "exclusion": punition.exclusion,
-                        "duree": int(punition.duration.total_seconds() // 60),
-                    }
-                )
-                nbpunition = nbpunition + 1
+                data["punition"].append(format_punition(punition))
+                nbpunition += 1
             data["Nb_Punitions"] = nbpunition
+            # Dernière punition (liste déjà triée par date desc)
+            data["derniere_punition"] = [data["punition"][0]] if data["punition"] else []
         else:
             time.sleep(5)
         return data
     except Exception as e:
-        logging.error("Un erreur est retourné sur le traitement des Punissions: %s", e)
+        logging.error("Un erreur est retourné sur le traitement des Punitions: %s", e)
         time.sleep(5)
         return data
 
 
 def ical(client):
-    # Récupération des coordonnées ICAL
+    """
+    Récupère l'URL du calendrier iCal de l'utilisateur.
+
+    Args:
+        client: L'objet client pronotepy connecté.
+
+    Returns:
+        str: L'URL du calendrier iCal, ou une chaîne vide si non trouvée ou en cas d'erreur.
+    """
     try:
-        jsondata = {"ICAL": client.export_ical()}
+        # pronotepy expose l'URL iCal comme un attribut de l'objet client
+        ical_url = getattr(client, "ical_url", None)
+        if ical_url:
+            logging.info("URL iCal récupérée avec succès.")
+            return ical_url
+        else:
+            logging.warning("Aucune URL iCal n'a été trouvée pour ce compte.")
+            return ""
     except Exception as e:
-        jsondata = {"ICAL": ""}
-        logging.info("Un erreur est retourné sur le traitement de l'ICAL: %s", e)
-    return jsondata["ICAL"]
+        line_number = e.__traceback__.tb_lineno if e.__traceback__ else "unknown"
+        logging.error(
+            "Une erreur est survenue lors de la récupération de l'URL iCal: ligne %s - %s",
+            line_number,
+            e,
+        )
+        return ""
+
+
+
+def download_photo(client, eqLogicId, tokenconnected, message):
+    """
+    Télécharge la photo de profil de l'élève ou de l'enfant sélectionné.
+    Note: pour les comptes parent avec Pronote 2024+ (N au format '46#...'), le téléchargement
+    de la photo n'est pas supporté — FichiersExternes requiert une session web (cookies)
+    que les sessions mobile API ne possèdent pas.
+
+    Args:
+        client: Objet client PronotePy
+        eqLogicId: ID de l'équipement Jeedom
+        tokenconnected: Indicateur si connecté via token
+        message: Dictionnaire du message reçu
+
+    Returns:
+        str or None: Chemin relatif de la photo, ou None si échec
+    """
+    try:
+        is_parent = (tokenconnected == "true") and ("parent.html" in message["TokenUrl"])
+        photo = None
+
+        if is_parent:
+            if client._selected_child and client._selected_child.profile_picture:
+                child_n = client._selected_child.raw_resource.get("N", "")
+                if "#" in str(child_n):
+                    logging.debug("Photo non disponible : compte parent avec Pronote 2024+ (N=%s...). FichiersExternes requiert une session web.", str(child_n)[:10])
+                    return None
+                photo = client._selected_child.profile_picture
+                logging.debug("Photo trouvée pour l'enfant : %s", client._selected_child.name)
+        else:
+            if client.info.profile_picture:
+                photo = client.info.profile_picture
+                logging.debug("Photo trouvée pour l'élève")
+
+        if not photo:
+            logging.debug("Aucune photo trouvée dans Pronote")
+            return None
+
+        data_dir = f"/var/www/html/plugins/ProJote/data/{eqLogicId}/"
+        verifdossier(data_dir)
+        final_path = f"{data_dir}profile_picture.jpg"
+        temp_path = f"{data_dir}profile_picture_temp.jpg"
+
+        downloaded = False
+
+        logging.debug("URL de la photo : %s", photo.url)
+        try:
+            photo.save(temp_path)
+            logging.info("Photo téléchargée avec succès via FichiersExternes")
+            downloaded = True
+        except FileNotFoundError:
+            # FichiersExternes retourne 404 — tenter avec headers supplémentaires
+            logging.debug("FichiersExternes 404, tentative avec Referer/Origin")
+            try:
+                headers = {
+                    "Referer": client.communication.root_site + "/",
+                    "Origin": client.communication.root_site,
+                }
+                resp = client.communication.session.get(photo.url, headers=headers)
+                if resp.status_code == 200 and len(resp.content) > 100:
+                    with open(temp_path, "wb") as f:
+                        f.write(resp.content)
+                    logging.info("Photo téléchargée avec Referer/Origin")
+                    downloaded = True
+                else:
+                    logging.error("Échec du téléchargement de la photo : %s (status %d)", photo.url, resp.status_code)
+            except Exception as e:
+                logging.error("Échec du téléchargement de la photo : %s", e)
+        except Exception as e:
+            logging.error("Échec du téléchargement de la photo : %s", e)
+
+        if not downloaded:
+            return None
+
+        # Vérifier si le fichier final existe et comparer
+        if os.path.exists(final_path):
+            try:
+                with open(temp_path, "rb") as f1, open(final_path, "rb") as f2:
+                    if f1.read() == f2.read():
+                        logging.info("La photo est identique, pas de remplacement")
+                        os.remove(temp_path)
+                        return f"/plugins/ProJote/data/{eqLogicId}/profile_picture.jpg"
+                    else:
+                        logging.info("La photo est différente, remplacement")
+            except Exception as e:
+                logging.error("Erreur lors de la comparaison des photos : %s", e)
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+                return None
+
+        # Remplacer ou créer le fichier final
+        try:
+            os.rename(temp_path, final_path)
+            logging.info("Photo mise à jour : %s", final_path)
+            return f"/plugins/ProJote/data/{eqLogicId}/profile_picture.jpg"
+        except Exception as e:
+            logging.error("Erreur lors du remplacement de la photo : %s", e)
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            return None
+
+    except Exception as e:
+        logging.error("Erreur lors du téléchargement de la photo : %s", e)
+        return None
 
 
 def identites(clientinfo):
@@ -902,15 +1202,21 @@ def identites(clientinfo):
     try:
         data = {"identiteinfo": []}
         # Création du dictionnaire d'informations d'identité avec des valeurs non vides
+        estab = (clientinfo.establishment or '').strip()
+        words = estab.split()
+        mid = len(words) // 2
+        if mid > 0 and words[:mid] == words[mid:]:
+            estab = ' '.join(words[:mid])
+
         IdentityInfo = {
             "Nom_Eleve": clientinfo.name,
             "Nom_Classe": clientinfo.class_name,
-            "Etablissement": clientinfo.establishment,
+            "Etablissement": estab,
             # "Email": clientinfo.email,
         }
         logging.debug("Nom de l''identité nom  %s", clientinfo.name)
         logging.debug("Nom de l''identité Classe %s", clientinfo.class_name)
-        logging.debug("Nom de l''identité Etablissement %s", clientinfo.establishment)
+        logging.debug("Nom de l''identité Etablissement %s", estab)
         return IdentityInfo
     except Exception as e:
         line_number = e.__traceback__.tb_lineno
@@ -921,12 +1227,13 @@ def identites(clientinfo):
         )
 
 
-def GetTokenFromLogin(Account):
-    qrcode_data = Account.request_qr_code_data("4321")
+def GetTokenFromLogin(Account, pin="4321"):
+    """Génère un jeton de connexion (credentials) à partir d'un compte déjà connecté."""
+    qrcode_data = Account.request_qr_code_data(pin)
     logging.debug("Les info du QRCode : %s", qrcode_data["url"])
     return Account.qrcode_login(
         qrcode_data,
-        "4321",
+        pin,
         uuid="ProJote",
     )
 
@@ -945,30 +1252,19 @@ def Connectparent(pronote_url, login, password, ent, enfant):
     # Je valide que j'ai les bonnes informations pour me connecter en tant que Parent
     try:
         if login == "":
-            logging.error("Pas de login reçu sur le deamon")
-            if pronote_url == "":
-                logging.error("pas d'URL reçu sur le deamon")
-            elif ent == "":
-                if pronote_url.endswith(
-                    ".index-education.net/pronote/parent.html?login=true"
-                ):
-                    pronote_url = pronote_url[: -len("?login=true")]
-                    logging.info("URL  modifiée : %s", pronote_url)
-            elif pronote_url.endswith(".index-education.net/pronote/parent.html"):
-                pronote_url += "?login=true"
-                logging.info("URL  modifiée : %s", pronote_url)
-        logging.debug("password chiffré : %s", password)
-        """ if password != "":
-            if isinstance(password, str):
-                password = my_decrypt(
-                    password,
-                    "084781141BD01304180B9B58120E4E058C1434394DDED646BF4ECC95380B9442",
-                )
-                logging.debug("password déchiffré : %s", password)
-            else:
-                logging.error("Le password n'est pas un string")
+            logging.error("Pas de login reçu sur le daemon")
+            return None, []
+        if pronote_url == "":
+            logging.error("Pas d'URL reçue sur le daemon")
+            return None, []
+        if password != "":
+            password = my_decrypt(
+                password,
+                "084781141BD01304180B9B58120E4E058C1434394DDED646BF4ECC95380B9442",
+            )
         else:
-            logging.error("pas de password reçu sur le deamon") """
+            logging.error("Pas de password reçu sur le daemon")
+            return None, []
         # Maintenant j'essaye de me connecter
         client = pronotepy.ParentClient(pronote_url, login, password, ent)
         logging.info("Je suis connecté en tant que parent")
@@ -990,13 +1286,15 @@ def Connectparent(pronote_url, login, password, ent, enfant):
             logging.info("Je suis connecté à l'enfant %s", enfant)
         return client, listenfant
     except Exception as e:
-        line_number = e.__traceback__.tb_lineno
-        logging.error("Connection parent échouée : lig. %s -   %s", line_number, e)
+        line_number = e.__traceback__.tb_lineno if e.__traceback__ else "unknown"
+        logging.error("Connection parent échouée : ligne %s - %s", line_number, e)
+        return None, []
 
 
 def Connect(pronote_url, login, password, ent):
     if login == "":
-        logging.error("Pas de login reçu sur le deamon")
+        logging.error("Pas de login reçu sur le daemon")
+        return None
 
     if pronote_url != "":
         if ent == "":
@@ -1004,27 +1302,166 @@ def Connect(pronote_url, login, password, ent):
                 ".index-education.net/pronote/eleve.html?login=true"
             ):
                 pronote_url = pronote_url[: -len("?login=true")]
-                logging.info("URL  modifiée :", pronote_url)
+                logging.info("URL modifiée :", pronote_url)
         elif pronote_url.endswith(".index-education.net/pronote/eleve.html"):
             pronote_url += "?login=true"
-            logging.info("URL  modifiée : %s", pronote_url)
-        logging.debug("L'url pour se connecter est  : %s", pronote_url)
+            logging.info("URL modifiée : %s", pronote_url)
+        logging.debug("L'url pour se connecter est : %s", pronote_url)
     else:
-        logging.error("pas d'URL reçu sur le deamon")
+        logging.error("Pas d'URL reçue sur le daemon")
+        return None
     if password != "":
-
         password = my_decrypt(
             password, "084781141BD01304180B9B58120E4E058C1434394DDED646BF4ECC95380B9442"
         )
-
     else:
-        logging.error("pas de password reçu sur le deamon")
+        logging.error("Pas de password reçu sur le daemon")
+        return None
     try:
         client = pronotepy.Client(pronote_url, login, password, ent)
         logging.info("Je suis connecté")
         return client
     except Exception as e:
-        logging.error("Connection échouée :  %s", e)
+        logging.error("Connection échouée : %s", e)
+        return None
+
+
+def check_and_update_failed_attempts(eqLogicId, increment=False):
+    """
+    Implémente un circuit breaker pour éviter les boucles infinies de reconnexion.
+
+    Args:
+        eqLogicId: ID de l'équipement
+        increment: Si True, incrémente le compteur d'échecs
+
+    Returns:
+        True si les tentatives sont autorisées, False si circuit ouvert
+    """
+    global failed_attempts
+    eqLogicId = str(eqLogicId)
+    max_attempts = 3
+    timeout_seconds = 300  # Réinitialiser après 5 minutes
+
+    current_time = time.time()
+
+    # Initialiser si n'existe pas
+    if eqLogicId not in failed_attempts:
+        failed_attempts[eqLogicId] = {"count": 0, "timestamp": current_time}
+
+    # Réinitialiser dopo timeout
+    if current_time - failed_attempts[eqLogicId]["timestamp"] > timeout_seconds:
+        failed_attempts[eqLogicId] = {"count": 0, "timestamp": current_time}
+
+    # Incrémenter si demandé
+    if increment:
+        failed_attempts[eqLogicId]["count"] += 1
+        if failed_attempts[eqLogicId]["count"] > max_attempts:
+            error_msg = (
+                f"ProJote - Circuit breaker: {failed_attempts[eqLogicId]['count']} tentatives échouées. "
+                f"Le token Pronote est expiré. Supprimez le token et rescanez le code QR pour générer une nouvelle connexion."
+            )
+            logging.error(
+                f"Circuit breaker OUVERT pour eqLogicId {eqLogicId}: {error_msg}"
+            )
+            # Note: Le message est envoyé via jeeProJote.php après réception du JSON
+            # send_jeedom_message() est désactivé car la route n'existe pas en Jeedom 4.3+
+            return False
+
+    # Vérifier si circuit est ouvert
+    if failed_attempts[eqLogicId]["count"] > max_attempts:
+        error_msg = (
+            f"ProJote - Circuit breaker bloqué pour eqLogicId {eqLogicId}. "
+            f"Attendez 5 minutes ou supprimez le token manuellement."
+        )
+        logging.error(error_msg)
+        return False
+
+    return True
+
+
+def load_persistent_token(eqLogicId):
+    """
+    Charge le token persistant depuis le fichier enfant.ProJote.json.txt
+    et l'utilise pour se reconnecter automatiquement au redémarrage du daemon.
+
+    Args:
+        eqLogicId: ID de l'équipement Jeedom
+
+    Returns:
+        tuple: (client, tokenconnected, enfant) ou (None, None, None) si échec
+    """
+    try:
+        data_dir = "/var/www/html/plugins/ProJote/data"
+        file_path = os.path.join(data_dir, str(eqLogicId), "enfant.ProJote.json.txt")
+
+        if not os.path.exists(file_path):
+            logging.info("Fichier token persistant non trouvé : %s", file_path)
+            return None, None, None
+
+        with open(file_path, "r") as f:
+            data = json.load(f)
+
+        if "Token" not in data:
+            logging.warning("Token absent du fichier persistant")
+            return None, None, None
+
+        token = data["Token"]
+        enfant = data.get("Eleve", "")
+
+        # Vérifier que le token contient les informations requises
+        required_token_keys = [
+            "pronote_url",
+            "username",
+            "password",
+            "client_identifier",
+        ]
+        if not all(key in token for key in required_token_keys):
+            logging.error("Token persistant incomplet, reconnexion requise")
+            return None, None, None
+
+        logging.info("Tentative de reconnexion avec le token persistant...")
+        try:
+            if "parent.html" in token["pronote_url"]:
+                client = pronotepy.ParentClient.token_login(
+                    pronote_url=token["pronote_url"],
+                    username=token["username"],
+                    password=token["password"],
+                    client_identifier=token["client_identifier"],
+                    uuid=token.get("uuid", "ProJote"),
+                )
+                # Sélectionner l'enfant si spécifié
+                if enfant and enfant != "":
+                    try:
+                        client.set_child(enfant)
+                        logging.info("Reconnecté à l'enfant persistant : %s", enfant)
+                    except Exception as e:
+                        logging.warning("Impossible de sélectionner l'enfant : %s", e)
+            else:
+                client = pronotepy.Client.token_login(
+                    pronote_url=token["pronote_url"],
+                    username=token["username"],
+                    password=token["password"],
+                    client_identifier=token["client_identifier"],
+                    uuid=token.get("uuid", "ProJote"),
+                )
+
+            if client and client.logged_in:
+                logging.info("Reconnexion avec token persistant réussie !")
+                return client, "true", enfant
+            else:
+                logging.error(
+                    "Le token persistant n'a pas permis une reconnexion valide"
+                )
+                return None, None, None
+
+        except Exception as e:
+            logging.warning("Reconnexion avec token persistant échouée : %s", e)
+            logging.debug("Le token doit être regénéré via QR code")
+            return None, None, None
+
+    except Exception as e:
+        logging.error("Erreur lors du chargement du token persistant : %s", e)
+        return None, None, None
 
 
 def read_socket():  # sourcery skip: extract-method, merge-dict-assign
@@ -1049,8 +1486,17 @@ def read_socket():  # sourcery skip: extract-method, merge-dict-assign
                 return
 
             logging.debug("Le MESSAGE reçu est : %s", message)
-            if message["apikey"] != _apikey:
-                logging.error("Invalid apikey from socket: %s", message)
+            if message.get("apikey") != _apikey:
+                logging.error("Invalid apikey from socket: %s", message.get("apikey"))
+                # Envoyer une notification d'erreur à Jeedom
+                jeedom_com.send_change_immediate(
+                    {
+                        "error": "Invalid API key",
+                        "CmdId": message.get("CmdId", ""),
+                        "connection_status": "error",
+                    }
+                )
+                return
             # ========================================================
             #   1 : On se connecte avec le Token réçu par défault
             # ========================================================
@@ -1065,6 +1511,34 @@ def read_socket():  # sourcery skip: extract-method, merge-dict-assign
                 logging.debug(
                     "Toutes les informations de Token sont présentes et non vides. Je me connecte avec le Token"
                 )
+
+                # Vérifier le circuit breaker avant de tenter la connexion
+                eqLogicId = message.get("CmdId", "")
+                if not check_and_update_failed_attempts(eqLogicId, increment=False):
+                    error_msg = (
+                        f"ProJote - Token expiré pour équipement {eqLogicId}. "
+                        f"Trop de tentatives échouées. "
+                        f"Supprimez le token et rescanez le code QR pour générer une nouvelle connexion."
+                    )
+                    logging.error(
+                        f"Circuit breaker BLOQUÉ pour eqLogicId {eqLogicId}. "
+                        f"Les tentatives de connexion au token repétées ont échoué. "
+                        f"Le token est probablement expiré. "
+                        f"Supprimez le fichier token et rescanez le code QR."
+                    )
+                    # Note: Le message est envoyé via jeeProJote.php après réception du JSON
+                    # send_jeedom_message() est désactivé car la route n'existe pas en Jeedom 4.3+
+
+                    jeedom_com.send_change_immediate(
+                        {
+                            "error": f"Token expiré. Trop de tentatives échouées ({failed_attempts.get(str(eqLogicId), {'count': 0})['count']} tentatives). "
+                            f"Supprimez le token et rescanez le code QR.",
+                            "CmdId": eqLogicId,
+                            "connection_status": "disconnected",
+                        }
+                    )
+                    return
+
                 try:
                     if "parent.html" in message["TokenUrl"]:
                         client = pronotepy.ParentClient.token_login(
@@ -1072,7 +1546,7 @@ def read_socket():  # sourcery skip: extract-method, merge-dict-assign
                             username=message["TokenUsername"],
                             password=message["TokenPassword"],
                             client_identifier=message["TokenId"],
-                            uuid="ProJote",
+                            uuid=message.get("TokenUuid", "ProJote"),
                         )
                         # Je sélectionne l'enfant si il est spécifié
                         if "enfant" in message and message["enfant"] != "":
@@ -1087,7 +1561,7 @@ def read_socket():  # sourcery skip: extract-method, merge-dict-assign
                             username=message["TokenUsername"],
                             password=message["TokenPassword"],
                             client_identifier=message["TokenId"],
-                            uuid="ProJote",
+                            uuid=message.get("TokenUuid", "ProJote"),
                         )
                 except Exception as e:
                     logging.error(
@@ -1100,60 +1574,28 @@ def read_socket():  # sourcery skip: extract-method, merge-dict-assign
                 # credentials = client.export_credentials()
                 if client is not None and client.logged_in:
                     tokenconnected = "true"
+                    # Réinitialiser le compteur d'échecs en cas de connexion réussie
+                    eqLogicId = message.get("CmdId", "")
+                    if str(eqLogicId) in failed_attempts:
+                        failed_attempts[str(eqLogicId)] = {
+                            "count": 0,
+                            "timestamp": time.time(),
+                        }
                 else:
-                    logging.error("Connection avec le Token échouée ")
-                    required_keys = ["url", "login", "password"]
-                    all_Comptekeys_present = True
-                    for key in required_keys:
-                        if key not in message or not message[key].strip():
-                            logging.error(
-                                "Information de login manquante ou vide : %s", key
-                            )
-                            all_Comptekeys_present = False
-                    # sourcery skip: raise-specific-error
-                    Exception(
-                        "Connection avec le Token échouée et les inforamtions de login sont manquantes."
-                    )
+                    logging.error("Connection avec le Token échouée. Regénérez le QR code.")
+                    eqLogicId = message.get("CmdId", "")
+                    check_and_update_failed_attempts(eqLogicId, increment=True)
+                    return
             else:
-                logging.info("Je me connecte via la compte et le mot de passe.")
-                required_keys = ["url", "login", "password"]
-                if (all_Comptekeys_present != True) or not all_Comptekeys_present:
-                    all_Comptekeys_present = True
-                    for key in required_keys:
-                        if key not in message or not message[key].strip():
-                            logging.error(
-                                "Information de login manquante ou vide : %s", key
-                            )
-                            all_Comptekeys_present = False
-
-                if message["cas"] != "":
-                    logging.debug("Cas/Ent reçu : %s", message["cas"])
-                    ent = class_for_name("pronotepy.ent", message["cas"])
-                else:
-                    ent = ""
-                if (message["CptParent"] == "1") or (
-                    "parent.html" in message["TokenUrl"]
-                ):
-                    logging.info("Je me connecte en tant que parent")
-                    ## connection en tant que parent
-                    client, listenfant = Connectparent(
-                        pronote_url=message["url"],
-                        login=message["login"],
-                        password=message["password"],
-                        ent=ent,
-                        enfant=message["enfant"],
-                    )
-                    message["CptParent"] == "1"
-                else:
-                    logging.info("Je me connecte en tant qu'élève")
-                    client = Connect(
-                        pronote_url=message["url"],
-                        login=message["login"],
-                        password=message["password"],
-                        ent=ent,
-                    )
-                # Maintenant que je suis connecté je vais chercher les informations de Token pour la prochaine fois
-                client = GetTokenFromLogin(client)
+                logging.error("Aucun token disponible. Configurez la connexion via QR code.")
+                jeedom_com.send_change_immediate(
+                    {
+                        "error": "Aucun token disponible, connexion impossible. Configurez via QR code.",
+                        "CmdId": message.get("CmdId", ""),
+                        "connection_status": "disconnected",
+                    }
+                )
+                return
             # ==================================================================================
             #  3 :  Je récupére les informations de l'élève
             # ==================================================================================
@@ -1165,6 +1607,7 @@ def read_socket():  # sourcery skip: extract-method, merge-dict-assign
                 jsondata["ConnectionDate"] = datetime.datetime.now().strftime(
                     " %H:%M:%S %d/%m/%Y"
                 )
+                jsondata["connection_status"] = "connected"
                 logging.debug(
                     "Validation Token %s",
                     tokenconnected,
@@ -1174,15 +1617,21 @@ def read_socket():  # sourcery skip: extract-method, merge-dict-assign
                 ):
                     logging.debug("Le nom de l'élève %s", client._selected_child.name)
                     jsondata["Eleve"] = identites(client._selected_child)
-                    if (
-                        client._selected_child.profile_picture
-                        and client._selected_child.profile_picture.url
-                    ):
-                        jsondata["Photo"] = client._selected_child.profile_picture.url
+                    # Ajouter la liste des enfants pour les comptes parents
+                    list_enfant = []
+                    for child in client.children:
+                        list_enfant.append(child.name)
+                    jsondata["Liste_Enfant"] = json.dumps(
+                        list_enfant, separators=(",", ":")
+                    )
                 else:
                     jsondata["Eleve"] = identites(client.info)
-                    if client.info.profile_picture and client.info.profile_picture.url:
-                        jsondata["Photo"] = client.info.profile_picture.url
+                # Téléchargement de la photo
+                local_picture_path = download_photo(
+                    client, message["CmdId"], tokenconnected, message
+                )
+                if local_picture_path:
+                    jsondata["Local_Picture"] = local_picture_path
                 # je renew le token
                 logging.info("Je renew le Token")
                 jsondata["Token"] = RenewToken(client)
@@ -1191,10 +1640,16 @@ def read_socket():  # sourcery skip: extract-method, merge-dict-assign
                 Checkeleve(client, message["CmdId"])
                 # J'ajoute l'emploi du temps
                 logging.info("Je récupére l'emploi du temps")
-                jsondata["Emploi_du_temps"] = Emploidutemps(client)
+                edt_data = Emploidutemps(client)
+                jsondata["Emploi_du_temps"] = edt_data
+                if "error" in edt_data:
+                    jsondata["error"] = edt_data["error"]
                 # J'ajoute les notes
                 logging.info("Je récupére les notes")
-                jsondata["Notes"] = notes(client)
+                notes_data = notes(client)
+                jsondata["Notes"] = notes_data
+                if "error" in notes_data:
+                    jsondata["error"] = notes_data["error"]
                 # j'ajoute les menus
                 logging.info("Je récupére les menus")
                 jsondata["Menus"] = menus(client)
@@ -1228,11 +1683,28 @@ def read_socket():  # sourcery skip: extract-method, merge-dict-assign
             else:
                 echo = "Le compte n'est pas loggué"
                 logging.error(echo)
+                jeedom_com.send_change_immediate(
+                    {
+                        "error": echo,
+                        "CmdId": message.get("CmdId", ""),
+                        "connection_status": "disconnected",
+                    }
+                )
                 return False
     except Exception as e:
-        line_number = e.__traceback__.tb_lineno
-        logging.error("Erreur d'éxécution du deamon : lig. %s -  %s", line_number, e)
-        jeedom_com.send_change_immediate(jsondata)
+        line_number = e.__traceback__.tb_lineno if e.__traceback__ else "unknown"
+        error_msg = f"Erreur d'éxécution du daemon : ligne {line_number} - {str(e)}"
+        logging.error(error_msg)
+        logging.debug("Traceback complet : %s", traceback.format_exc())
+        # Envoyer une notification d'erreur à Jeedom avec le CmdId si disponible
+        cmd_id = message.get("CmdId", "") if "message" in locals() else ""
+        jeedom_com.send_change_immediate(
+            {
+                "error": error_msg,
+                "CmdId": cmd_id,
+                "connection_status": "error",
+            }
+        )
 
 
 def listen():
@@ -1287,12 +1759,25 @@ _cycle = int(_cycle)
 
 jeedom_utils.set_log_level(_log_level)
 
+# Filtre les messages DEBUG verbeux de PronotePy (champs optionnels absents)
+class _PronotepyNoiseFilter(logging.Filter):
+    def filter(self, record):
+        msg = record.getMessage()
+        return "setting to default" not in msg and "Could not get value for" not in msg
+
+for _log_handler in logging.root.handlers:
+    _log_handler.addFilter(_PronotepyNoiseFilter())
+
 logging.info("Start demond")
 logging.info("Log level: %s", _log_level)
 logging.info("Socket port: %s", _socket_port)
 logging.info("Socket host: %s", _socket_host)
 logging.info("PID file: %s", _pidfile)
 logging.info("Apikey: %s", _apikey)
+
+# Initialiser les variables globales pour les messages Jeedom
+_callback_url = _callback
+_apikey_global = _apikey
 
 
 signal.signal(signal.SIGINT, handler)
@@ -1306,7 +1791,12 @@ try:
             "Network communication issues. Please fixe your Jeedom network configuration."
         )
         shutdown()
-    logging.info(f"j'écris {str(_pidfile)}")
+    jeedom_socket = jeedom_socket(port=_socket_port, address=_socket_host)
+    listen()
+except Exception as e:
+    logging.error("Fatal error: %s", e)
+    logging.info(traceback.format_exc())
+    shutdown()
     jeedom_socket = jeedom_socket(port=_socket_port, address=_socket_host)
     listen()
 except Exception as e:

@@ -3,25 +3,14 @@
     "apt": {
         "python3-pyudev": {},
         "python3-requests": {},
-        "python3-dev": {}
+        "python3-dev": {},
+        "python3-venv": {}
     },
-    "pip3": {
-        "pronotepy": {
-            "reinstall": true
-        },
-        "autoslot": {},
-        "cryptography": {},
-        "pycryptodome": {
-            "version": "3.20.0",
-            "reinstall": true
-        },
-        "requests": {},
-        "beautifulsoup4": {},
-        "serial": {},
-        "pyudev": {}
-    },
+    "pip3": {},
     "npm": {},
     "yarn": {},
     "plugin": {},
-    "post-install": {}
+    "post-install": {
+        "script": "plugins/ProJote/resources/post-install.sh"
+    }
 }

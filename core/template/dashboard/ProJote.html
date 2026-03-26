@@ -1,0 +1,1023 @@
+<style>
+/* ═══════════════════════════════════════════════════════
+   Widget ProJote — Design v2
+   ═══════════════════════════════════════════════════════ */
+.pjw-#id# {
+    --pjw-a: #accent_color#;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: inherit;
+    font-size: 12px;
+    line-height: 1.45;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 6px 4px;
+}
+
+/* ── En-tête : flex horizontal ──────────────────────── */
+.pjw-#id# .ph {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+.pjw-#id# .ph-av-col { flex-shrink: 0; }
+.pjw-#id# .ph-av {
+    width: 58px; height: 58px; border-radius: 50%;
+    overflow: hidden;
+    box-shadow: 0 0 0 2.5px var(--pjw-a), 0 0 0 4.5px color-mix(in srgb, var(--pjw-a) 18%, transparent);
+    background: rgba(var(--contrast-color),.1);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 19px; font-weight: 700; letter-spacing: -1px;
+}
+.pjw-#id# .ph-av img { width:100%; height:100%; object-fit:cover; display:block; }
+.pjw-#id# .ph-info {
+    flex: 1; min-width: 0;
+    display: flex; flex-direction: column; gap: 3px;
+}
+.pjw-#id# .ph-name {
+    font-weight: 800; font-size: 14px;
+    text-transform: uppercase; letter-spacing: .4px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    line-height: 1.2;
+}
+.pjw-#id# .ph-class {
+    display: inline-block; align-self: flex-start;
+    font-size: 10px; font-weight: 700;
+    background: color-mix(in srgb, var(--pjw-a) 15%, transparent); color: var(--pjw-a);
+    border: 1px solid color-mix(in srgb, var(--pjw-a) 30%, transparent);
+    padding: 1px 8px; border-radius: 20px;
+    letter-spacing: .3px;
+}
+.pjw-#id# .ph-school { font-size: 10px; opacity: .5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pjw-#id# .ph-ts     { font-size: 9px; opacity: .28; }
+
+/* ── Séparateur ─────────────────────────────────────── */
+.pjw-#id# hr {
+    border: none;
+    border-top: 1px solid rgba(var(--contrast-color),.12);
+    margin: 0 0 12px;
+}
+
+/* ── EDT : deux colonnes côte à côte ─────────────────── */
+.pjw-#id# .edt-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+.pjw-#id# .edt-col-title {
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .6px;
+    opacity: .5; margin-bottom: 2px;
+}
+.pjw-#id# .edt-col-range {
+    font-size: 12px; font-weight: 700;
+    letter-spacing: -.3px;
+    margin-bottom: 6px; color: var(--pjw-a);
+}
+.pjw-#id# .edt-pill {
+    border-radius: 6px; margin-bottom: 3px;
+    font-size: 10px; font-weight: 600;
+    display: flex; align-items: stretch;
+    overflow: hidden;
+    background: rgba(var(--contrast-color),.08);
+    transition: opacity .15s;
+}
+.pjw-#id# .edt-pill-bar {
+    width: 4px; min-width: 4px; flex-shrink: 0;
+}
+.pjw-#id# .edt-pill-text {
+    padding: 4px 7px;
+    flex: 1; display: flex; align-items: center; gap: 4px;
+    min-width: 0;
+}
+.pjw-#id# .edt-t-start {
+    flex-shrink: 0; font-size: 9px; font-weight: 700;
+    opacity: .7; min-width: 26px;
+}
+.pjw-#id# .edt-t-name {
+    flex: 1; text-align: center;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font-size: 10px;
+}
+.pjw-#id# .edt-t-end {
+    flex-shrink: 0; font-size: 9px; opacity: .45;
+    min-width: 26px; text-align: right;
+}
+.pjw-#id# .edt-pill.edt-pill-annule { opacity: .45; }
+.pjw-#id# .edt-pill.edt-pill-gap    { opacity: .35; background: rgba(128,128,128,.06); }
+.pjw-#id# .edt-pill.edt-pill-retenue {
+    background: rgba(192,57,43,.18);
+    border: 1px solid rgba(192,57,43,.5);
+    animation: pjw-pulse-#id# 1.4s ease-in-out infinite;
+}
+.pjw-#id# .edt-pill.edt-pill-retenue .edt-t-name {
+    color: #e74c3c; font-weight: 800; font-size: 10px; letter-spacing: .2px;
+}
+.pjw-#id# .edt-pill.edt-pill-retenue .edt-t-start,
+.pjw-#id# .edt-pill.edt-pill-retenue .edt-t-end { color: #e74c3c; opacity: .9; font-weight: 700; }
+@keyframes pjw-pulse-#id# {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(192,57,43,.0); }
+    50%       { box-shadow: 0 0 0 4px rgba(192,57,43,.25); }
+}
+.pjw-#id# .edt-t-annule {
+    flex: 3; text-align: center;
+    font-size: 9px; font-weight: 700; color: #e74c3c;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* ── Barre de moyenne ────────────────────────────────── */
+.pjw-#id# .nb { margin-bottom: 14px; }
+.pjw-#id# .nb-header {
+    display: flex; align-items: center;
+    gap: 6px; margin-bottom: 5px;
+}
+.pjw-#id# .nb-lbl {
+    font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .5px;
+    opacity: .55; flex-shrink: 0;
+}
+.pjw-#id# .nb-spacer { flex: 1; }
+.pjw-#id# .nb-score {
+    font-size: 15px; font-weight: 800; flex-shrink: 0;
+    letter-spacing: -.5px;
+}
+.pjw-#id# .nb-trend { font-size: 13px; flex-shrink: 0; }
+.pjw-#id# .nb-track {
+    height: 10px; border-radius: 6px; overflow: hidden;
+    background: rgba(var(--contrast-color),.1);
+    position: relative;
+}
+.pjw-#id# .nb-fill {
+    position: absolute; left: 0; top: 0; bottom: 0;
+    background: linear-gradient(to right,
+        #e74c3c 0%, #e67e22 30%, #f1c40f 60%, var(--pjw-a) 85%, #2ecc71 100%);
+    border-radius: 6px;
+    transition: width .6s ease;
+    width: 0;
+}
+
+/* ── Onglets ─────────────────────────────────────────── */
+.pjw-#id# .tabs { margin-top: 2px; }
+.pjw-#id# .tab-btns {
+    display: flex;
+    margin-bottom: 10px;
+    background: rgba(var(--contrast-color),.07);
+    border-radius: 8px;
+    padding: 2px;
+    gap: 1px;
+}
+.pjw-#id# .tab-btn {
+    font-size: 10px; font-weight: 600;
+    padding: 4px 4px; border: none;
+    background: transparent; cursor: pointer;
+    color: inherit; opacity: .45;
+    border-radius: 6px;
+    display: flex; align-items: center; gap: 3px;
+    transition: opacity .15s, background .15s;
+    flex: 1; justify-content: center;
+    white-space: nowrap;
+}
+.pjw-#id# .tab-btn i { font-size: 9px; }
+.pjw-#id# .tab-btn:hover { opacity: .65; }
+.pjw-#id# .tab-btn.active {
+    opacity: 1;
+    background: color-mix(in srgb, var(--pjw-a) 18%, transparent);
+    color: var(--pjw-a);
+    box-shadow: 0 1px 3px rgba(0,0,0,.1);
+}
+.pjw-#id# .tab-badge {
+    background: #e74c3c; color: #fff;
+    border-radius: 8px; padding: 0 4px;
+    font-size: 8px; font-weight: 800;
+    line-height: 12px; min-width: 12px; text-align: center;
+    display: none;
+}
+.pjw-#id# .tab-badge.visible { display: inline-block; }
+.pjw-#id# .tab-pane { display: none; }
+.pjw-#id# .tab-pane.active { display: block; }
+
+/* ── Items devoirs ───────────────────────────────────── */
+.pjw-#id# .dv-section-title {
+    font-size: 9px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .8px;
+    opacity: .4; margin: 6px 0 4px;
+}
+.pjw-#id# .dv-item {
+    display: flex; align-items: stretch;
+    border-radius: 6px; overflow: hidden;
+    background: rgba(var(--contrast-color),.07); margin-bottom: 3px;
+    cursor: default;
+}
+.pjw-#id# .dv-bar { width: 4px; min-width: 4px; flex-shrink: 0; }
+.pjw-#id# .dv-content { padding: 4px 7px; flex: 1; min-width: 0; text-align: left; }
+.pjw-#id# .dv-subject {
+    font-size: 11px; font-weight: 700;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pjw-#id# .dv-desc    { font-size: 10px; opacity: .65; word-break: break-word; margin-top: 1px; }
+.pjw-#id# .dv-files   { margin-top: 3px; display: flex; flex-wrap: wrap; gap: 3px; }
+.pjw-#id# .dv-file-link {
+    font-size: 9px; color: #3498db; text-decoration: none;
+    background: rgba(52,152,219,.1); border-radius: 4px; padding: 1px 6px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px;
+    display: inline-block; border: 1px solid rgba(52,152,219,.2);
+}
+.pjw-#id# .dv-file-link:hover { text-decoration: underline; }
+.pjw-#id# .dv-item.dv-done { opacity: .45; }
+
+/* ── Items notes ─────────────────────────────────────── */
+.pjw-#id# .dn-item {
+    display: flex; align-items: stretch;
+    border-radius: 6px; overflow: hidden;
+    background: rgba(var(--contrast-color),.07); margin-bottom: 3px;
+}
+.pjw-#id# .dn-bar { width: 4px; min-width: 4px; flex-shrink: 0; }
+.pjw-#id# .dn-content {
+    padding: 4px 7px;
+    display: flex; align-items: center; gap: 5px;
+    flex: 1; min-width: 0;
+}
+.pjw-#id# .dn-d {
+    font-size: 9px; opacity: .38; flex-shrink: 0;
+    min-width: 26px;
+}
+.pjw-#id# .dn-m {
+    flex: 1; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: 11px; font-weight: 600;
+}
+.pjw-#id# .dn-v {
+    font-weight: 800; flex-shrink: 0;
+    font-size: 11px; font-variant-numeric: tabular-nums;
+    min-width: 34px; text-align: center;
+    padding: 1px 5px; border-radius: 4px;
+    background: rgba(var(--contrast-color),.1);
+}
+.pjw-#id# .dn-v.c-ok   { background: rgba(39,174,96,.15);  color: #27ae60; }
+.pjw-#id# .dn-v.c-warn { background: rgba(230,126,34,.15); color: #e67e22; }
+.pjw-#id# .dn-v.c-bad  { background: rgba(231,76,60,.15);  color: #e74c3c; }
+.pjw-#id# .dn-mc { font-size: 9px; opacity: .4; flex-shrink: 0; }
+
+
+/* ── Items vie scolaire (onglets) ────────────────────── */
+.pjw-#id# .vs-summary {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 8px; margin-bottom: 8px;
+    border-radius: 8px;
+    background: rgba(var(--contrast-color),.05);
+    border: 1px solid rgba(var(--contrast-color),.1);
+}
+.pjw-#id# .vs-summary-count {
+    font-weight: 800; font-size: 22px;
+    min-width: 30px; text-align: center;
+    line-height: 1;
+}
+.pjw-#id# .vs-summary-lbl { font-size: 11px; opacity: .55; }
+.pjw-#id# .vs-item {
+    display: flex; align-items: stretch;
+    border-radius: 6px; overflow: hidden;
+    background: rgba(var(--contrast-color),.07); margin-bottom: 3px;
+}
+.pjw-#id# .vs-bar { width: 4px; min-width: 4px; flex-shrink: 0; }
+.pjw-#id# .vs-content { padding: 5px 8px; flex: 1; min-width: 0; }
+.pjw-#id# .vs-row1 {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 10px; margin-bottom: 2px;
+}
+.pjw-#id# .vs-date  { font-weight: 700; flex-shrink: 0; font-size: 10px; }
+.pjw-#id# .vs-info  { flex: 1; opacity: .6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 10px; }
+.pjw-#id# .vs-tag {
+    font-size: 9px; padding: 2px 7px; border-radius: 20px;
+    font-weight: 700; flex-shrink: 0; color: #fff;
+    letter-spacing: .2px;
+}
+.pjw-#id# .vs-tag-ok  { background: #27ae60; }
+.pjw-#id# .vs-tag-nok { background: #e74c3c; }
+.pjw-#id# .vs-row2 {
+    font-size: 9px; opacity: .45;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    line-height: 1.4;
+}
+
+/* ── Couleurs sémantiques ───────────────────────────── */
+.pjw-#id# .c-ok   { color: #27ae60; }
+.pjw-#id# .c-warn { color: #e67e22; }
+.pjw-#id# .c-bad  { color: #e74c3c; }
+
+/* ── État vide ──────────────────────────────────────── */
+.pjw-#id# .p-empty {
+    text-align: center; padding: 8px 0;
+    font-size: 10px; opacity: .28;
+    letter-spacing: .3px;
+}
+</style>
+
+<div class="pjw-#id#">
+
+    <!-- ══ EN-TÊTE ════════════════════════════════════════ -->
+    <div class="ph">
+        <div class="ph-av-col">
+            <div class="ph-av" id="pjwav#id#">?</div>
+        </div>
+        <div class="ph-info">
+            <div class="ph-name"   id="pjwnm#id#">–</div>
+            <div class="ph-class"  id="pjwcl#id#"></div>
+            <div class="ph-school" id="pjwsc#id#"></div>
+            <div class="ph-ts"     id="pjwts#id#"></div>
+        </div>
+    </div>
+
+    <hr>
+
+    <!-- ══ EDT ═══════════════════════════════════════════ -->
+    <div id="pjwedt#id#">
+        <div class="edt-cols">
+            <div class="edt-col" id="pjwcol-auj#id#">
+                <div class="edt-col-title">Aujourd'hui</div>
+                <div class="edt-col-range" id="pjwrng-auj#id#"></div>
+                <div id="pjwec-auj#id#"><div class="p-empty">Pas de cours</div></div>
+            </div>
+            <div class="edt-col" id="pjwcol-dem#id#">
+                <div class="edt-col-title" id="pjwlbl-dem#id#">Demain</div>
+                <div class="edt-col-range" id="pjwrng-dem#id#"></div>
+                <div id="pjwec-dem#id#"><div class="p-empty">Pas de cours</div></div>
+            </div>
+        </div>
+    </div>
+
+    <hr>
+
+    <!-- ══ BARRE MOYENNE (fill depuis gauche) ════════════ -->
+    <div class="nb">
+        <div class="nb-header">
+            <span class="nb-lbl">Moyenne générale</span>
+            <span class="nb-spacer"></span>
+            <span class="nb-score" id="pjwmoy#id#">–</span>
+            <span class="nb-trend" id="pjwtrend#id#"></span>
+        </div>
+        <div class="nb-track">
+            <div class="nb-fill" id="pjwnbf#id#" style="width:0%"></div>
+        </div>
+    </div>
+
+    <hr>
+
+    <!-- ══ ONGLETS ════════════════════════════════════════ -->
+    <div class="tabs" id="pjwtabs#id#">
+        <div class="tab-btns">
+            <button class="tab-btn active" data-tab="dv#id#"><i class="fas fa-book"></i> Dev.<span class="tab-badge" id="pjwbdv#id#"></span></button>
+            <button class="tab-btn" data-tab="notes#id#"><i class="fas fa-star"></i> Notes</button>
+            <button class="tab-btn" data-tab="abs#id#"><i class="fas fa-user-times"></i> Abs.<span class="tab-badge" id="pjwbabs#id#"></span></button>
+            <button class="tab-btn" data-tab="ret#id#"><i class="fas fa-clock"></i> Ret.<span class="tab-badge" id="pjwbret#id#"></span></button>
+            <button class="tab-btn" data-tab="pun#id#"><i class="fas fa-exclamation-triangle"></i> Pun.<span class="tab-badge" id="pjwbpun#id#"></span></button>
+        </div>
+
+        <!-- Devoirs (défaut) -->
+        <div class="tab-pane active" id="dv#id#">
+            <div id="pjwdv#id#"><div class="p-empty">Aucun devoir</div></div>
+        </div>
+
+        <!-- Notes -->
+        <div class="tab-pane" id="notes#id#">
+            <div id="pjwdn#id#"><div class="p-empty">Aucune note</div></div>
+        </div>
+
+        <!-- Absences -->
+        <div class="tab-pane" id="abs#id#">
+            <div id="pjwabs#id#"><div class="p-empty">–</div></div>
+        </div>
+
+        <!-- Retards -->
+        <div class="tab-pane" id="ret#id#">
+            <div id="pjwret#id#"><div class="p-empty">–</div></div>
+        </div>
+
+        <!-- Punitions -->
+        <div class="tab-pane" id="pun#id#">
+            <div id="pjwpun#id#"><div class="p-empty">–</div></div>
+        </div>
+    </div>
+
+</div><!-- .pjw-#id# -->
+
+<script>
+(function () {
+    'use strict';
+    var ID  = '#id#';
+    var EID = '#id#';
+    var LAST_LOGIN_CMD_ID = #lastLoginCmdId#;
+
+    var D   = #initData#;
+    var VIS = #visibilityMap#;
+
+    /* ─── Utilitaires DOM ─────────────────────────────── */
+    function el(id) { return document.getElementById(id); }
+
+    function esc(s) {
+        return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function escAttr(s) {
+        return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+
+    function ratio(v, sur) {
+        var a = parseFloat(String(v   || '').replace(',','.'));
+        var b = parseFloat(String(sur || '20').replace(',','.'));
+        return (!isNaN(a) && !isNaN(b) && b > 0) ? a / b : null;
+    }
+
+    function gradeClass(r) {
+        if (r === null) return '';
+        return r >= 0.70 ? 'c-ok' : r >= 0.50 ? 'c-warn' : 'c-bad';
+    }
+
+    function subjectColor(name) {
+        var s = String(name || '');
+        var h = 0;
+        for (var i = 0; i < s.length; i++) {
+            h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
+        }
+        return 'hsl(' + (Math.abs(h) % 360) + ',50%,42%)';
+    }
+
+    function fmtH(h) {
+        var s = String(h || '');
+        if (s.length === 4) return s.slice(0,2) + ':' + s.slice(2);
+        return s;
+    }
+
+    function fmtTs(dt) {
+        try {
+            var d = new Date(dt);
+            return 'Màj ' + d.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+        } catch(e) { return ''; }
+    }
+
+    function minToHHMM(min) {
+        return String(Math.floor(min / 60)).padStart(2, '0') + String(min % 60).padStart(2, '0');
+    }
+
+    function timeRange(courses) {
+        if (!courses || !courses.length) return '';
+        var starts = [], ends = [];
+        courses.forEach(function(c) {
+            if (c.annulation) return; // cours annulé n'impacte pas les horaires
+            if (c.heure)     starts.push(c.heure);
+            if (c.heure_fin) ends.push(c.heure_fin);
+        });
+        if (!starts.length) return '';
+        starts.sort(); ends.sort();
+        return fmtH(starts[0]) + ' \u2014 ' + fmtH(ends[ends.length - 1]);
+    }
+
+    /* ─── EN-TÊTE ─────────────────────────────────────── */
+    function renderHeader(d, ts) {
+        var ph = document.querySelector('.pjw-' + ID + ' .ph');
+        if (ph) ph.style.display = VIS.header ? '' : 'none';
+        if (!VIS.header) return;
+
+        var nm = el('pjwnm' + ID); if (nm) nm.textContent = (d.eleve || '–').toUpperCase();
+        var cl = el('pjwcl' + ID); if (cl) cl.textContent = d.classe       || '';
+        var sc = el('pjwsc' + ID); if (sc) sc.textContent = d.etablissement || '';
+        var ts_ = el('pjwts' + ID); if (ts_ && ts) ts_.textContent = fmtTs(ts);
+        var av  = el('pjwav' + ID);
+        if (av) {
+            if (d.photo && VIS.photo) {
+                av.innerHTML = '<img src="' + esc(d.photo) + '" alt="">';
+            } else {
+                av.textContent = (d.eleve || '?').split(' ')
+                    .map(function(w){ return w[0]; }).join('').slice(0,2).toUpperCase();
+            }
+        }
+    }
+
+    /* ─── EDT : pills pleine largeur ─────────────────── */
+    function toMin(hhmm) {
+        var s = String(hhmm || '').replace(':', '');
+        if (s.length >= 3) return parseInt(s.slice(0, s.length - 2), 10) * 60 + parseInt(s.slice(-2), 10);
+        return 0;
+    }
+
+    function repasPill(startStr, endStr) {
+        return '<div class="edt-pill">' +
+            '<div class="edt-pill-bar" style="background:#27ae60"></div>' +
+            '<div class="edt-pill-text">' +
+                '<span class="edt-t-start">' + esc(startStr) + '</span>' +
+                '<span class="edt-t-name">🍽 Repas</span>' +
+                '<span class="edt-t-end">' + esc(endStr) + '</span>' +
+            '</div>' +
+        '</div>';
+    }
+
+    function gapPill(startStr, endStr) {
+        return '<div class="edt-pill edt-pill-gap">' +
+            '<div class="edt-pill-bar" style="background:#95a5a6"></div>' +
+            '<div class="edt-pill-text">' +
+                '<span class="edt-t-start">' + esc(startStr) + '</span>' +
+                '<span class="edt-t-name">Pas de cours</span>' +
+                '<span class="edt-t-end">' + esc(endStr) + '</span>' +
+            '</div>' +
+        '</div>';
+    }
+
+    function edtCoursesHtml(courses) {
+        if (!courses || !courses.length) return '<div class="p-empty">Pas de cours</div>';
+        var result = [];
+        var lastActiveEndMin = -1; // heure de fin du dernier cours NON annulé
+
+        for (var i = 0; i < courses.length; i++) {
+            var c        = courses[i];
+            var canceled = !!c.annulation;
+            var time     = fmtH(c.heure);
+            var timeEnd  = fmtH(c.heure_fin);
+            var name     = c.cours || '';
+            var room     = c.salle ? ' · ' + c.salle : '';
+            var isRepas  = (name === 'Repas' || name === 'REPAS');
+            var color    = isRepas ? '#27ae60' : (c.background_color || '#7f8c8d');
+
+            // Gap/repas : se détecte avant tout cours, annulé ou non
+            var currStartMin = toMin(c.heure);
+            if (lastActiveEndMin >= 0) {
+                var gap = currStartMin - lastActiveEndMin;
+                var prevEndStr = fmtH(minToHHMM(lastActiveEndMin));
+                // Pause de midi : gap ≥ 30 min, fin préc ≥ 11h00, début suiv ≤ 14h00
+                if (gap >= 30 && lastActiveEndMin >= 11 * 60 && currStartMin <= 14 * 60) {
+                    result.push(repasPill(prevEndStr, time));
+                    lastActiveEndMin = currStartMin; // avance le repère pour ne pas redoubler
+                // Trou ≥ 60 min hors midi → "Pas de cours"
+                } else if (gap >= 60) {
+                    result.push(gapPill(prevEndStr, time));
+                    lastActiveEndMin = currStartMin;
+                }
+            }
+
+            if (!canceled) {
+                lastActiveEndMin = toMin(c.heure_fin);
+            } else {
+                // Cours annulé : avancer quand même au-delà de son créneau
+                // pour éviter un trou qui chevaucherait son affichage
+                lastActiveEndMin = Math.max(lastActiveEndMin, toMin(c.heure_fin));
+            }
+
+            if (canceled) {
+                result.push(
+                    '<div class="edt-pill edt-pill-annule">' +
+                        '<div class="edt-pill-bar" style="background:' + esc(color) + '"></div>' +
+                        '<div class="edt-pill-text">' +
+                            '<span class="edt-t-start">' + esc(time) + '</span>' +
+                            '<span class="edt-t-annule">❌ ' + esc(name + room) + ' — Annulé</span>' +
+                            '<span class="edt-t-end">' + esc(timeEnd) + '</span>' +
+                        '</div>' +
+                    '</div>'
+                );
+            } else if (c.est_retenue) {
+                result.push(
+                    '<div class="edt-pill edt-pill-retenue">' +
+                        '<div class="edt-pill-bar" style="background:#c0392b"></div>' +
+                        '<div class="edt-pill-text">' +
+                            '<span class="edt-t-start">' + esc(time) + '</span>' +
+                            '<span class="edt-t-name">⚠ ' + esc(name) + '</span>' +
+                            '<span class="edt-t-end">' + esc(timeEnd) + '</span>' +
+                        '</div>' +
+                    '</div>'
+                );
+            } else {
+                var nameHtml = isRepas ? '🍽 Repas' : esc(name + room);
+                result.push(
+                    '<div class="edt-pill">' +
+                        '<div class="edt-pill-bar" style="background:' + esc(color) + '"></div>' +
+                        '<div class="edt-pill-text">' +
+                            '<span class="edt-t-start">' + esc(time) + '</span>' +
+                            '<span class="edt-t-name">' + nameHtml + '</span>' +
+                            '<span class="edt-t-end">' + esc(timeEnd) + '</span>' +
+                        '</div>' +
+                    '</div>'
+                );
+            }
+        }
+        return result.join('');
+    }
+
+    /* Extrait les retenues programmées (schedule) pour un jour donné ("DD/MM") */
+    function retenuesCourses(punitions, dateStr) {
+        var result = [];
+        (punitions || []).forEach(function(p) {
+            (p.schedule || []).forEach(function(s) {
+                if (!s.start || s.start.slice(0, 5) !== dateStr) return;
+                var parts     = s.start.split(' ');
+                var timeParts = (parts[1] || '00:00').split(':');
+                var hh  = timeParts[0] || '00';
+                var mm  = timeParts[1] || '00';
+                var startHHMM = hh + mm;
+                var endHHMM   = '';
+                if (s.duree) {
+                    var startMin = parseInt(hh, 10) * 60 + parseInt(mm, 10);
+                    var endMin   = startMin + s.duree;
+                    endHHMM = String(Math.floor(endMin / 60)).padStart(2, '0') +
+                              String(endMin % 60).padStart(2, '0');
+                }
+                result.push({
+                    cours:            p.type || 'Retenue',
+                    heure:            startHHMM,
+                    heure_fin:        endHHMM,
+                    salle:            '',
+                    annulation:       false,
+                    background_color: '#c0392b',
+                    est_retenue:      true
+                });
+            });
+        });
+        return result;
+    }
+
+    function mergeAndSort(courses, retenues) {
+        return courses.concat(retenues).sort(function(a, b) {
+            return (a.heure || '').localeCompare(b.heure || '');
+        });
+    }
+
+    function renderEDT(d) {
+        var edtEl = el('pjwedt' + ID);
+
+        var now       = new Date();
+        var tomorrow  = new Date(now); tomorrow.setDate(tomorrow.getDate() + 1);
+        function ddmm(dt) {
+            return String(dt.getDate()).padStart(2,'0') + '/' + String(dt.getMonth()+1).padStart(2,'0');
+        }
+        var todayStr    = ddmm(now);
+        var tomorrowStr = ddmm(tomorrow);
+
+        var colAuj = el('pjwcol-auj' + ID);
+        if (colAuj) colAuj.style.display = VIS.edt_aujourdhui ? '' : 'none';
+        if (VIS.edt_aujourdhui) {
+            var rng_auj = el('pjwrng-auj' + ID);
+            var ec_auj  = el('pjwec-auj'  + ID);
+            var courses_auj = mergeAndSort(
+                d.edt_aujourdhui || [],
+                retenuesCourses(d.punitions, todayStr)
+            );
+            if (rng_auj) rng_auj.textContent = timeRange(courses_auj);
+            if (ec_auj)  ec_auj.innerHTML    = edtCoursesHtml(courses_auj);
+        }
+
+        var colDem = el('pjwcol-dem' + ID);
+        if (colDem) colDem.style.display = VIS.edt_prochainjour ? '' : 'none';
+        if (VIS.edt_prochainjour) {
+            var rng_dem = el('pjwrng-dem' + ID);
+            var ec_dem  = el('pjwec-dem'  + ID);
+            var lbl_dem = el('pjwlbl-dem' + ID);
+            // Le prochain jour scolaire peut ne pas être J+1 : on extrait la date depuis les données
+            var prochainDateStr = tomorrowStr;
+            if (d.edt_prochainjour_date) {
+                var dp = d.edt_prochainjour_date.split('/');
+                if (dp.length >= 2) prochainDateStr = dp[0] + '/' + dp[1];
+            }
+            var courses_dem = mergeAndSort(
+                d.edt_prochainjour || [],
+                prochainDateStr !== todayStr ? retenuesCourses(d.punitions, prochainDateStr) : []
+            );
+            if (lbl_dem) lbl_dem.textContent = d.edt_prochainjour_date || 'Demain';
+            if (rng_dem) rng_dem.textContent = timeRange(courses_dem);
+            if (ec_dem)  ec_dem.innerHTML    = edtCoursesHtml(courses_dem);
+        }
+
+        if (edtEl) edtEl.style.display = (VIS.edt_aujourdhui || VIS.edt_prochainjour) ? '' : 'none';
+    }
+
+    /* ─── BARRE DE MOYENNE (fill depuis gauche) ─────── */
+    function renderNotesBar(notes) {
+        var nb = document.querySelector('.pjw-' + ID + ' .nb');
+        if (nb) nb.style.display = VIS.notes ? '' : 'none';
+        if (!VIS.notes) return;
+
+        var moyEl   = el('pjwmoy'  + ID);
+        var fillEl  = el('pjwnbf'  + ID);
+        var trendEl = el('pjwtrend' + ID);
+        if (!notes || !Array.isArray(notes) || !notes.length) {
+            if (moyEl)  moyEl.textContent  = '–';
+            if (fillEl) fillEl.style.width = '0%';
+            return;
+        }
+        var tot = 0, coefs = 0;
+        notes.forEach(function(n) {
+            var r = ratio(n.note, n.sur);
+            var c = parseFloat(String(n.coef || '1').replace(',','.')) || 1;
+            if (r !== null) { tot += r * 20 * c; coefs += c; }
+        });
+        if (coefs > 0) {
+            var moy = (tot / coefs).toFixed(1).replace('.',',');
+            var pct = Math.min(100, Math.round(parseFloat(moy.replace(',','.')) / 20 * 100));
+            if (moyEl)  moyEl.textContent  = moy + '/20';
+            if (fillEl) fillEl.style.width = pct + '%';
+            if (trendEl && notes.length >= 4) {
+                var sorted = notes.slice().sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
+                var first3 = sorted.slice(0, 3), last3 = sorted.slice(-3);
+                var avg = function(arr) {
+                    var s=0, n=0;
+                    arr.forEach(function(x){ var r=ratio(x.note,x.sur); if(r!==null){s+=r;n++;} });
+                    return n ? s/n : 0;
+                };
+                var up = avg(last3) >= avg(first3);
+                trendEl.textContent = up ? '↗' : '↘';
+                trendEl.className = 'nb-trend ' + (up ? 'c-ok' : 'c-bad');
+            }
+        }
+    }
+
+    /* ─── DERNIÈRES NOTES (onglet) ────────────────────── */
+    function renderDernieresNotes(notes, data) {
+        var dnEl = el('pjwdn' + ID);
+        if (!dnEl) return;
+        if (!VIS.notes) { var pane = el('notes' + ID); if (pane) pane.style.display='none'; return; }
+        if (!notes || !Array.isArray(notes) || !notes.length) {
+            dnEl.innerHTML = '<div class="p-empty">Aucune note</div>';
+            return;
+        }
+        function dateKey(d) {
+            var p = (d || '').split('/');
+            return p.length === 3 ? p[2] + p[1] + p[0] : (d || '');
+        }
+        var sorted = notes.slice()
+            .sort(function(a,b){ return dateKey(b.date).localeCompare(dateKey(a.date)); })
+            .slice(0, 10);
+        dnEl.innerHTML = sorted.map(function(n) {
+            var r   = ratio(n.note, n.sur);
+            var mat = (n.cours || '–');
+            if (mat.indexOf(' > ') !== -1) mat = mat.split(' > ').pop();
+            var dateStr = (n.date || '').slice(0, 5);
+            var color = subjectColor(mat);
+            var mc = n.moyenne_classe ? 'cl.' + esc(n.moyenne_classe) : '';
+            return (
+                '<div class="dn-item">' +
+                    '<div class="dn-bar" style="background:' + esc(color) + '"></div>' +
+                    '<div class="dn-content">' +
+                        '<span class="dn-d">' + esc(dateStr) + '</span>' +
+                        '<span class="dn-m">' + esc(mat)     + '</span>' +
+                        '<span class="dn-v ' + gradeClass(r) + '">' + esc((n.note || '?') + (n.sur ? '/' + n.sur : '')) + '</span>' +
+                        (mc ? '<span class="dn-mc">' + mc + '</span>' : '') +
+                    '</div>' +
+                '</div>'
+            );
+        }).join('');
+    }
+
+    /* ─── ABSENCES ────────────────────────────────────── */
+    function renderAbsences(d) {
+        var container = el('pjwabs' + ID);
+        if (!container) return;
+        if (!VIS.absences) {
+            var pane = el('abs' + ID); if (pane) pane.style.display = 'none';
+            return;
+        }
+        var list  = d.absences  || [];
+        var count = d.nb_absences != null ? d.nb_absences : list.length;
+        var colorClass = count === 0 ? 'c-ok' : 'c-bad';
+        var summary = '<div class="vs-summary">' +
+            '<span class="vs-summary-count ' + colorClass + '">' + count + '</span>' +
+            '<span class="vs-summary-lbl">' + (count <= 1 ? 'absence' : 'absences') + ' cette année</span>' +
+            '</div>';
+        if (!list.length) {
+            container.innerHTML = summary + '<div class="p-empty">Aucune absence</div>';
+            return;
+        }
+        var items = list.map(function(a) {
+            var justTag = a.justifie
+                ? '<span class="vs-tag vs-tag-ok">Justifiée</span>'
+                : '<span class="vs-tag vs-tag-nok">Non justifiée</span>';
+            var duree = [];
+            if (a.nb_jours)  duree.push(a.nb_jours  + 'j');
+            if (a.nb_heures) duree.push(a.nb_heures + 'h');
+            var dureeStr = duree.join(' ');
+            var row2 = [a.raison, dureeStr].filter(Boolean).join(' · ');
+            return '<div class="vs-item">' +
+                '<div class="vs-bar" style="background:#e74c3c"></div>' +
+                '<div class="vs-content">' +
+                    '<div class="vs-row1">' +
+                        '<span class="vs-date">' + esc(a.date_debut || '') + '</span>' +
+                        '<span class="vs-info">' + esc(a.date_fin ? '→ ' + a.date_fin : '') + '</span>' +
+                        justTag +
+                    '</div>' +
+                    (row2 ? '<div class="vs-row2">' + esc(row2) + '</div>' : '') +
+                '</div>' +
+            '</div>';
+        }).join('');
+        container.innerHTML = summary + items;
+    }
+
+    /* ─── RETARDS ─────────────────────────────────────── */
+    function renderRetards(d) {
+        var container = el('pjwret' + ID);
+        if (!container) return;
+        if (!VIS.retards) {
+            var pane = el('ret' + ID); if (pane) pane.style.display = 'none';
+            return;
+        }
+        var list  = d.retards  || [];
+        var count = d.nb_retards != null ? d.nb_retards : list.length;
+        var colorClass = count === 0 ? 'c-ok' : 'c-warn';
+        var summary = '<div class="vs-summary">' +
+            '<span class="vs-summary-count ' + colorClass + '">' + count + '</span>' +
+            '<span class="vs-summary-lbl">' + (count <= 1 ? 'retard' : 'retards') + ' cette année</span>' +
+            '</div>';
+        if (!list.length) {
+            container.innerHTML = summary + '<div class="p-empty">Aucun retard</div>';
+            return;
+        }
+        var items = list.map(function(r) {
+            var justTag = r.justifie
+                ? '<span class="vs-tag vs-tag-ok">Justifié</span>'
+                : '<span class="vs-tag vs-tag-nok">Non justifié</span>';
+            var dureeStr = r.nb_minutes ? r.nb_minutes + ' min' : '';
+            var row2 = [r.justification, r.raison].filter(Boolean).join(' · ');
+            return '<div class="vs-item">' +
+                '<div class="vs-bar" style="background:#e67e22"></div>' +
+                '<div class="vs-content">' +
+                    '<div class="vs-row1">' +
+                        '<span class="vs-date">' + esc(r.date || '') + '</span>' +
+                        '<span class="vs-info">' + esc(dureeStr) + '</span>' +
+                        justTag +
+                    '</div>' +
+                    (row2 ? '<div class="vs-row2">' + esc(row2) + '</div>' : '') +
+                '</div>' +
+            '</div>';
+        }).join('');
+        container.innerHTML = summary + items;
+    }
+
+    /* ─── PUNITIONS ───────────────────────────────────── */
+    function renderPunitions(d) {
+        var container = el('pjwpun' + ID);
+        if (!container) return;
+        if (!VIS.punitions) {
+            var pane = el('pun' + ID); if (pane) pane.style.display = 'none';
+            return;
+        }
+        var list  = d.punitions  || [];
+        var count = d.nb_punitions != null ? d.nb_punitions : list.length;
+        var colorClass = count === 0 ? 'c-ok' : 'c-bad';
+        var summary = '<div class="vs-summary">' +
+            '<span class="vs-summary-count ' + colorClass + '">' + count + '</span>' +
+            '<span class="vs-summary-lbl">' + (count <= 1 ? 'punition' : 'punitions') + ' cette année</span>' +
+            '</div>';
+        if (!list.length) {
+            container.innerHTML = summary + '<div class="p-empty">Aucune punition</div>';
+            return;
+        }
+        var items = list.map(function(p) {
+            var dureeStr = p.duree ? p.duree + ' min' : '';
+            var typeStr  = [p.type, dureeStr].filter(Boolean).join(' · ');
+            var schedule = '';
+            if (p.schedule && p.schedule.length) {
+                schedule = p.schedule.map(function(s) {
+                    return s.start + (s.duree ? ' (' + s.duree + ' min)' : '');
+                }).join(', ');
+            }
+            return '<div class="vs-item">' +
+                '<div class="vs-bar" style="background:#c0392b"></div>' +
+                '<div class="vs-content">' +
+                    '<div class="vs-row1">' +
+                        '<span class="vs-date">' + esc(p.date_court || p.date || '') + '</span>' +
+                        '<span class="vs-info">' + esc(typeStr) + '</span>' +
+                    '</div>' +
+                    (p.raison       ? '<div class="vs-row2">' + esc(p.raison)       + '</div>' : '') +
+                    (p.circonstances? '<div class="vs-row2">' + esc(p.circonstances) + '</div>' : '') +
+                    (p.travail      ? '<div class="vs-row2">Travail : ' + esc(p.travail) + '</div>' : '') +
+                    (schedule       ? '<div class="vs-row2">📅 ' + esc(schedule)    + '</div>' : '') +
+                    (p.donneur      ? '<div class="vs-row2">Donné par : ' + esc(p.donneur) + '</div>' : '') +
+                '</div>' +
+            '</div>';
+        }).join('');
+        container.innerHTML = summary + items;
+    }
+
+    /* ─── DEVOIRS (onglet) ────────────────────────────── */
+    function renderDevoirs(d) {
+        var dvEl = el('pjwdv' + ID);
+        if (!dvEl) return;
+        if (!VIS.devoirs) { var pane = el('dv' + ID); if (pane) pane.style.display='none'; return; }
+
+        function devoirHtml(list) {
+            return list.map(function(dv) {
+                var done    = !!dv.done;
+                var color   = dv.color || subjectColor(dv.title);
+                var tooltip = escAttr((dv.title || '') + (dv.description ? ' — ' + dv.description : ''));
+                var subject = (done ? '✓ ' : '') + esc(dv.title || '–');
+                var filesHtml = '';
+                if (dv.fichiers && dv.fichiers.length) {
+                    filesHtml = '<div class="dv-files">' +
+                        dv.fichiers.map(function(f) {
+                            var icon = f.type === 0 ? '🔗' : '📎';
+                            return '<a class="dv-file-link" href="' + escAttr(f.url) + '" target="_blank" title="' + escAttr(f.nom) + '">' +
+                                icon + ' ' + esc(f.nom) + '</a>';
+                        }).join('') +
+                    '</div>';
+                }
+                return (
+                    '<div class="dv-item' + (done ? ' dv-done' : '') + '" title="' + tooltip + '">' +
+                        '<div class="dv-bar" style="background:' + esc(color) + '"></div>' +
+                        '<div class="dv-content">' +
+                            '<div class="dv-subject">' + subject + '</div>' +
+                            (dv.description ? '<div class="dv-desc">' + esc(dv.description) + '</div>' : '') +
+                            filesHtml +
+                        '</div>' +
+                    '</div>'
+                );
+            }).join('');
+        }
+
+        var auj = (d.devoirs        || []);
+        var dem = (d.devoirs_demain || []);
+        var html = '';
+        if (auj.length) html += '<div class="dv-section-title">Aujourd\'hui</div>' + devoirHtml(auj);
+        if (dem.length) html += '<div class="dv-section-title">Demain</div>'       + devoirHtml(dem);
+        dvEl.innerHTML = html || '<div class="p-empty">Aucun devoir</div>';
+    }
+
+    /* ─── ONGLETS : gestion des clics ─────────────────── */
+    function initTabs() {
+        var tabsEl = el('pjwtabs' + ID);
+        if (!tabsEl) return;
+        tabsEl.addEventListener('click', function(e) {
+            var btn = e.target.closest('.tab-btn');
+            if (!btn) return;
+            var target = btn.getAttribute('data-tab');
+            tabsEl.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+            tabsEl.querySelectorAll('.tab-pane').forEach(function(p) { p.classList.remove('active'); });
+            btn.classList.add('active');
+            var pane = el(target);
+            if (pane) pane.classList.add('active');
+        });
+    }
+
+    /* ─── BADGES ONGLETS ──────────────────────────────── */
+    function setBadge(elId, count) {
+        var b = el(elId);
+        if (!b) return;
+        var n = parseInt(count, 10);
+        if (!isNaN(n) && n > 0) {
+            b.textContent = n;
+            b.classList.add('visible');
+        } else {
+            b.classList.remove('visible');
+        }
+    }
+
+    /* ─── RENDU GLOBAL ────────────────────────────────── */
+    function render(d, ts) {
+        if (!d || typeof d !== 'object') return;
+        renderHeader(d, ts);
+        renderEDT(d);
+        renderNotesBar(d.notes);
+        renderDernieresNotes(d.notes, d);
+        renderAbsences(d);
+        renderRetards(d);
+        renderPunitions(d);
+        renderDevoirs(d);
+        // Masquer les boutons d'onglets des sections non visibles
+        var tabsEl = el('pjwtabs' + ID);
+        if (tabsEl) {
+            var btnMap = { 'abs': VIS.absences, 'ret': VIS.retards, 'pun': VIS.punitions,
+                           'notes': VIS.notes, 'dv': VIS.devoirs };
+            tabsEl.querySelectorAll('.tab-btn').forEach(function(btn) {
+                var tab = (btn.getAttribute('data-tab') || '').replace(ID, '');
+                if (btnMap.hasOwnProperty(tab) && !btnMap[tab]) {
+                    btn.style.display = 'none';
+                }
+            });
+        }
+        // Badges sur les onglets
+        setBadge('pjwbabs' + ID, d.nb_absences);
+        setBadge('pjwbret' + ID, d.nb_retards);
+        setBadge('pjwbpun' + ID, d.nb_punitions);
+        var dvCount = ((d.devoirs || []).concat(d.devoirs_demain || [])).filter(function(dv){ return !dv.done; }).length;
+        setBadge('pjwbdv' + ID, dvCount);
+    }
+
+    /* ─── INITIALISATION ──────────────────────────────── */
+    initTabs();
+
+    if (D && Object.keys(D).length > 0) {
+        render(D, D.last_update || '');
+    }
+
+    /* ─── MISE À JOUR AUTOMATIQUE ─────────────────────── */
+    if (LAST_LOGIN_CMD_ID) {
+        jeedom.cmd.addUpdateFunction(LAST_LOGIN_CMD_ID, function(_opts) {
+            $.ajax({
+                type: 'POST',
+                url: 'plugins/ProJote/core/ajax/ProJote.ajax.php',
+                data: { action: 'GetWidgetData', eqlogic: EID },
+                dataType: 'json',
+                success: function(r) {
+                    if (r && r.state === 'ok' && r.result) {
+                        render(r.result, new Date().toISOString());
+                    }
+                }
+            });
+        });
+    }
+
+})();
+</script>

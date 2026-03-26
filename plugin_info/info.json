@@ -5,7 +5,7 @@
 	"description": {
 		"fr_FR": "Plugin destinée à récupérer les informations de Pronote"
 	},
-	"licence": "AGPL",
+	"licence": "Apache",
 	"author": "Aldarande",
 	"require": "4.3",
 	"category": "organization",
@@ -13,7 +13,7 @@
 	"hasOwnDeamon": true,
 	"maxDependancyInstallTime": 60,
 	"changelog": "https://aldarande.github.io/ProJote/#language#/index.html#Version",
-	"documentation": "https://aldarande.github.io/ProJote/#language#/index.html",
+	"documentation": "/plugins/ProJote/docs/#language#/index.html",
 	"language": [
 		"fr_FR"
 	],

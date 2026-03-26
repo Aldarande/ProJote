@@ -1,79 +1,61 @@
 <div class="cmd cmd-widget #history#" data-type="info" data-subtype="string" data-template="note" data-cmd_id="#id#"
     data-cmd_uid="#uid#" data-version="#version#" data-eqLogic_id="">
     <div class="content-xs">
-        <div class="cmdName #hide_name#">#name_display#
-            <div id="date-note-#id#" class="date-item" style="font-style: italic; font-weight: bold;"></div>
-            <span class="value" style="max-width: 245px; max-height: 350px;">#value#</span>
-        </div>
+        <div class="cmdName #hide_name#">#name_display#</div>
+        <div class="projote-widget-container value" style="max-width: 245px; max-height: 350px;">#value#</div>
     </div>
-    <style>
-        .note-item {
-            display: flex;
-            flex-direction: column;
-            position: relative;
-            margin-bottom: 10px;
-            padding: 10px;
-            border-radius: 5px;
-            background: rgba(255, 255, 255, 0.07);
-            position: relative;
-
-        }
-    </style>
-    <div id="note-list-#id#"></div>
+    
     <script>
         jeedom.cmd.addUpdateFunction('#id#', function (_options) {
-            if (is_object(cmd = document.querySelector('.cmd[data-cmd_uid="#uid#"]'))) {
-                const noteData = _options.value;
-                if (!noteData || noteData.trim() === '' || noteData === '[]' || noteData === 'Pas de notes retournées' || noteData === 'Pas de dernière note retournée') {
-                    cmd.querySelector('.value').innerHTML = '<div style="color:gray;">Pas de cours</div>';
-                    return;
-                } else {
-                    try {
-                        const notes = JSON.parse(noteData);
-                        const noteHTML = Array.isArray(notes) ? notes.map(note => {
-                            // Conversion sécurisée des notes avec virgule
-                            let noteVal = parseFloat((note.note ?? '').toString().replace(',', '.'));
-                            let surVal = parseFloat((note.sur ?? '').toString().replace(',', '.'));
-                            let greenHeight = (!isNaN(noteVal) && !isNaN(surVal) && surVal > 0) ? (noteVal / surVal * 100) : 0;
-                            return `
-                                <div class="note-item" style="position:relative;  margin-bottom:10px;">
-                                    <!-- Bande rouge sur toute la hauteur -->
-                                    <div style="background:red; width:10px; height:100%; position:absolute; left:0; top:0; border-radius:5px 0 0 5px; z-index:0;"></div>
-                                    <!-- Bande verte, hauteur proportionnelle à la note -->
-                                    <div style="
-                                        background:#4caf50;
-                                        width:10px;
-                                        height:${greenHeight}%;
-                                        position:absolute;
-                                        left:0;
-                                        bottom:0;
-                                        border-radius:0 0 0 5px; /* arrondi seulement en bas à gauche */
-                                        z-index:1;
-                                    "></div>
-                                    <div style="margin-left:16px; position:relative; z-index:2;">
-                                        <div class="cours" style="font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block;">
-                                        ${note.cours ?? ''}
-                                        </div>
-                                        <div class="date_note" style="font-size:0.8em;">${note.date ?? ''}</div>
-                                        <div class="note" style="font-size:1.1em;font-style:italic;">
-                                            ${(note.note ?? '')}${note.sur ? ' / ' + note.sur : ''}
-                                        </div>
-                                        <div class="commentaire" style="font-size:0.9em; color:gray;">
-                                            ${note.commentaire ?? ''}
-                                        </div>
-                                        <div class="optionnel-bonus" style="font-size:0.9em; color:gray;">
-                                        ${note.optionnel ? 'optionnel' : ''} ${note.bonus ? 'bonus' : ''}
-                                        </div>  
-                                    </div>
+            const cmd = document.querySelector('.cmd[data-cmd_uid="#uid#"]');
+            if (!is_object(cmd)) {
+                return;
+            }
+
+            const noteData = _options.value;
+            const container = cmd.querySelector('.value');
+
+            if (!noteData || noteData.trim() === '' || noteData === '[]' || noteData === 'Pas de notes retournées' || noteData === 'Pas de dernière note retournée') {
+                container.innerHTML = '<div style="color:gray;">Aucune note à afficher.</div>';
+                return;
+            }
+
+            try {
+                const notes = JSON.parse(noteData);
+                const noteHTML = Array.isArray(notes) ? notes.map(note => {
+                    const noteVal = parseFloat((note.note ?? '').toString().replace(',', '.'));
+                    const surVal = parseFloat((note.sur ?? '').toString().replace(',', '.'));
+                    const greenHeight = (!isNaN(noteVal) && !isNaN(surVal) && surVal > 0) ? (noteVal / surVal * 100) : 0;
+                    
+                    let optionalBonus = [note.optionnel ? 'optionnel' : '', note.bonus ? 'bonus' : ''].filter(Boolean).join(' ');
+
+                    return `
+                        <div class="projote-item projote-note-item">
+                            <div class="projote-grade-bar">
+                                <div class="projote-grade-bar-inner" style="height:${greenHeight}%;"></div>
+                            </div>
+                            <div class="projote-item-header">${note.cours ?? ''}</div>
+                            <div class="projote-item-meta">
+                                <span>${note.date ?? ''}</span>
+                                ${optionalBonus ? `<span> - ${optionalBonus}</span>` : ''}
+                            </div>
+                            <div class="projote-item-body">
+                                <div class="note" style="font-size:1.1em; font-style:italic;">
+                                    ${(note.note ?? '')}${note.sur ? ' / ' + note.sur : ''}
                                 </div>
-                            `;
-                        }).join('') : '<div style="color:gray;">Aucun note</div>';
-                        cmd.querySelector('.value').innerHTML = noteHTML;
-                    } catch (e) {
-                        cmd.querySelector('.value').innerHTML = '<div style="color:red;">Erreur de données note</div>';
-                        console.error("Erreur lors du parsing des données JSON :", e);
-                    }
-                }
+                                <div class="commentaire" style="font-size:0.9em;">
+                                    ${note.commentaire ?? ''}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('') : '<div style="color:gray;">Aucune note.</div>';
+                
+                container.innerHTML = noteHTML;
+
+            } catch (e) {
+                container.innerHTML = '<div style="color:red;">Erreur de données de note.</div>';
+                console.error("Erreur lors du parsing des données JSON :", e);
             }
         });
 

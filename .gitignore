@@ -1,11 +1,27 @@
-# Ignore data directory
+# Répertoire de données runtime (JSON élèves)
 data/
-Parle en francais/
 
-# Ignore Python virtual environment directory
-resources/python_venv
+# Environnement virtuel Python
+resources/python_venv/
+
+# Fichiers compilés Python (platform-specific, ne jamais versionner)
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+
+# Fichiers de travail et de test
+resources/ProJoted/test_token_persistence.py
+
+# Configuration IDE et outils locaux
 .vscode/
 .venv/
 .cspell/
+.continue/
+.claude/
+.github/
+
+# Fichiers locaux divers
+rules/
+Parle en francais/
+resources/cspell.json
 plugin_info/ProJote_icon.png
-resources/ProJoted\jeedom/__pycache__

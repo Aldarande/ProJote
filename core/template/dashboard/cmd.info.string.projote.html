@@ -1,0 +1,552 @@
+<div class="cmd cmd-widget #history#" data-type="info" data-subtype="string" data-template="projote"
+    data-cmd_id="#id#" data-cmd_uid="#uid#" data-version="#version#" data-eqLogic_id="">
+
+<style>
+/* ═══════════════════════════════════════════════════════
+   Widget ProJote — Feuille de style complète
+   Toutes les règles sont préfixées par .pjw-#id# pour
+   éviter tout conflit avec d'autres widgets Jeedom.
+   ═══════════════════════════════════════════════════════ */
+.pjw-#id# {
+    font-family: inherit;
+    color: inherit;
+    font-size: 13px;
+    line-height: 1.4;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 4px 2px;
+}
+
+/* ── En-tête : photo centrée + nom ─────────────────── */
+.pjw-#id# .ph {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    margin-bottom: 10px;
+}
+.pjw-#id# .ph-av {
+    width: 56px; height: 56px; border-radius: 50%;
+    overflow: hidden; flex-shrink: 0;
+    background: rgba(128,128,128,.15);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 700;
+}
+.pjw-#id# .ph-av img { width:100%; height:100%; object-fit:cover; display:block; }
+.pjw-#id# .ph-name {
+    font-weight: 800; font-size: 15px;
+    text-transform: uppercase; letter-spacing: .5px;
+    text-align: center;
+}
+.pjw-#id# .ph-class  { font-size: 11px; opacity: .55; text-align: center; }
+.pjw-#id# .ph-school { font-size: 11px; opacity: .55; text-align: center; }
+.pjw-#id# .ph-ts     { font-size: 9px;  opacity: .3;  text-align: center; }
+
+/* ── Vie scolaire : badges circulaires ─────────────── */
+.pjw-#id# .vs {
+    margin-bottom: 10px;
+}
+.pjw-#id# .vs-title {
+    font-size: 9px; font-weight: 700; opacity: .4;
+    text-align: center; text-transform: uppercase;
+    letter-spacing: 1px; margin-bottom: 6px;
+}
+.pjw-#id# .vs-badges {
+    display: flex; justify-content: space-around; gap: 2px;
+}
+.pjw-#id# .vs-badge {
+    display: flex; flex-direction: column;
+    align-items: center; gap: 3px; flex: 1;
+}
+.pjw-#id# .vs-circle {
+    width: 26px; height: 26px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 800; color: #fff;
+}
+.pjw-#id# .vs-c-abs { background: #e74c3c; }
+.pjw-#id# .vs-c-ret { background: #e67e22; }
+.pjw-#id# .vs-c-pun { background: #d35400; }
+.pjw-#id# .vs-c-dv  { background: #8e44ad; }
+.pjw-#id# .vs-lbl   { font-size: 8px; opacity: .55; text-align: center; line-height: 1.2; }
+
+/* ── Séparateur ─────────────────────────────────────── */
+.pjw-#id# hr {
+    border: none; border-top: 1px solid rgba(128,128,128,.15);
+    margin: 0 0 10px;
+}
+
+/* ── EDT : bloc jour ────────────────────────────────── */
+.pjw-#id# .edt-block { margin-bottom: 10px; }
+.pjw-#id# .edt-header {
+    display: flex; align-items: baseline;
+    gap: 6px; margin-bottom: 5px;
+}
+.pjw-#id# .edt-day-lbl {
+    font-size: 9px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .8px;
+    opacity: .4; flex-shrink: 0; min-width: 62px;
+}
+.pjw-#id# .edt-range {
+    font-size: 13px; font-weight: 600;
+    letter-spacing: -.2px; white-space: nowrap;
+}
+
+/* ── EDT : grille de cours ──────────────────────────── */
+.pjw-#id# .edt-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3px;
+}
+/* Cours normal : pill colorée */
+.pjw-#id# .edt-pill {
+    border-radius: 5px; padding: 3px 6px;
+    color: #fff; overflow: hidden;
+    display: flex; flex-direction: column; justify-content: center;
+    min-height: 30px;
+}
+.pjw-#id# .edt-pill-t  { font-size: 9px;  font-weight: 400; opacity: .85; margin-bottom: 1px; }
+.pjw-#id# .edt-pill-n  { font-size: 11px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pjw-#id# .edt-pill-s  { font-size: 9px;  opacity: .75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Cours annulé : bullet barré, pleine largeur */
+.pjw-#id# .edt-canceled {
+    grid-column: 1 / -1; /* occupe les 2 colonnes */
+    display: flex; align-items: center; gap: 5px;
+    font-size: 11px; padding: 2px 2px; opacity: .5;
+}
+.pjw-#id# .edt-canceled-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    flex-shrink: 0; background: currentColor;
+}
+.pjw-#id# .edt-canceled-tx { text-decoration: line-through; }
+
+/* ── Barre de moyenne ───────────────────────────────── */
+.pjw-#id# .nb {
+    margin-bottom: 10px;
+}
+.pjw-#id# .nb-header {
+    display: flex; align-items: center;
+    gap: 5px; margin-bottom: 4px;
+}
+.pjw-#id# .nb-lbl     { font-size: 11px; font-weight: 700; flex-shrink: 0; }
+.pjw-#id# .nb-sublbl  { font-size: 10px; opacity: .45; flex: 1; }
+.pjw-#id# .nb-score   { font-size: 12px; font-weight: 700; flex-shrink: 0; }
+.pjw-#id# .nb-trend   { font-size: 11px; opacity: .5; }
+/* Barre dégradée rouge → jaune → vert */
+.pjw-#id# .nb-track {
+    height: 6px; border-radius: 3px; overflow: hidden;
+    background: linear-gradient(to right, #e74c3c 0%, #f39c12 40%, #f1c40f 65%, #2ecc71 100%);
+    position: relative;
+}
+/* Masque gris qui cache la partie "non atteinte" depuis la droite */
+.pjw-#id# .nb-mask {
+    position: absolute; right: 0; top: 0; bottom: 0;
+    background: rgba(128,128,128,.25);
+    border-radius: 0 3px 3px 0;
+    transition: width .5s;
+}
+
+/* ── Bas de widget : devoirs + dernières notes ──────── */
+.pjw-#id# .bottom {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+.pjw-#id# .bc-title {
+    font-size: 9px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .8px;
+    opacity: .4; margin-bottom: 5px;
+}
+/* Devoir : ligne à puce */
+.pjw-#id# .dv-item {
+    display: flex; align-items: flex-start;
+    gap: 5px; font-size: 11px; padding: 1px 0;
+    line-height: 1.35;
+}
+.pjw-#id# .dv-dot {
+    width: 5px; height: 5px; border-radius: 50%;
+    background: currentColor; opacity: .4;
+    flex-shrink: 0; margin-top: 4px;
+}
+.pjw-#id# .dv-done { opacity: .35; text-decoration: line-through; }
+/* Dernière note : date + matière + note */
+.pjw-#id# .dn-item {
+    display: flex; align-items: baseline;
+    gap: 3px; font-size: 11px; padding: 1px 0;
+    line-height: 1.35;
+}
+.pjw-#id# .dn-d { font-size: 9px; opacity: .4; flex-shrink: 0; }
+.pjw-#id# .dn-m { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pjw-#id# .dn-v { font-weight: 700; flex-shrink: 0; font-size: 11px; }
+
+/* ── Couleurs sémantiques ───────────────────────────── */
+.pjw-#id# .c-ok   { color: #27ae60; }
+.pjw-#id# .c-warn { color: #e67e22; }
+.pjw-#id# .c-bad  { color: #e74c3c; }
+
+/* ── État vide ──────────────────────────────────────── */
+.pjw-#id# .p-empty {
+    text-align: center; padding: 6px 0;
+    font-size: 10px; opacity: .3;
+}
+</style>
+
+<div class="pjw-#id#">
+
+    <!-- ══ EN-TÊTE ══════════════════════════════════════ -->
+    <div class="ph">
+        <div class="ph-av" id="pjwav#id#">?</div>
+        <div class="ph-name"  id="pjwnm#id#">–</div>
+        <div class="ph-class" id="pjwcl#id#"></div>
+        <div class="ph-school"id="pjwsc#id#"></div>
+        <span class="ph-ts"   id="pjwts#id#"></span>
+    </div>
+
+    <!-- ══ VIE SCOLAIRE ══════════════════════════════════ -->
+    <div class="vs">
+        <div class="vs-title">Vie Scolaire</div>
+        <div class="vs-badges">
+            <div class="vs-badge">
+                <div class="vs-circle vs-c-abs" id="pjwn-abs#id#">–</div>
+                <div class="vs-lbl">Absences</div>
+            </div>
+            <div class="vs-badge">
+                <div class="vs-circle vs-c-ret" id="pjwn-ret#id#">–</div>
+                <div class="vs-lbl">Retards</div>
+            </div>
+            <div class="vs-badge">
+                <div class="vs-circle vs-c-pun" id="pjwn-pun#id#">–</div>
+                <div class="vs-lbl">Punitions</div>
+            </div>
+            <div class="vs-badge">
+                <div class="vs-circle vs-c-dv" id="pjwn-dv#id#">–</div>
+                <div class="vs-lbl">Devoirs<br>non faits</div>
+            </div>
+        </div>
+    </div>
+
+    <hr>
+
+    <!-- ══ EDT ═══════════════════════════════════════════ -->
+    <div id="pjwedt#id#">
+        <!-- Aujourd'hui -->
+        <div class="edt-block">
+            <div class="edt-header">
+                <div class="edt-day-lbl">Aujourd'hui</div>
+                <div class="edt-range" id="pjwrng-auj#id#"></div>
+            </div>
+            <div id="pjwec-auj#id#"><div class="p-empty">Pas de cours aujourd'hui</div></div>
+        </div>
+        <!-- Prochain jour -->
+        <div class="edt-block">
+            <div class="edt-header">
+                <div class="edt-day-lbl" id="pjwlbl-dem#id#">Demain</div>
+                <div class="edt-range" id="pjwrng-dem#id#"></div>
+            </div>
+            <div id="pjwec-dem#id#"><div class="p-empty">Pas de cours</div></div>
+        </div>
+    </div>
+
+    <hr>
+
+    <!-- ══ BARRE MOYENNE ══════════════════════════════════ -->
+    <div class="nb">
+        <div class="nb-header">
+            <span class="nb-lbl">Notes</span>
+            <span class="nb-sublbl">Moyenne Générale</span>
+            <span class="nb-score" id="pjwmoy#id#">–</span>
+            <span class="nb-trend" id="pjwtrend#id#"></span>
+        </div>
+        <div class="nb-track">
+            <div class="nb-mask" id="pjwnbm#id#" style="width:100%"></div>
+        </div>
+    </div>
+
+    <hr>
+
+    <!-- ══ DEVOIRS + DERNIÈRES NOTES ══════════════════════ -->
+    <div class="bottom">
+        <div>
+            <div class="bc-title">Devoirs</div>
+            <div id="pjwdv#id#"><div class="p-empty">Aucun</div></div>
+        </div>
+        <div>
+            <div class="bc-title">Dernières notes</div>
+            <div id="pjwdn#id#"><div class="p-empty">Aucune</div></div>
+        </div>
+    </div>
+
+</div><!-- .pjw-#id# -->
+
+<script>
+(function () {
+    'use strict';
+    var ID = '#id#';  // Remplacé par Jeedom avec l'ID réel de la commande
+    var D  = null;    // Stocke les dernières données reçues (pour re-rendu si besoin)
+
+    /* ─── Utilitaires DOM ─────────────────────────────── */
+    function el(id) { return document.getElementById(id); }
+
+    /** Échappe les caractères HTML dangereux (protection XSS) */
+    function esc(s) {
+        return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    /** Calcule le ratio note/sur (ex: 14/20 = 0.7). Retourne null si impossible. */
+    function ratio(v, sur) {
+        var a = parseFloat(String(v   || '').replace(',','.'));
+        var b = parseFloat(String(sur || '20').replace(',','.'));
+        return (!isNaN(a) && !isNaN(b) && b > 0) ? a / b : null;
+    }
+
+    /** Retourne la classe CSS de couleur selon le ratio (vert/orange/rouge) */
+    function gradeClass(r) {
+        if (r === null) return '';
+        return r >= 0.70 ? 'c-ok' : r >= 0.50 ? 'c-warn' : 'c-bad';
+    }
+
+    /**
+     * Convertit un horaire Pronote "0815" → "08:15".
+     * Pronote stocke les heures sans séparateur (4 chiffres).
+     */
+    function fmtH(h) {
+        var s = String(h || '');
+        if (s.length === 4) return s.slice(0,2) + ':' + s.slice(2);
+        return s;
+    }
+
+    /** Formate la date de mise à jour (ex: "2025-03-20 08:15:00" → "Màj 08:15") */
+    function fmtTs(dt) {
+        try {
+            var d = new Date(dt);
+            return 'Màj ' + d.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+        } catch(e) { return ''; }
+    }
+
+    /**
+     * Calcule la plage horaire d'une liste de cours.
+     * Ex: [08:15, 10:15, 11:15] → "08:15 — 12:00"
+     * Retourne une chaîne vide si aucun cours.
+     */
+    function timeRange(courses) {
+        if (!courses || !courses.length) return '';
+        var starts = [], ends = [];
+        courses.forEach(function(c) {
+            if (c.heure)     starts.push(c.heure);
+            if (c.heure_fin) ends.push(c.heure_fin);
+        });
+        if (!starts.length) return '';
+        starts.sort(); ends.sort();
+        return fmtH(starts[0]) + ' \u2014 ' + fmtH(ends[ends.length - 1]);
+    }
+
+    /* ─── EN-TÊTE ─────────────────────────────────────── */
+    function renderHeader(d, ts) {
+        var nm = el('pjwnm' + ID); if (nm) nm.textContent = (d.eleve || '–').toUpperCase();
+        var cl = el('pjwcl' + ID); if (cl) cl.textContent = d.classe       || '';
+        var sc = el('pjwsc' + ID); if (sc) sc.textContent = d.etablissement || '';
+        var ts_ = el('pjwts' + ID); if (ts_ && ts) ts_.textContent = fmtTs(ts);
+        var av  = el('pjwav' + ID);
+        if (av) {
+            if (d.photo) {
+                av.innerHTML = '<img src="' + esc(d.photo) + '" alt="">';
+            } else {
+                /* Initiales si pas de photo */
+                av.textContent = (d.eleve || '?').split(' ')
+                    .map(function(w){ return w[0]; }).join('').slice(0,2).toUpperCase();
+            }
+        }
+    }
+
+    /* ─── BADGES VIE SCOLAIRE ─────────────────────────── */
+    function renderStats(d) {
+        var abs = el('pjwn-abs' + ID); if (abs) abs.textContent = d.nb_absences  ?? '–';
+        var ret = el('pjwn-ret' + ID); if (ret) ret.textContent = d.nb_retards   ?? '–';
+        var pun = el('pjwn-pun' + ID); if (pun) pun.textContent = d.nb_punitions ?? '–';
+        var dv  = el('pjwn-dv'  + ID); if (dv)  dv.textContent  = d.nb_devoirs_nf ?? '–';
+    }
+
+    /* ─── EDT ─────────────────────────────────────────── */
+    /**
+     * Génère le HTML d'une grille de cours (2 colonnes).
+     * Cours normaux → pills colorées.
+     * Cours annulés → ligne texte barrée, pleine largeur (span 2 col).
+     */
+    function edtGridHtml(courses) {
+        if (!courses || !courses.length) return '<div class="p-empty">Pas de cours</div>';
+        return '<div class="edt-grid">' + courses.map(function(c) {
+            var canceled = !!c.annulation;
+            var time     = fmtH(c.heure);
+            var name     = c.cours || '';
+            if (canceled) {
+                /* Cours annulé : bullet + texte barré, occupe les 2 colonnes */
+                return (
+                    '<div class="edt-canceled">' +
+                        '<div class="edt-canceled-dot"></div>' +
+                        '<div class="edt-canceled-tx">' + esc(time) + ' ' + esc(name) + '</div>' +
+                    '</div>'
+                );
+            }
+            /* Cours normal : pill avec couleur Pronote */
+            var color = c.background_color || '#7f8c8d';
+            var room  = c.salle ? '<div class="edt-pill-s">' + esc(c.salle) + '</div>' : '';
+            return (
+                '<div class="edt-pill" style="background:' + esc(color) + '">' +
+                    '<div class="edt-pill-t">' + esc(time) + '</div>' +
+                    '<div class="edt-pill-n">' + esc(name) + '</div>' +
+                    room +
+                '</div>'
+            );
+        }).join('') + '</div>';
+    }
+
+    function renderEDT(d) {
+        /* Aujourd'hui */
+        var rng_auj = el('pjwrng-auj' + ID);
+        var ec_auj  = el('pjwec-auj'  + ID);
+        var courses_auj = d.edt_aujourdhui || [];
+        if (rng_auj) rng_auj.textContent = timeRange(courses_auj);
+        if (ec_auj)  ec_auj.innerHTML    = edtGridHtml(courses_auj);
+
+        /* Prochain jour */
+        var rng_dem = el('pjwrng-dem' + ID);
+        var ec_dem  = el('pjwec-dem'  + ID);
+        var lbl_dem = el('pjwlbl-dem' + ID);
+        var courses_dem = d.edt_prochainjour || [];
+        if (lbl_dem) lbl_dem.textContent = d.edt_prochainjour_date || 'Demain';
+        if (rng_dem) rng_dem.textContent = timeRange(courses_dem);
+        if (ec_dem)  ec_dem.innerHTML    = edtGridHtml(courses_dem);
+    }
+
+    /* ─── BARRE DE MOYENNE ────────────────────────────── */
+    function renderNotesBar(notes) {
+        var moyEl   = el('pjwmoy'   + ID);
+        var maskEl  = el('pjwnbm'   + ID);
+        var trendEl = el('pjwtrend' + ID);
+        if (!notes || !Array.isArray(notes) || !notes.length) {
+            if (moyEl)  moyEl.textContent  = '–';
+            if (maskEl) maskEl.style.width = '100%';
+            return;
+        }
+        /* Calcul de la moyenne pondérée */
+        var tot = 0, coefs = 0;
+        notes.forEach(function(n) {
+            var r = ratio(n.note, n.sur);
+            var c = parseFloat(String(n.coef || '1').replace(',','.')) || 1;
+            if (r !== null) { tot += r * 20 * c; coefs += c; }
+        });
+        if (coefs > 0) {
+            var moy = (tot / coefs).toFixed(1).replace('.',',');
+            var pct = Math.min(100, Math.round(parseFloat(moy.replace(',','.')) / 20 * 100));
+            if (moyEl)  moyEl.textContent  = moy + '/20';
+            /* Le masque couvre la portion "non atteinte" depuis la droite */
+            if (maskEl) maskEl.style.width = (100 - pct) + '%';
+            /* Flèche de tendance : compare les 3 premières et 3 dernières notes */
+            if (trendEl && notes.length >= 4) {
+                var sorted = notes.slice().sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
+                var first3 = sorted.slice(0, 3), last3 = sorted.slice(-3);
+                var avg = function(arr) {
+                    var s=0, n=0;
+                    arr.forEach(function(x){ var r=ratio(x.note,x.sur); if(r!==null){s+=r;n++;} });
+                    return n ? s/n : 0;
+                };
+                trendEl.textContent = avg(last3) >= avg(first3) ? '↗' : '↘';
+                trendEl.className = 'nb-trend ' + (avg(last3) >= avg(first3) ? 'c-ok' : 'c-bad');
+            }
+        }
+    }
+
+    /* ─── DEVOIRS À FAIRE ─────────────────────────────── */
+    /** Affiche les devoirs du prochain jour non encore faits */
+    function renderDevoirs(d) {
+        var dvEl = el('pjwdv' + ID);
+        if (!dvEl) return;
+        /* On prend les devoirs de demain non faits, puis si vide ceux d'aujourd'hui */
+        var liste = (d.devoirs_demain || []).concat(d.devoirs || [])
+            .filter(function(dv){ return !dv.done; })
+            .slice(0, 5); /* Max 5 lignes pour ne pas surcharger le widget */
+        if (!liste.length) {
+            dvEl.innerHTML = '<div class="p-empty">Aucun devoir</div>';
+            return;
+        }
+        dvEl.innerHTML = liste.map(function(dv) {
+            return (
+                '<div class="dv-item">' +
+                    '<div class="dv-dot"></div>' +
+                    '<span>' + esc(dv.title || '–') + '</span>' +
+                '</div>'
+            );
+        }).join('');
+    }
+
+    /* ─── DERNIÈRES NOTES ─────────────────────────────── */
+    function renderDernieresNotes(notes) {
+        var dnEl = el('pjwdn' + ID);
+        if (!dnEl) return;
+        if (!notes || !Array.isArray(notes) || !notes.length) {
+            dnEl.innerHTML = '<div class="p-empty">Aucune note</div>';
+            return;
+        }
+        /* Tri par date décroissante, puis les 4 plus récentes */
+        var sorted = notes.slice()
+            .sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); })
+            .slice(0, 4);
+        dnEl.innerHTML = sorted.map(function(n) {
+            var r   = ratio(n.note, n.sur);
+            /* Simplifie "MATHS > Contrôle" → "Contrôle" */
+            var mat = (n.cours || '–');
+            if (mat.indexOf(' > ') !== -1) mat = mat.split(' > ').pop();
+            /* Raccourcit la date "20/03/2025" → "20/03" */
+            var dateStr = (n.date || '').slice(0, 5);
+            return (
+                '<div class="dn-item">' +
+                    '<span class="dn-d">' + esc(dateStr) + '</span>' +
+                    '<span class="dn-m">' + esc(mat)     + '</span>' +
+                    '<span class="dn-v ' + gradeClass(r) + '">' + esc(n.note || '?') + '</span>' +
+                '</div>'
+            );
+        }).join('');
+    }
+
+    /* ─── RENDU GLOBAL ────────────────────────────────── */
+    /** Point d'entrée principal : reçoit l'objet de données et met à jour tout le widget */
+    function render(d, ts) {
+        D = d;
+        renderHeader(d, ts);
+        renderStats(d);
+        renderEDT(d);
+        renderNotesBar(d.notes);
+        renderDevoirs(d);
+        renderDernieresNotes(d.notes);
+    }
+
+    /* ─── LIAISON JEEDOM ──────────────────────────────── */
+    /**
+     * addUpdateFunction : Jeedom appelle cette fonction chaque fois que
+     * la valeur de la commande change. _opts.value contient le JSON brut.
+     */
+    jeedom.cmd.addUpdateFunction('#id#', function(_opts) {
+        var v = _opts.value;
+        if (!v || v.trim() === '' || v === '{}') return;
+        try {
+            render(JSON.parse(v), _opts.collectDate || _opts.valueDate);
+        } catch(e) {
+            console.error('[ProJote] Erreur de parsing JSON :', e);
+        }
+    });
+
+    /**
+     * refreshValue : déclenche le premier rendu avec la valeur déjà en cache Jeedom.
+     * Sans cela le widget serait vide jusqu'à la prochaine mise à jour.
+     */
+    jeedom.cmd.refreshValue([{
+        cmd_id:        '#id#',
+        value:         '#value#',
+        display_value: '#state#',
+        valueDate:     '#valueDate#',
+        collectDate:   '#collectDate#',
+        alertLevel:    '#alertLevel#'
+    }]);
+
+})();
+</script>
+</div>

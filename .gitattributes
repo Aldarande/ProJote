@@ -1,0 +1,13 @@
+# Force LF pour tous les fichiers texte (bash, PHP, Python, HTML, JS, CSS)
+* text=auto eol=lf
+
+# Fichiers binaires — pas de conversion
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.pyc  binary
+*.pyo  binary
+*.so   binary
+*.pyd  binary
