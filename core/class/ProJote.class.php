@@ -98,8 +98,8 @@ class ProJote extends eqLogic
       } else {
         // Le fichier PID est là, mais le processus est mort (ex: a crashé).
         // C'est un état invalide, il faut nettoyer en supprimant le fichier PID.
-        log::add(__CLASS__, 'erreur', "Le fichier PID du démon existe mais le processus est introuvable. Nettoyage.");
-        shell_exec(system::getCmdSudo() . 'rm -rf ' . $pid_file . ' 2>&1 > /dev/null');
+        log::add(__CLASS__, 'error', "Le fichier PID du démon existe mais le processus est introuvable. Nettoyage.");
+        unlink($pid_file);
       }
     }
     // 'launchable' indique à Jeedom si le démon peut être démarré.
@@ -139,9 +139,11 @@ class ProJote extends eqLogic
     $pid_file = jeedom::getTmpFolder(__CLASS__) . '/deamon.pid'; // Chemin du fichier PID à créer
 
     // Construction de la commande shell
-    $cmd = self::getPythonBinaryPath() . " {$path}/ProJoted.py";
+    $data_dir = dirname(dirname(__FILE__)) . '/data';
+    $cmd = system::getCmdPython3(__CLASS__) . " {$path}/ProJoted.py";
     $cmd .= ' --loglevel ' . $loglevel;
     $cmd .= ' --socketport ' . $socketport;
+    $cmd .= ' --datadir ' . escapeshellarg($data_dir);
     $cmd .= ' --callback ' . $callback . '/plugins/ProJote/core/php/jeeProJote.php';
     $cmd .= ' --apikey ' . $apikey;
     $cmd .= ' --cycle 3'; // Inutilisé actuellement, pourrait servir pour le rafraîchissement
@@ -199,26 +201,12 @@ class ProJote extends eqLogic
   }
 
   // Fonctions utilitaires pour obtenir des chemins importants du plugin de manière fiable.
-  private static function getResourcePath()
-  {
-    $path = realpath(__DIR__ . '/../../resources');
-    if (!$path) throw new Exception("Impossible de déterminer le chemin des ressources du plugin");
-    return $path;
-  }
   private static function getDataPath()
   {
     $path = realpath(__DIR__ . '/../..') . DIRECTORY_SEPARATOR . 'data';
     if (!is_dir($path)) mkdir($path);
     return $path;
   }
-  private static function getPythonBinaryPath()
-  {
-    $pythonPath = self::getResourcePath() . '/python_venv/bin/python3';
-    if (!file_exists($pythonPath)) throw new Exception("Environnement virtuel Python introuvable à : " . $pythonPath);
-    return $pythonPath;
-  }
-
-
   /**
    * Tâche planifiée (cron) exécutée toutes les heures par Jeedom.
    *
@@ -264,12 +252,14 @@ class ProJote extends eqLogic
     // 1. Générer un identifiant unique (UUID) pour cet équipement s'il n'en a pas.
     // Cet UUID est utilisé pour identifier l'appareil de manière unique auprès de Pronote.
     if (empty($this->getConfiguration('uuid'))) {
-      $uuid = sprintf('PJ-%s-%s-%s-%s',
+      // Format UUID standard (RFC 4122 v4) — sans préfixe identifiant le plugin
+      $uuid = sprintf('%s-%s-%s-%s-%s',
         bin2hex(random_bytes(4)), bin2hex(random_bytes(2)),
-        bin2hex(random_bytes(2)), bin2hex(random_bytes(6))
+        bin2hex(random_bytes(2)), bin2hex(random_bytes(2)),
+        bin2hex(random_bytes(6))
       );
       $this->setConfiguration('uuid', $uuid);
-      log::add('ProJote', 'info', 'preSave : UUID généré pour ' . $this->getHumanName() . ' : ' . $uuid);
+      log::add('ProJote', 'debug', 'preSave : UUID généré pour ' . $this->getHumanName());
     }
 
     // 2. Définir la largeur par défaut du tile sur le dashboard (~1/3 de page).

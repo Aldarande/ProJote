@@ -247,7 +247,7 @@ def Checkeleve(client, CmdId):
             logging.error("Aucun élève sélectionné.")
             return False
         else:
-            chemin_fichier = "/var/www/html/plugins/ProJote/data"
+            chemin_fichier = _data_dir
             if not os.path.exists(chemin_fichier):
                 logging.error(f"Le fichier {chemin_fichier} n'existe pas.")
                 return False
@@ -523,8 +523,8 @@ def Emploidutemps(client):
             data["edt_prochainjour_fin"] = lesson.end.strftime("%H%M")
             data["edt_prochainjour_date"] = lesson.start.strftime("%d/%m/%Y")
 
-        # Récupération  emploi d'un jour spécifique pour des tests
-        lessons_specific = client.lessons(datetime.date(2024, 4, 23))
+        # Récupération emploi du jour courant (date spécifique)
+        lessons_specific = client.lessons(datetime.date.today())
         lessons_specific = sorted(lessons_specific, key=lambda lesson: lesson.start)
 
         data["edt_date_specific"] = []
@@ -1129,7 +1129,7 @@ def download_photo(client, eqLogicId, tokenconnected, message):
             logging.debug("Aucune photo trouvée dans Pronote")
             return None
 
-        data_dir = f"/var/www/html/plugins/ProJote/data/{eqLogicId}/"
+        data_dir = os.path.join(_data_dir, str(eqLogicId)) + "/"
         verifdossier(data_dir)
         final_path = f"{data_dir}profile_picture.jpg"
         temp_path = f"{data_dir}profile_picture_temp.jpg"
@@ -1227,14 +1227,15 @@ def identites(clientinfo):
         )
 
 
-def GetTokenFromLogin(Account, pin="4321"):
+def GetTokenFromLogin(Account, pin="4321", uuid=None):
     """Génère un jeton de connexion (credentials) à partir d'un compte déjà connecté."""
     qrcode_data = Account.request_qr_code_data(pin)
-    logging.debug("Les info du QRCode : %s", qrcode_data["url"])
+    logging.debug("Les info du QRCode url : %s", qrcode_data.get("url", ""))
+    # Ne pas logger le contenu complet du qrcode_data (contient le jeton)
     return Account.qrcode_login(
         qrcode_data,
         pin,
-        uuid="ProJote",
+        uuid=uuid,
     )
 
 
@@ -1242,7 +1243,8 @@ def RenewToken(client):
     try:
         # Récupération des tokens
         data = {"Token": client.export_credentials()}
-        logging.debug("Les tokens sont : %s", data["Token"])
+        # Ne jamais logger le contenu du token (contient username/password chiffré)
+        logging.debug("Token de reconnexion exporté avec succès")
         return data["Token"]
     except Exception as e:
         logging.error("Un erreur est retourné sur le traitement des tokens: %s", e)
@@ -1391,7 +1393,7 @@ def load_persistent_token(eqLogicId):
         tuple: (client, tokenconnected, enfant) ou (None, None, None) si échec
     """
     try:
-        data_dir = "/var/www/html/plugins/ProJote/data"
+        data_dir = _data_dir
         file_path = os.path.join(data_dir, str(eqLogicId), "enfant.ProJote.json.txt")
 
         if not os.path.exists(file_path):
@@ -1546,6 +1548,7 @@ def read_socket():  # sourcery skip: extract-method, merge-dict-assign
                             username=message["TokenUsername"],
                             password=message["TokenPassword"],
                             client_identifier=message["TokenId"],
+                            # Fallback "ProJote" : compat tokens créés avant v0.9 (uuid non stocké)
                             uuid=message.get("TokenUuid", "ProJote"),
                         )
                         # Je sélectionne l'enfant si il est spécifié
@@ -1561,6 +1564,7 @@ def read_socket():  # sourcery skip: extract-method, merge-dict-assign
                             username=message["TokenUsername"],
                             password=message["TokenPassword"],
                             client_identifier=message["TokenId"],
+                            # Fallback "ProJote" : compat tokens créés avant v0.9 (uuid non stocké)
                             uuid=message.get("TokenUuid", "ProJote"),
                         )
                 except Exception as e:
@@ -1746,6 +1750,7 @@ parser.add_argument("--apikey", help="Apikey", type=str)
 parser.add_argument("--cycle", help="Cycle to send event", type=str)
 parser.add_argument("--pid", help="Pid file", type=str)
 parser.add_argument("--socketport", help="Port for Projote Deamon", type=str)
+parser.add_argument("--datadir", help="Path to plugin data directory", type=str)
 args = parser.parse_args()
 
 _log_level = args.loglevel or "error"
@@ -1754,6 +1759,7 @@ _apikey = args.apikey or ""
 _pidfile = args.pid or "/tmp/ProJoted.pid"
 _cycle = float(args.cycle) if args.cycle else 0.3
 _socket_port = args.socketport or 55369
+_data_dir = args.datadir or "/var/www/html/plugins/ProJote/data"
 _socket_port = int(_socket_port)
 _cycle = int(_cycle)
 

@@ -1,13 +1,14 @@
 {
 	"id": "ProJote",
 	"name": "Plugin Pronote",
-	"pluginVersion": "0.8",
+	"pluginVersion": "0.9",
 	"description": {
-		"fr_FR": "Plugin destinée à récupérer les informations de Pronote"
+		"fr_FR": "Plugin destinée à récupérer les informations de Pronote",
+		"en_US": "Plugin to retrieve information from Pronote school management platform"
 	},
-	"licence": "Apache",
+	"licence": "AGPL",
 	"author": "Aldarande",
-	"require": "4.3",
+	"require": "4.4",
 	"category": "organization",
 	"hasDependency": true,
 	"hasOwnDeamon": true,

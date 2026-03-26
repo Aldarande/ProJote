@@ -52,7 +52,7 @@ try {
 
   // 3. INITIALISATION DE LA RÉPONSE AJAX
   // Prépare Jeedom à renvoyer une réponse au format JSON pour le JavaScript.
-  ajax::init();
+  ajax::init(['Validate', 'ValidateQRCode', 'ChangeEnfant', 'GetConfig', 'GetWidgetData']);
 
   // 4. RÉCUPÉRATION DE L'ACTION DEMANDÉE
   // Le JavaScript envoie un paramètre "action" qui nous dit quoi faire.
@@ -109,7 +109,7 @@ try {
 
     // Récupération de l'UUID pour l'identification auprès de Pronote (nécessaire pour certains ENT)
     $eqLogicForUuid = eqLogic::byId($eqLogicId);
-    $uuid = (is_object($eqLogicForUuid)) ? $eqLogicForUuid->getConfiguration('uuid', 'ProJote') : 'ProJote';
+    $uuid = (is_object($eqLogicForUuid)) ? $eqLogicForUuid->getConfiguration('uuid', jeedom::createUniqueId()) : jeedom::createUniqueId();
 
     // Étape 2 : Construire la commande shell à exécuter.
     // C'est ici que l'on assemble la commande qui sera lancée, comme si on la tapait dans un terminal.
@@ -133,13 +133,11 @@ try {
     $command .= ' --Eqid ' . escapeshellarg($eqLogicId);
     $command .= ' --Uuid ' . escapeshellarg($uuid);
     $command .= ' --Loglevel ' . (log::convertLogLevel(log::getLogLevel("ProJote")));
-
-    // Redirige la sortie standard (stdout) ET la sortie d'erreur (stderr) vers le fichier de log du plugin.
-    // C'est crucial pour le débogage : tout ce que le script Python affichera (erreurs comprises)
-    // sera visible dans les logs de ProJote.
+    $command .= ' --datadir ' . escapeshellarg(dirname(dirname(__FILE__)) . '/data');
     $command .= ' >> ' . log::getPathToLog('ProJote') . ' 2>&1 ';
 
-    log::add('ProJote', 'debug', 'Ajax::Commande de validation exécutée : ' . $command);
+    // Ne pas logger la commande complète (contient le mot de passe en clair)
+    log::add('ProJote', 'debug', 'Ajax::Commande de validation lancée pour eqLogic ' . $eqLogicId);
 
     // Étape 3 : Exécuter la commande et récupérer le résultat.
     exec($command, $output, $return_var);
@@ -217,7 +215,7 @@ try {
     }
 
     $eqLogicForUuid = eqLogic::byId($eqLogicId);
-    $uuid = (is_object($eqLogicForUuid)) ? $eqLogicForUuid->getConfiguration('uuid', 'ProJote') : 'ProJote';
+    $uuid = (is_object($eqLogicForUuid)) ? $eqLogicForUuid->getConfiguration('uuid', jeedom::createUniqueId()) : jeedom::createUniqueId();
 
     // Construction de la commande shell avec les arguments spécifiques au QR Code
     $command = escapeshellarg($pythonBinary) . ' ' . escapeshellarg($qrScript);
@@ -228,9 +226,11 @@ try {
     $command .= ' --Eqid ' . escapeshellarg($eqLogicId);
     $command .= ' --Uuid ' . escapeshellarg($uuid);
     $command .= ' --Loglevel ' . escapeshellarg(log::convertLogLevel(log::getLogLevel("ProJote")));
+    $command .= ' --datadir ' . escapeshellarg(dirname(dirname(__FILE__)) . '/data');
     $command .= ' >> ' . log::getPathToLog('ProJote') . ' 2>&1 ';
 
-    log::add('ProJote', 'debug', 'Ajax::Commande de validation QR Code exécutée : ' . $command);
+    // Ne pas logger la commande complète (contient le jeton QR en clair)
+    log::add('ProJote', 'debug', 'Ajax::Commande de validation QR Code lancée pour eqLogic ' . $eqLogicId);
 
     // Exécution de la commande
     exec($command, $output, $return_var);

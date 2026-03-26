@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ProJote — Guide de développement Jeedom</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 960px; margin: 0 auto; padding: 20px 40px; color: #333; line-height: 1.7; }
+        h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px; }
+        h2 { color: #2980b9; margin-top: 40px; border-left: 4px solid #3498db; padding-left: 12px; }
+        h3 { color: #16a085; margin-top: 25px; }
+        h4 { color: #8e44ad; }
+        code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-family: "SFMono-Regular", Consolas, monospace; font-size: 0.9em; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 16px; border-radius: 6px; overflow-x: auto; line-height: 1.5; }
+        pre code { background: none; padding: 0; color: inherit; font-size: 0.85em; }
+        .note { background: #e8f4fd; border-left: 4px solid #3498db; padding: 12px 16px; margin: 16px 0; border-radius: 0 4px 4px 0; }
+        .warning { background: #fef9e7; border-left: 4px solid #f39c12; padding: 12px 16px; margin: 16px 0; border-radius: 0 4px 4px 0; }
+        .success { background: #eafaf1; border-left: 4px solid #27ae60; padding: 12px 16px; margin: 16px 0; border-radius: 0 4px 4px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th { background: #2c3e50; color: white; padding: 8px 12px; text-align: left; }
+        td { padding: 8px 12px; border-bottom: 1px solid #ddd; }
+        tr:nth-child(even) { background: #f8f9fa; }
+        .toc { background: #f8f9fa; border: 1px solid #ddd; padding: 16px 24px; border-radius: 6px; margin: 24px 0; }
+        .toc ul { margin: 0; padding-left: 20px; }
+        .toc li { margin: 4px 0; }
+        a { color: #2980b9; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .file-tree { font-family: monospace; background: #f4f4f4; padding: 16px; border-radius: 6px; line-height: 1.8; }
+        .keyword { color: #569cd6; }
+        .string { color: #ce9178; }
+        .comment { color: #6a9955; }
+        .function { color: #dcdcaa; }
+    </style>
+</head>
+<body>
+
+<h1>ProJote — Guide de développement Jeedom</h1>
+<p><em>Ce document explique l'intégralité de l'architecture et du code du plugin ProJote. Il sert à la fois de documentation technique et de cours pratique pour comprendre comment développer un plugin Jeedom avec daemon Python.</em></p>
+
+<div class="toc">
+    <strong>Table des matières</strong>
+    <ul>
+        <li><a href="#architecture">1. Architecture générale d'un plugin Jeedom</a></li>
+        <li><a href="#structure">2. Structure des fichiers du plugin</a></li>
+        <li><a href="#info">3. plugin_info/ — Métadonnées du plugin</a></li>
+        <li><a href="#class">4. core/class/ProJote.class.php — La classe principale</a></li>
+        <li><a href="#ajax">5. core/ajax/ProJote.ajax.php — Le handler AJAX</a></li>
+        <li><a href="#callback">6. core/php/jeeProJote.php — Le callback daemon</a></li>
+        <li><a href="#daemon">7. resources/ProJoted/ProJoted.py — Le daemon Python</a></li>
+        <li><a href="#widget">8. Widget et templates HTML</a></li>
+        <li><a href="#frontend">9. desktop/ — Interface utilisateur</a></li>
+        <li><a href="#communication">10. Communication PHP ↔ Python</a></li>
+        <li><a href="#securite">11. Sécurité</a></li>
+        <li><a href="#checklist">12. Checklist de mise en production</a></li>
+    </ul>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="architecture">1. Architecture générale d'un plugin Jeedom</h2>
+
+<p>Un plugin Jeedom suit toujours la même architecture en couches :</p>
+
+<pre><code>Navigateur (JS) ──AJAX──► ProJote.ajax.php ──► ProJote.class.php ──► BDD Jeedom
+                                                       │
+                                                 socket TCP
+                                                       │
+                                              ProJoted.py (daemon)
+                                                       │
+                                               API Pronote (internet)
+                                                       │
+                                           HTTP callback (POST)
+                                                       │
+                                              jeeProJote.php ──► ProJote.class.php</code></pre>
+
+<p>Le cœur du plugin est la classe PHP <code>ProJote</code> qui hérite de <code>eqLogic</code> (un "équipement" Jeedom). Le daemon Python tourne en arrière-plan, collecte les données Pronote, et les renvoie vers Jeedom via un callback HTTP.</p>
+
+<!-- ============================================================ -->
+<h2 id="structure">2. Structure des fichiers du plugin</h2>
+
+<div class="file-tree">
+ProJote/
+├── plugin_info/
+│   ├── info.json           ← Métadonnées obligatoires du plugin
+│   ├── packages.json       ← Dépendances système (apt, pip, npm)
+│   └── ProJote.png         ← Icône du plugin (128×128 px)
+├── core/
+│   ├── class/
+│   │   └── ProJote.class.php   ← Classe principale (eqLogic + cmd)
+│   ├── ajax/
+│   │   └── ProJote.ajax.php    ← Endpoints AJAX (actions JS → PHP)
+│   └── php/
+│       └── jeeProJote.php      ← Callback HTTP du daemon Python
+├── resources/
+│   └── ProJoted/
+│       ├── ProJoted.py         ← Daemon Python principal
+│       ├── LoginConnect.py     ← Gestion connexion login/password
+│       ├── QRConnect.py        ← Gestion connexion QR code
+│       └── jeedom/
+│           └── jeedom.py       ← Module officiel Jeedom Python
+├── desktop/
+│   ├── php/
+│   │   └── ProJote.php         ← Vue liste des équipements
+│   ├── js/
+│   │   └── ProJote.js          ← JavaScript frontend
+│   └── modal/
+│       └── cmd.config.*.html   ← Templates modaux de config
+├── core/template/
+│   └── dashboard/
+│       └── cmd.info.string.note.html ← Template widget
+└── docs/
+    └── fr_FR/
+        ├── index.html          ← Documentation utilisateur
+        └── dev.html            ← Ce fichier
+</div>
+
+<!-- ============================================================ -->
+<h2 id="info">3. plugin_info/ — Métadonnées du plugin</h2>
+
+<h3>info.json</h3>
+<p>Ce fichier est <strong>obligatoire</strong>. Jeedom le lit pour connaître le plugin.</p>
+
+<pre><code>{
+    "id": "ProJote",            // Identifiant unique — doit correspondre au nom du dossier
+    "name": "Plugin Pronote",   // Nom affiché dans le market
+    "pluginVersion": "0.9",     // Version du plugin (semver recommandé)
+    "description": {
+        "fr_FR": "Plugin destinée à récupérer les informations de Pronote",
+        "en_US": "Plugin to retrieve information from Pronote school management platform"
+    },
+    "licence": "AGPL",          // Obligatoire AGPL pour les plugins Jeedom
+    "author": "Aldarande",
+    "require": "4.4",           // Version Jeedom minimale requise
+    "category": "organization",
+    "hasDependency": true,      // Le plugin a des dépendances à installer
+    "hasOwnDeamon": true,       // Le plugin gère son propre daemon
+    "maxDependancyInstallTime": 60,
+    "compatibility": ["smart", "luna", "atlas", "rpi", "docker", "diy", "mobile"]
+}</code></pre>
+
+<div class="note">
+    <strong>Règle :</strong> <code>id</code> doit être identique au nom du dossier du plugin ET au nom de la classe PHP principale.
+</div>
+
+<h3>packages.json</h3>
+<p>Déclare les dépendances à installer automatiquement. Remplace les anciens scripts <code>install_apt.sh</code>.</p>
+
+<pre><code>{
+    "apt": {
+        "python3-dev": {},
+        "python3-venv": {},
+        "python3-requests": {},
+        "python3-pyudev": {}
+    },
+    "post-install": {
+        "script": "plugins/ProJote/resources/post-install.sh"
+    }
+}</code></pre>
+
+<p>Le script <code>post-install.sh</code> peut créer le venv Python, installer les packages pip spécifiques, etc.</p>
+
+<!-- ============================================================ -->
+<h2 id="class">4. core/class/ProJote.class.php — La classe principale</h2>
+
+<h3>4.1 Héritage et structure</h3>
+
+<pre><code>class ProJote extends eqLogic {
+    // Propriétés statiques spéciales lues par le Core Jeedom
+    public static $_encryptConfigKey = array('Token_password');
+    public static $_widgetPossibility = array(...);
+
+    // Méthodes statiques du daemon (Jeedom les appelle automatiquement)
+    public static function deamon_info() { ... }
+    public static function deamon_start() { ... }
+    public static function deamon_stop() { ... }
+    public static function dependancy_info() { ... }
+    public static function dependancy_install() { ... }
+
+    // Méthodes du cycle de vie d'un équipement
+    public function preSave() { ... }
+    public function postSave() { ... }
+    public function preRemove() { ... }
+
+    // Méthodes de cron
+    public static function cronHourly() { ... }
+
+    // Méthodes métier spécifiques à ProJote
+    public static function sendToDeamon($data) { ... }
+    public function getListeDefaultCommandes() { ... }
+}
+
+class ProJoteCmd extends cmd {
+    public function execute($_options = []) { ... }
+}</code></pre>
+
+<h3>4.2 $_encryptConfigKey — Chiffrement automatique</h3>
+
+<pre><code>public static $_encryptConfigKey = array('Token_password');</code></pre>
+
+<p>Jeedom chiffre automatiquement en BDD les valeurs de configuration dont la clé est listée ici. Le déchiffrement est aussi automatique lors de la lecture. Utilisez-le pour les mots de passe, tokens, clés API.</p>
+
+<h3>4.3 $_widgetPossibility — Paramètres de widget</h3>
+
+<pre><code>public static $_widgetPossibility = array(
+    'custom' => true,
+    'custom::layout' => false,
+    'parameters' => array(
+        'accent_color' => array(
+            'label' => 'Couleur d\'accent',
+            'type' => 'color',
+        ),
+    ),
+);</code></pre>
+
+<p>Expose des paramètres configurables depuis l'onglet "Affichage avancé" de l'équipement dans Jeedom.</p>
+
+<h3>4.4 deamon_info() — État du daemon</h3>
+
+<pre><code>public static function deamon_info() {
+    $return = array(
+        'log'       => __CLASS__,
+        'state'     => 'nok',
+        'launchable' => 'ok',
+    );
+
+    // Vérifier si le PID est actif
+    $pid_file = jeedom::getTmpFolder(__CLASS__) . '/deamon.pid';
+    if (file_exists($pid_file)) {
+        $pid = intval(file_get_contents($pid_file));
+        if (posix_getsid($pid) !== false) {  // le processus est vivant
+            $return['state'] = 'ok';
+        }
+    }
+
+    // Vérifier si le daemon est lançable (configuration minimale)
+    $url = config::byKey('Url', __CLASS__);
+    if (empty($url)) {
+        $return['launchable'] = 'nok';
+        $return['launchable_message'] = 'URL Pronote non configurée';
+    }
+    return $return;
+}</code></pre>
+
+<div class="note">
+    <strong>Clés importantes :</strong>
+    <ul>
+        <li><code>state</code> : <code>'ok'</code> si le daemon tourne, <code>'nok'</code> sinon</li>
+        <li><code>launchable</code> : <code>'ok'</code> si la config est valide pour démarrer</li>
+        <li><code>launchable_message</code> : message affiché à l'utilisateur si <code>'nok'</code></li>
+    </ul>
+</div>
+
+<h3>4.5 deamon_start() — Démarrage du daemon</h3>
+
+<pre><code>public static function deamon_start() {
+    self::deamon_stop();  // S'assurer que l'instance précédente est arrêtée
+
+    $path = realpath(dirname(__FILE__) . '/../../resources/ProJoted');
+    $socketport = config::byKey('socketport', __CLASS__, '55369');
+    $callback = network::getNetworkAccess('internal', 'http:127.0.0.1:port:comp');
+    $loglevel = log::convertLogLevel(log::getLogLevel(__CLASS__));
+    $apikey = jeedom::getApiKey(__CLASS__);
+    $pid_file = jeedom::getTmpFolder(__CLASS__) . '/deamon.pid';
+    $data_dir = dirname(dirname(__FILE__)) . '/data';
+
+    // system::getCmdPython3() gère automatiquement venv Debian 12 vs système
+    $cmd = system::getCmdPython3(__CLASS__) . " {$path}/ProJoted.py";
+    $cmd .= ' --loglevel ' . $loglevel;
+    $cmd .= ' --socketport ' . $socketport;
+    $cmd .= ' --callback ' . $callback . '/plugins/ProJote/core/php/jeeProJote.php';
+    $cmd .= ' --apikey ' . $apikey;
+    $cmd .= ' --cycle 3';
+    $cmd .= ' --pid ' . $pid_file;
+    $cmd .= ' --datadir ' . escapeshellarg($data_dir);
+
+    exec($cmd . ' >> ' . log::getPathToLog(__CLASS__) . ' 2>&1 &');
+
+    // Attendre le démarrage (max 20s)
+    $i = 0;
+    while ($i < 20) {
+        sleep(1);
+        $deamon_info = self::deamon_info();
+        if ($deamon_info['state'] === 'ok') break;
+        $i++;
+    }
+}</code></pre>
+
+<div class="warning">
+    <strong>Important :</strong> Utilisez toujours <code>system::getCmdPython3(__CLASS__)</code> et non un chemin Python hardcodé. Cette méthode gère automatiquement le venv Python (Debian 12) ou le Python système selon la plateforme.
+</div>
+
+<h3>4.6 deamon_stop() — Arrêt du daemon</h3>
+
+<pre><code>public static function deamon_stop() {
+    $pid_file = jeedom::getTmpFolder(__CLASS__) . '/deamon.pid';
+    if (file_exists($pid_file)) {
+        $pid = intval(file_get_contents($pid_file));
+        system::kill($pid);     // Kill propre par PID
+        unlink($pid_file);      // Supprimer le fichier PID
+    }
+    system::kill('ProJoted.py');  // Kill par nom de processus (sécurité)
+}</code></pre>
+
+<div class="warning">
+    <strong>Éviter :</strong> <code>shell_exec(system::getCmdSudo() . 'rm -rf ' . $pid_file)</code> — inutilement root, et dangereux. Utilisez simplement <code>unlink()</code>.
+</div>
+
+<h3>4.7 preSave() — Avant sauvegarde d'un équipement</h3>
+
+<pre><code>public function preSave() {
+    // Générer un UUID si absent (identifiant unique de l'équipement)
+    if (empty($this->getConfiguration('CmdId'))) {
+        $this->setConfiguration('CmdId', jeedom::createUniqueId());
+    }
+
+    // Largeur par défaut sur le dashboard
+    if ($this->getDisplay('width') === '0px' || empty($this->getDisplay('width'))) {
+        $this->setDisplay('width', '300px');
+    }
+
+    // IMPORTANT : protéger les tokens de ne pas être écrasés lors d'une sauvegarde
+    // (la sauvegarde UI ne renvoie pas les champs chiffrés)
+    $existingConfig = eqLogic::byId($this->getId());
+    if ($existingConfig) {
+        $existing_token = $existingConfig->getConfiguration('Token_password');
+        $new_token = $this->getConfiguration('Token_password');
+        if (empty($new_token) && !empty($existing_token)) {
+            $this->setConfiguration('Token_password', $existing_token);
+        }
+    }
+}</code></pre>
+
+<h3>4.8 postSave() — Après sauvegarde</h3>
+
+<pre><code>public function postSave() {
+    // Créer/mettre à jour les commandes par défaut
+    foreach ($this->getListeDefaultCommandes() as $cmdData) {
+        $cmd = $this->getCmd(null, $cmdData['logicalId']);
+        if (!is_object($cmd)) {
+            $cmd = new ProJoteCmd();
+            $cmd->setEqLogic_id($this->getId());
+            $cmd->setLogicalId($cmdData['logicalId']);
+        }
+        $cmd->setName($cmdData['name']);
+        $cmd->setType($cmdData['type']);
+        $cmd->setSubType($cmdData['subType'] ?? 'string');
+        $cmd->save();
+    }
+}</code></pre>
+
+<h3>4.9 sendToDeamon() — Envoyer une commande au daemon</h3>
+
+<pre><code>public static function sendToDeamon($data) {
+    $socketport = config::byKey('socketport', __CLASS__, '55369');
+    $socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
+    if (@socket_connect($socket, '127.0.0.1', intval($socketport))) {
+        socket_write($socket, json_encode($data) . "\n");
+        socket_close($socket);
+    }
+}</code></pre>
+
+<p>Cette méthode envoie un JSON au daemon Python via socket TCP. C'est le canal PHP → Python.</p>
+
+<!-- ============================================================ -->
+<h2 id="ajax">5. core/ajax/ProJote.ajax.php — Le handler AJAX</h2>
+
+<pre><code>&lt;?php
+try {
+    require_once dirname(__FILE__) . '/../../../../core/php/core.inc.php';
+    include_file('core', 'authentification', 'php');
+    if (!isConnect('admin')) {
+        throw new Exception('{{401 - Accès non autorisé}}');
+    }
+
+    // Whitelist obligatoire depuis Jeedom Core 4.1
+    ajax::init(['Validate', 'ValidateQRCode', 'ChangeEnfant', 'GetConfig', 'GetWidgetData']);
+
+    $action = init('action');
+
+    if ($action == 'Validate') {
+        // Récupérer les paramètres
+        $eqLogicId = init('eqLogicId');
+        $url = init('url');
+        // ... traitement ...
+        ajax::success();
+    }
+
+    if ($action == 'GetWidgetData') {
+        $eqLogicId = init('eqLogicId');
+        $eqLogic = ProJote::byId($eqLogicId);
+        $data = $eqLogic->getConfiguration('widget_json', '{}');
+        ajax::success(json_decode($data, true));
+    }
+
+    throw new Exception('Action non reconnue : ' . $action);
+
+} catch (Exception $e) {
+    ajax::error(displayException($e), $e->getCode());
+}</code></pre>
+
+<div class="note">
+    <strong>Règle :</strong> <code>ajax::init(['action1', 'action2'])</code> avec la liste blanche des actions est <strong>obligatoire</strong> depuis Core 4.1. Sans cela, toutes les actions passent, ce qui est une faille de sécurité.
+</div>
+
+<p>Côté JavaScript, les appels se font via :</p>
+
+<pre><code>// Jeedom Core 4.4 — utiliser domUtils.ajax (Vanilla JS)
+domUtils.ajax({
+    type: 'POST',
+    url: 'plugins/ProJote/core/ajax/ProJote.ajax.php',
+    data: { action: 'GetWidgetData', eqLogicId: eqLogic.id },
+    success: function(data) {
+        // data contient le résultat de ajax::success($data)
+    },
+    error: function(error) { console.error(error); }
+});</code></pre>
+
+<!-- ============================================================ -->
+<h2 id="callback">6. core/php/jeeProJote.php — Le callback daemon</h2>
+
+<p>Ce fichier est l'endpoint HTTP que le daemon Python appelle pour envoyer ses données à Jeedom.</p>
+
+<pre><code>&lt;?php
+require_once dirname(__FILE__) . '/../../../../core/php/core.inc.php';
+
+// Vérifier l'API key — OBLIGATOIRE pour les callbacks daemon
+jeedom::apiAccess(init('apikey'), 'ProJote');
+
+$result = json_decode(file_get_contents('php://input'), true);
+if (!is_array($result)) {
+    die();
+}
+
+$eqLogicId = $result['CmdId'] ?? null;
+$eqLogic = ProJote::byId($eqLogicId);
+if (!is_object($eqLogic)) {
+    die();
+}
+
+// Mettre à jour les commandes Jeedom avec les nouvelles valeurs
+$eqLogic->checkAndUpdateCmd('connection_status', $result['connection_status'] ?? '');
+$eqLogic->checkAndUpdateCmd('nb_devoirs', count($result['Devoirs'] ?? []));
+// ... autres commandes ...
+
+// Sauvegarder les données JSON complètes pour le widget
+$eqLogic->setConfiguration('widget_json', json_encode($result));
+$eqLogic->save(true);  // true = sauvegarde directe sans cycle complet
+
+// Persister sur disque pour la reconnexion par token
+saveDataToJsonFile($eqLogic, $result);</code></pre>
+
+<div class="note">
+    <strong>Flux des données :</strong> Le daemon envoie toutes ses données en un seul POST JSON vers ce fichier. Le callback les dispatche vers les commandes Jeedom (<code>checkAndUpdateCmd</code>) et sauvegarde le JSON complet dans la config de l'équipement pour le widget.
+</div>
+
+<h3>checkAndUpdateCmd() — Mise à jour des valeurs de commandes</h3>
+
+<pre><code>// Met à jour la valeur d'une commande ET déclenche les scénarios associés
+$eqLogic->checkAndUpdateCmd('logicalId', $newValue);</code></pre>
+
+<p>Cette méthode est fondamentale : elle met à jour la valeur de la commande en BDD, met à jour le cache, et déclenche les scénarios Jeedom qui écoutent cette commande.</p>
+
+<!-- ============================================================ -->
+<h2 id="daemon">7. resources/ProJoted/ProJoted.py — Le daemon Python</h2>
+
+<h3>7.1 Structure générale</h3>
+
+<pre><code># Arguments reçus au démarrage depuis PHP
+parser = argparse.ArgumentParser()
+parser.add_argument("--loglevel")
+parser.add_argument("--callback")    # URL HTTP de retour vers Jeedom
+parser.add_argument("--apikey")      # Clé API Jeedom pour le callback
+parser.add_argument("--socketport")  # Port TCP d'écoute (commandes PHP → Python)
+parser.add_argument("--pid")         # Chemin du fichier PID
+parser.add_argument("--cycle")       # Fréquence de rafraîchissement
+parser.add_argument("--datadir")     # Chemin du dossier data du plugin
+args = parser.parse_args()
+
+_data_dir = args.datadir or "/var/www/html/plugins/ProJote/data"</code></pre>
+
+<h3>7.2 Module jeedom.py — Communication bidirectionnelle</h3>
+
+<pre><code>from jeedom.jeedom import jeedom_utils, jeedom_com, jeedom_socket
+
+# Initialiser le socket d'écoute (PHP → Python)
+jeedom_socket = jeedom_socket(port=_socket_port, address='127.0.0.1')
+jeedom_socket.open()
+
+# Envoyer des données vers PHP (Python → PHP via HTTP)
+jeedom_com = jeedom_com(apikey=_apikey, loglevel=_log_level, url=_callback)
+jeedom_com.send_change_immediate({'CmdId': eqid, 'Notes': [...], ...})</code></pre>
+
+<h3>7.3 Boucle principale</h3>
+
+<pre><code>def listen():
+    """Boucle principale du daemon — écoute les commandes entrantes."""
+    while True:
+        try:
+            # Lire les messages entrants du socket (PHP → Python)
+            if not jeedom_socket.presence():
+                time.sleep(0.5)
+                continue
+
+            message = jeedom_socket.get()
+            if message is None:
+                continue
+
+            data = json.loads(message)
+            action = data.get('action')
+
+            if action == 'refresh':
+                eqLogicId = data.get('eqLogicId')
+                # ... déclencher la collecte des données ...
+
+        except Exception as e:
+            logging.error(f"Erreur dans la boucle principale : {e}")</code></pre>
+
+<h3>7.4 Monkey patches pronotepy</h3>
+
+<p>ProJote applique deux corrections à la volée sur la librairie pronotepy :</p>
+
+<pre><code># Patch 1 : Grade.__init__ — gère les champs optionnels absents
+# Sans ce patch, une note sans noteMax/noteMin lève une KeyError
+_original_grade_init = pronotepy.dataClasses.Grade.__init__
+
+def _patched_grade_init(self, json_data):
+    for field in ["noteMax", "noteMin", "coefficient", "commentaire",
+                  "estBonus", "estFacultatif", "estRamenerSur20"]:
+        if field not in json_data:
+            json_data[field] = {"V": "" if field != "estBonus" else False}
+    _original_grade_init(self, json_data)
+
+pronotepy.dataClasses.Grade.__init__ = _patched_grade_init
+
+# Patch 2 : html_parse — préserve les &lt;br&gt; comme espaces
+# Sans ce patch : "Faire ex 1&lt;br&gt;Apprendre" → "Faire ex 1Apprendre"
+@staticmethod
+def _patched_html_parse(html_text):
+    text = re.sub(r'&lt;br\s*/?&gt;', ' ', html_text, flags=re.IGNORECASE)
+    text = re.sub(r'&lt;[^&gt;]+&gt;', '', text)
+    return html.unescape(text).strip()
+
+pronotepy.dataClasses.Util.html_parse = _patched_html_parse</code></pre>
+
+<h3>7.5 Connexion à Pronote</h3>
+
+<pre><code># Méthode 1 : Login / mot de passe
+client = pronotepy.ParentClient(url, username=login, password=password, ent=ent_func)
+
+# Méthode 2 : QR Code (token)
+qr_data = {'jeton': token, 'login': login}
+client = pronotepy.ParentClient.token_login(url, username=login,
+                                             token=token, uuid=uuid, ent=ent_func)
+
+# Méthode 3 : Reconnexion token persistant (depuis fichier JSON)
+token_data = load_persistent_token(eqLogicId)
+if token_data:
+    client = pronotepy.ParentClient.token_login(...)
+
+# Sélectionner l'enfant (client ParentClient)
+client.set_child(child_name)</code></pre>
+
+<h3>7.6 Collecte des données Pronote</h3>
+
+<table>
+    <tr><th>Fonction Python</th><th>Données collectées</th><th>Commandes Jeedom</th></tr>
+    <tr><td><code>Emploidutemps()</code></td><td>EDT aujourd'hui, demain, prochain jour, période complète</td><td>edt_aujourd_hui, edt_demain, etc.</td></tr>
+    <tr><td><code>Notes()</code></td><td>Notes de toutes les périodes + moyennes</td><td>nb_notes, moy_generale, etc.</td></tr>
+    <tr><td><code>Devoirs()</code></td><td>Devoirs du jour et du lendemain + fichiers joints</td><td>nb_devoirs, devoirs_aujourdhui</td></tr>
+    <tr><td><code>Absences()</code></td><td>Liste des absences</td><td>nb_absences</td></tr>
+    <tr><td><code>Retards()</code></td><td>Liste des retards</td><td>nb_retards</td></tr>
+    <tr><td><code>Punitions()</code></td><td>Liste des punitions/retenues</td><td>nb_punitions</td></tr>
+    <tr><td><code>Notifications()</code></td><td>Notifications/informations Pronote</td><td>nb_notifications</td></tr>
+    <tr><td><code>Competences()</code></td><td>Évaluations par compétences</td><td>nb_competences</td></tr>
+    <tr><td><code>Menus()</code></td><td>Menus de la cantine</td><td>menus</td></tr>
+    <tr><td><code>download_photo()</code></td><td>Photo de profil de l'élève</td><td>photo_eleve</td></tr>
+</table>
+
+<h3>7.7 Circuit breaker — Protection anti-boucle</h3>
+
+<pre><code>failed_attempts = {}  # Compteur d'échecs par eqLogicId
+
+def check_circuit_breaker(eqLogicId, max_attempts=5):
+    """Empêche les reconnexions infinies en cas d'échec répété."""
+    if eqLogicId not in failed_attempts:
+        failed_attempts[eqLogicId] = {"count": 0, "last_attempt": 0}
+
+    now = time.time()
+    # Réinitialiser après 5 minutes
+    if now - failed_attempts[eqLogicId]["last_attempt"] > 300:
+        failed_attempts[eqLogicId]["count"] = 0
+
+    if failed_attempts[eqLogicId]["count"] > max_attempts:
+        logging.error(f"Circuit breaker bloqué pour {eqLogicId}")
+        return False
+
+    failed_attempts[eqLogicId]["count"] += 1
+    failed_attempts[eqLogicId]["last_attempt"] = now
+    return True</code></pre>
+
+<!-- ============================================================ -->
+<h2 id="widget">8. Widget et templates HTML</h2>
+
+<h3>8.1 Template widget (cmd.info.string.note.html)</h3>
+
+<p>Le fichier <code>core/template/dashboard/cmd.info.string.note.html</code> définit le rendu visuel de la commande widget sur le dashboard Jeedom.</p>
+
+<pre><code>&lt;!-- Variables disponibles dans le template (syntaxe Jeedom) --&gt;
+&lt;!-- #id#        : ID de la commande --&gt;
+&lt;!-- #eqLogic_id# : ID de l'équipement --&gt;
+&lt;!-- #value#     : Valeur courante de la commande --&gt;
+&lt;!-- #name#      : Nom de la commande --&gt;
+
+&lt;div class="cmd projote-widget" data-cmd_id="#id#" data-eq_id="#eqLogic_id#"&gt;
+    &lt;div class="projote-header"&gt;
+        &lt;span class="projote-title"&gt;#name#&lt;/span&gt;
+    &lt;/div&gt;
+    &lt;div class="projote-content" id="projote-content-#id#"&gt;
+        &lt;!-- Données chargées dynamiquement via AJAX GetWidgetData --&gt;
+    &lt;/div&gt;
+&lt;/div&gt;
+
+&lt;script&gt;
+// Initialisation du widget
+(function() {
+    var cmdId = '#id#';
+    var eqId = '#eqLogic_id#';
+
+    // Charger les données depuis le backend
+    domUtils.ajax({
+        type: 'POST',
+        url: 'plugins/ProJote/core/ajax/ProJote.ajax.php',
+        data: { action: 'GetWidgetData', eqLogicId: eqId },
+        success: function(data) {
+            renderWidget(data.result, cmdId);
+        }
+    });
+
+    function renderWidget(data, cmdId) {
+        var container = document.getElementById('projote-content-' + cmdId);
+        // ... rendu HTML des données ...
+    }
+})();
+&lt;/script&gt;</code></pre>
+
+<h3>8.2 Paramètres widget via $_widgetPossibility</h3>
+
+<pre><code>// Dans ProJote.class.php
+public static $_widgetPossibility = array(
+    'custom'          => true,   // Widget personnalisé activé
+    'custom::layout'  => false,  // Pas de layout personnalisé
+    'parameters'      => array(
+        'accent_color' => array(
+            'label' => 'Couleur d\'accent',
+            'type'  => 'color',  // Affiche un color picker dans l'UI
+        ),
+    ),
+);</code></pre>
+
+<p>Dans le template HTML, accéder au paramètre via : <code>#accent_color#</code></p>
+
+<!-- ============================================================ -->
+<h2 id="frontend">9. desktop/ — Interface utilisateur</h2>
+
+<h3>9.1 desktop/php/ProJote.php — Vue liste</h3>
+
+<p>Rendu côté serveur de la page d'administration du plugin. Jeedom l'inclut dans l'iframe de l'interface.</p>
+
+<pre><code>&lt;?php
+if (!isConnect('admin')) {
+    throw new Exception('{{401 - Accès non autorisé}}');
+}
+$plugin = plugin::byId('ProJote');
+if ($plugin === null) {
+    throw new Exception('{{Plugin ProJote non trouvé}}');
+}
+$eqLogics = eqLogic::byType($plugin->getId());
+sendVarToJS('eqType', $plugin->getId());
+sendVarToJS('LogLevel', log::convertLogLevel(log::getLogLevel($plugin->getId())));
+?&gt;
+&lt;div class="row"&gt;
+    &lt;!-- Liste des équipements --&gt;
+    &lt;div class="eqLogicThumbnailDisplay"&gt;
+        &lt;?php foreach ($eqLogics as $eqLogic) { ... } ?&gt;
+    &lt;/div&gt;
+&lt;/div&gt;</code></pre>
+
+<div class="note">
+    <strong>sendVarToJS()</strong> exporte une variable PHP vers JavaScript. Elle sera accessible dans <code>ProJote.js</code> via la variable globale correspondante.
+</div>
+
+<h3>9.2 desktop/js/ProJote.js — JavaScript frontend</h3>
+
+<p>Jeedom 4.4 utilise <strong>Vanilla JS</strong> (pas jQuery). Les APIs principales :</p>
+
+<pre><code>// Initialisation au chargement de la page
+document.addEventListener('DOMContentLoaded', function() {
+    // Charger les équipements
+    jeedomUtils.initPage({
+        eqType: eqType,     // Variable exportée depuis PHP
+        onEqLogicSelect: function(eqLogic) {
+            loadEqLogicConfig(eqLogic);
+        }
+    });
+});
+
+// Appel AJAX
+domUtils.ajax({
+    type: 'POST',
+    url: 'plugins/ProJote/core/ajax/ProJote.ajax.php',
+    data: { action: 'GetConfig', eqLogicId: id },
+    success: function(data) { ... },
+    error: function(error) { jeedomUtils.showAlert({message: error, level: 'danger'}); }
+});
+
+// Boîte de dialogue
+jeeDialog.dialog({
+    title: 'Scan QR Code',
+    content: '&lt;canvas id="qr-canvas"&gt;&lt;/canvas&gt;',
+    buttons: {
+        Fermer: { click: function() { jeeDialog.closeAll(); } }
+    }
+});</code></pre>
+
+<!-- ============================================================ -->
+<h2 id="communication">10. Communication PHP ↔ Python</h2>
+
+<h3>10.1 PHP → Python (commandes en temps réel)</h3>
+
+<p>Jeedom envoie des commandes au daemon via socket TCP :</p>
+
+<pre><code>// PHP — envoyer une commande
+$socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
+socket_connect($socket, '127.0.0.1', 55369);
+socket_write($socket, json_encode(['action' => 'refresh', 'eqLogicId' => 42]) . "\n");
+socket_close($socket);</code></pre>
+
+<pre><code># Python — recevoir une commande
+message = jeedom_socket.get()
+data = json.loads(message)
+if data['action'] == 'refresh':
+    collect_data(data['eqLogicId'])</code></pre>
+
+<h3>10.2 Python → PHP (envoi de données)</h3>
+
+<p>Le daemon envoie ses données via HTTP POST vers le callback :</p>
+
+<pre><code># Python — envoyer les données vers Jeedom
+payload = {
+    'CmdId': eqLogicId,
+    'connection_status': 'connected',
+    'Notes': [...],
+    'Devoirs': [...],
+    # ... toutes les données ...
+}
+jeedom_com.send_change_immediate(payload)</code></pre>
+
+<pre><code># Sous le capot, jeedom_com fait :
+requests.post(
+    callback_url,
+    params={'apikey': apikey},
+    json=payload
+)</code></pre>
+
+<h3>10.3 Schéma complet</h3>
+
+<pre><code>Utilisateur clique "Rafraîchir"
+    │
+    ▼
+ProJote.js ──POST──► ProJote.ajax.php (action=Validate)
+                            │
+                            ▼
+                    ProJote.class.php::sendToDeamon()
+                            │
+                        Socket TCP
+                            │
+                            ▼
+                    ProJoted.py (reçoit la commande)
+                            │
+                    pronotepy (API Pronote)
+                            │
+                    Collecte toutes les données
+                            │
+                        HTTP POST
+                            │
+                            ▼
+                    jeeProJote.php
+                            │
+                            ▼
+                    checkAndUpdateCmd() → commandes Jeedom
+                    setConfiguration('widget_json') → widget
+                    saveDataToJsonFile() → persistance disque</code></pre>
+
+<!-- ============================================================ -->
+<h2 id="securite">11. Sécurité</h2>
+
+<h3>11.1 Authentification dans les fichiers PHP</h3>
+
+<pre><code>// Pour les pages admin (desktop/php/, ajax/)
+if (!isConnect('admin')) {
+    throw new Exception('{{401 - Accès non autorisé}}');
+}
+
+// Pour les callbacks daemon (core/php/)
+jeedom::apiAccess(init('apikey'), 'ProJote');
+// Lance une exception si la clé est invalide → arrête le traitement</code></pre>
+
+<h3>11.2 Whitelist AJAX</h3>
+
+<pre><code>// Obligatoire en Core 4.1+ — liste explicite des actions autorisées
+ajax::init(['Validate', 'ValidateQRCode', 'ChangeEnfant', 'GetConfig', 'GetWidgetData']);</code></pre>
+
+<h3>11.3 Niveaux de log valides</h3>
+
+<pre><code>// CORRECT
+log::add(__CLASS__, 'debug',   $message);
+log::add(__CLASS__, 'info',    $message);
+log::add(__CLASS__, 'warning', $message);
+log::add(__CLASS__, 'error',   $message);  // et non 'erreur' !
+
+// INCORRECT — "erreur" n'existe pas dans Jeedom
+log::add(__CLASS__, 'erreur',  $message);  // ← bug silencieux</code></pre>
+
+<h3>11.4 Chiffrement des données sensibles</h3>
+
+<pre><code>// Lister les clés à chiffrer automatiquement
+public static $_encryptConfigKey = array('Token_password', 'password');
+
+// En lecture, Jeedom déchiffre automatiquement
+$token = $eqLogic->getConfiguration('Token_password');  // déjà déchiffré</code></pre>
+
+<h3>11.5 Échappement shell</h3>
+
+<pre><code>// Toujours échapper les valeurs passées en shell
+$cmd .= ' --datadir ' . escapeshellarg($data_dir);
+
+// Éviter les injections dans les requêtes DB
+// → Utiliser les méthodes Jeedom (getConfiguration, setConfiguration)
+// → Éviter les requêtes SQL directes</code></pre>
+
+<!-- ============================================================ -->
+<h2 id="checklist">12. Checklist de mise en production</h2>
+
+<div class="success">
+    <strong>Vérifications obligatoires avant release :</strong>
+</div>
+
+<table>
+    <tr><th>Élément</th><th>Vérification</th><th>Statut ProJote 0.9</th></tr>
+    <tr>
+        <td><code>info.json</code></td>
+        <td>licence=AGPL, require="4.4", description bilingue</td>
+        <td>✅ Corrigé</td>
+    </tr>
+    <tr>
+        <td><code>packages.json</code></td>
+        <td>Pas de sections vides (pip3, npm, yarn...)</td>
+        <td>✅ Corrigé</td>
+    </tr>
+    <tr>
+        <td><code>ajax::init()</code></td>
+        <td>Whitelist explicite des actions</td>
+        <td>✅ Corrigé</td>
+    </tr>
+    <tr>
+        <td><code>log::add()</code></td>
+        <td>Niveau valide (debug/info/warning/error)</td>
+        <td>✅ Corrigé</td>
+    </tr>
+    <tr>
+        <td><code>system::getCmdPython3()</code></td>
+        <td>Utilisé pour lancer le daemon (Debian 12)</td>
+        <td>✅ Corrigé</td>
+    </tr>
+    <tr>
+        <td>PID cleanup</td>
+        <td><code>unlink()</code> et non <code>shell_exec(rm)</code></td>
+        <td>✅ Corrigé</td>
+    </tr>
+    <tr>
+        <td>Chemins hardcodés Python</td>
+        <td>Utilise <code>_data_dir</code> passé via <code>--datadir</code></td>
+        <td>✅ Corrigé</td>
+    </tr>
+    <tr>
+        <td>Code de test Python</td>
+        <td>Aucune date hardcodée, aucun code de debug</td>
+        <td>✅ Corrigé</td>
+    </tr>
+    <tr>
+        <td><code>message::add()</code></td>
+        <td>Signature : <code>($_type, $_message, $_action, $_logicalId)</code></td>
+        <td>✅ Corrigé</td>
+    </tr>
+    <tr>
+        <td><code>error_log()</code></td>
+        <td>Aucun appel debug en production</td>
+        <td>✅ Corrigé</td>
+    </tr>
+    <tr>
+        <td>Tokens protégés</td>
+        <td>Non écrasés lors des sauvegardes UI</td>
+        <td>✅ OK</td>
+    </tr>
+    <tr>
+        <td>Monkey patches</td>
+        <td>Grade.__init__ et html_parse patchés</td>
+        <td>✅ OK</td>
+    </tr>
+    <tr>
+        <td>Circuit breaker</td>
+        <td>Protection anti-boucle de reconnexion</td>
+        <td>✅ OK</td>
+    </tr>
+</table>
+
+<hr>
+<p><em>Documentation générée pour ProJote v0.9 — Auteur : Aldarande — Licence AGPL</em></p>
+<p><em>Pour toute question, consultez <a href="index.html">la documentation utilisateur</a> ou le <a href="https://github.com/Aldarande/ProJote">dépôt GitHub</a>.</em></p>
+
+</body>
+</html>
