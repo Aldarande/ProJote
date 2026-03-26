@@ -37,6 +37,7 @@ try:
     import binascii
     import importlib
     import requests
+    import threading
 
     # import du Plugin Principal
     import pronotepy
@@ -107,6 +108,11 @@ except ImportError as e:
 # Dictionnaire global pour tracker les tentatives échouées de connexion
 # Utilise pour implémenter un "circuit breaker" et éviter les boucles infinies
 failed_attempts = {}  # Format: {eqLogicId: {"count": N, "timestamp": time.time()}}
+_failed_attempts_lock = threading.Lock()
+
+# Threads actifs par équipement — garantit qu'un seul thread tourne par eqLogicId
+_active_eq_lock = threading.Lock()
+_active_eq = {}  # Format: {eqLogicId: threading.Thread}
 
 # Variable globale pour stocker les info de connexion Jeedom
 _callback_url = None
@@ -1331,6 +1337,7 @@ def Connect(pronote_url, login, password, ent):
 def check_and_update_failed_attempts(eqLogicId, increment=False):
     """
     Implémente un circuit breaker pour éviter les boucles infinies de reconnexion.
+    Thread-safe via _failed_attempts_lock.
 
     Args:
         eqLogicId: ID de l'équipement
@@ -1346,37 +1353,36 @@ def check_and_update_failed_attempts(eqLogicId, increment=False):
 
     current_time = time.time()
 
-    # Initialiser si n'existe pas
-    if eqLogicId not in failed_attempts:
-        failed_attempts[eqLogicId] = {"count": 0, "timestamp": current_time}
+    with _failed_attempts_lock:
+        # Initialiser si n'existe pas
+        if eqLogicId not in failed_attempts:
+            failed_attempts[eqLogicId] = {"count": 0, "timestamp": current_time}
 
-    # Réinitialiser dopo timeout
-    if current_time - failed_attempts[eqLogicId]["timestamp"] > timeout_seconds:
-        failed_attempts[eqLogicId] = {"count": 0, "timestamp": current_time}
+        # Réinitialiser après timeout
+        if current_time - failed_attempts[eqLogicId]["timestamp"] > timeout_seconds:
+            failed_attempts[eqLogicId] = {"count": 0, "timestamp": current_time}
 
-    # Incrémenter si demandé
-    if increment:
-        failed_attempts[eqLogicId]["count"] += 1
+        # Incrémenter si demandé
+        if increment:
+            failed_attempts[eqLogicId]["count"] += 1
+            if failed_attempts[eqLogicId]["count"] > max_attempts:
+                error_msg = (
+                    f"ProJote - Circuit breaker: {failed_attempts[eqLogicId]['count']} tentatives échouées. "
+                    f"Le token Pronote est expiré. Supprimez le token et rescanez le code QR pour générer une nouvelle connexion."
+                )
+                logging.error(
+                    f"Circuit breaker OUVERT pour eqLogicId {eqLogicId}: {error_msg}"
+                )
+                return False
+
+        # Vérifier si circuit est ouvert
         if failed_attempts[eqLogicId]["count"] > max_attempts:
             error_msg = (
-                f"ProJote - Circuit breaker: {failed_attempts[eqLogicId]['count']} tentatives échouées. "
-                f"Le token Pronote est expiré. Supprimez le token et rescanez le code QR pour générer une nouvelle connexion."
+                f"ProJote - Circuit breaker bloqué pour eqLogicId {eqLogicId}. "
+                f"Attendez 5 minutes ou supprimez le token manuellement."
             )
-            logging.error(
-                f"Circuit breaker OUVERT pour eqLogicId {eqLogicId}: {error_msg}"
-            )
-            # Note: Le message est envoyé via jeeProJote.php après réception du JSON
-            # send_jeedom_message() est désactivé car la route n'existe pas en Jeedom 4.3+
+            logging.error(error_msg)
             return False
-
-    # Vérifier si circuit est ouvert
-    if failed_attempts[eqLogicId]["count"] > max_attempts:
-        error_msg = (
-            f"ProJote - Circuit breaker bloqué pour eqLogicId {eqLogicId}. "
-            f"Attendez 5 minutes ou supprimez le token manuellement."
-        )
-        logging.error(error_msg)
-        return False
 
     return True
 
@@ -1556,249 +1562,283 @@ def load_persistent_token(eqLogicId):
         return None, None, None
 
 
-def read_socket():  # sourcery skip: extract-method, merge-dict-assign
-    global JEEDOM_SOCKET_MESSAGE
+def process_message(message):
+    """
+    Traite un message reçu depuis le socket Jeedom.
+    Exécuté dans un thread dédié par équipement (eqLogicId).
+    """
+    eq_id = str(message.get("CmdId", ""))
     try:
-        if not JEEDOM_SOCKET_MESSAGE.empty():
-            logging.debug("Notification received in socket JEEDOM_SOCKET_MESSAGE")
+        if message.get("apikey") != _apikey:
+            logging.error("Invalid apikey from socket: %s", message.get("apikey"))
+            # Envoyer une notification d'erreur à Jeedom
+            jeedom_com.send_change_immediate(
+                {
+                    "error": "Invalid API key",
+                    "CmdId": message.get("CmdId", ""),
+                    "connection_status": "error",
+                }
+            )
+            return
+        # ========================================================
+        #   1 : On se connecte avec le Token réçu par défault
+        # ========================================================
+        # Vérifier que les informations de Token sont présentes et non vides
+        required_keys = ["TokenId", "TokenUsername", "TokenPassword", "TokenUrl"]
+        all_keys_present = True
+        for key in required_keys:
+            if key not in message or not message[key].strip():
+                logging.error("Information de Token manquante ou vide : %s", key)
+                all_keys_present = False
+        if all_keys_present:
+            logging.debug(
+                "Toutes les informations de Token sont présentes et non vides. Je me connecte avec le Token"
+            )
 
-            raw_message = JEEDOM_SOCKET_MESSAGE.get()
-            decoded_message = raw_message.decode("utf-8")
-            logging.debug("Decoded message: %s", decoded_message)
-            if (
-                not decoded_message.strip()
-            ):  # Vérifier si la chaîne est vide après suppression des espaces
-                logging.error("Notification vide ou invalide reçu depuis le socket.")
-                return
-            try:
-                message = json.loads(decoded_message)
-            except json.JSONDecodeError as e:
-                logging.error("Erreur de décodage JSON : %s", e)
-                logging.debug("Notification en erreur : %s", raw_message)
-                return
+            # Vérifier le circuit breaker avant de tenter la connexion
+            eqLogicId = message.get("CmdId", "")
+            if not check_and_update_failed_attempts(eqLogicId, increment=False):
+                error_msg = (
+                    f"ProJote - Token expiré pour équipement {eqLogicId}. "
+                    f"Trop de tentatives échouées. "
+                    f"Supprimez le token et rescanez le code QR pour générer une nouvelle connexion."
+                )
+                logging.error(
+                    f"Circuit breaker BLOQUÉ pour eqLogicId {eqLogicId}. "
+                    f"Les tentatives de connexion au token repétées ont échoué. "
+                    f"Le token est probablement expiré. "
+                    f"Supprimez le fichier token et rescanez le code QR."
+                )
+                # Note: Le message est envoyé via jeeProJote.php après réception du JSON
+                # send_jeedom_message() est désactivé car la route n'existe pas en Jeedom 4.3+
 
-            logging.debug("Le MESSAGE reçu est : %s", message)
-            if message.get("apikey") != _apikey:
-                logging.error("Invalid apikey from socket: %s", message.get("apikey"))
-                # Envoyer une notification d'erreur à Jeedom
+                with _failed_attempts_lock:
+                    nb_attempts = failed_attempts.get(str(eqLogicId), {"count": 0})["count"]
                 jeedom_com.send_change_immediate(
                     {
-                        "error": "Invalid API key",
-                        "CmdId": message.get("CmdId", ""),
-                        "connection_status": "error",
+                        "error": f"Token expiré. Trop de tentatives échouées ({nb_attempts} tentatives). "
+                        f"Supprimez le token et rescanez le code QR.",
+                        "CmdId": eqLogicId,
+                        "connection_status": "disconnected",
                     }
                 )
                 return
-            # ========================================================
-            #   1 : On se connecte avec le Token réçu par défault
-            # ========================================================
-            # Vérifier que les informations de Token sont présentes et non vides
-            required_keys = ["TokenId", "TokenUsername", "TokenPassword", "TokenUrl"]
-            all_keys_present = True
-            for key in required_keys:
-                if key not in message or not message[key].strip():
-                    logging.error("Information de Token manquante ou vide : %s", key)
-                    all_keys_present = False
-            if all_keys_present:
-                logging.debug(
-                    "Toutes les informations de Token sont présentes et non vides. Je me connecte avec le Token"
+
+            try:
+                if "parent.html" in message["TokenUrl"]:
+                    client = pronotepy.ParentClient.token_login(
+                        pronote_url=message["TokenUrl"],
+                        username=message["TokenUsername"],
+                        password=message["TokenPassword"],
+                        client_identifier=message["TokenId"],
+                        # Fallback "ProJote" : compat tokens créés avant v0.9 (uuid non stocké)
+                        uuid=message.get("TokenUuid", "ProJote"),
+                    )
+                    # Je sélectionne l'enfant si il est spécifié
+                    if "enfant" in message and message["enfant"] != "":
+                        # Pour mettre à jour la liste d'enfant, je vérifie toujours la liste
+                        client.set_child(message["enfant"])
+                        logging.info(
+                            "Je suis connecté à l'enfant %s", message["enfant"]
+                        )
+                else:
+                    client = pronotepy.Client.token_login(
+                        pronote_url=message["TokenUrl"],
+                        username=message["TokenUsername"],
+                        password=message["TokenPassword"],
+                        client_identifier=message["TokenId"],
+                        # Fallback "ProJote" : compat tokens créés avant v0.9 (uuid non stocké)
+                        uuid=message.get("TokenUuid", "ProJote"),
+                    )
+            except Exception as e:
+                logging.error(
+                    "Token invalide, regénérer le QR CODE ou re valider le compte : %s",
+                    e,
                 )
-
-                # Vérifier le circuit breaker avant de tenter la connexion
+                client = None
+            ### 05/01/2025 : A revalider si je dois doubler
+            # A supprimer car doublon avec ligne 1155
+            # credentials = client.export_credentials()
+            if client is not None and client.logged_in:
+                tokenconnected = "true"
+                # Réinitialiser le compteur d'échecs en cas de connexion réussie
                 eqLogicId = message.get("CmdId", "")
-                if not check_and_update_failed_attempts(eqLogicId, increment=False):
-                    error_msg = (
-                        f"ProJote - Token expiré pour équipement {eqLogicId}. "
-                        f"Trop de tentatives échouées. "
-                        f"Supprimez le token et rescanez le code QR pour générer une nouvelle connexion."
-                    )
-                    logging.error(
-                        f"Circuit breaker BLOQUÉ pour eqLogicId {eqLogicId}. "
-                        f"Les tentatives de connexion au token repétées ont échoué. "
-                        f"Le token est probablement expiré. "
-                        f"Supprimez le fichier token et rescanez le code QR."
-                    )
-                    # Note: Le message est envoyé via jeeProJote.php après réception du JSON
-                    # send_jeedom_message() est désactivé car la route n'existe pas en Jeedom 4.3+
-
-                    jeedom_com.send_change_immediate(
-                        {
-                            "error": f"Token expiré. Trop de tentatives échouées ({failed_attempts.get(str(eqLogicId), {'count': 0})['count']} tentatives). "
-                            f"Supprimez le token et rescanez le code QR.",
-                            "CmdId": eqLogicId,
-                            "connection_status": "disconnected",
-                        }
-                    )
-                    return
-
-                try:
-                    if "parent.html" in message["TokenUrl"]:
-                        client = pronotepy.ParentClient.token_login(
-                            pronote_url=message["TokenUrl"],
-                            username=message["TokenUsername"],
-                            password=message["TokenPassword"],
-                            client_identifier=message["TokenId"],
-                            # Fallback "ProJote" : compat tokens créés avant v0.9 (uuid non stocké)
-                            uuid=message.get("TokenUuid", "ProJote"),
-                        )
-                        # Je sélectionne l'enfant si il est spécifié
-                        if "enfant" in message and message["enfant"] != "":
-                            # Pour mettre à jour la liste d'enfant, je vérifie toujours la liste
-                            client.set_child(message["enfant"])
-                            logging.info(
-                                "Je suis connecté à l'enfant %s", message["enfant"]
-                            )
-                    else:
-                        client = pronotepy.Client.token_login(
-                            pronote_url=message["TokenUrl"],
-                            username=message["TokenUsername"],
-                            password=message["TokenPassword"],
-                            client_identifier=message["TokenId"],
-                            # Fallback "ProJote" : compat tokens créés avant v0.9 (uuid non stocké)
-                            uuid=message.get("TokenUuid", "ProJote"),
-                        )
-                except Exception as e:
-                    logging.error(
-                        "Token invalide, regénérer le QR CODE ou re valider le compte : %s",
-                        e,
-                    )
-                    client = None
-                ### 05/01/2025 : A revalider si je dois doubler
-                # A supprimer car doublon avec ligne 1155
-                # credentials = client.export_credentials()
-                if client is not None and client.logged_in:
-                    tokenconnected = "true"
-                    # Réinitialiser le compteur d'échecs en cas de connexion réussie
-                    eqLogicId = message.get("CmdId", "")
+                with _failed_attempts_lock:
                     if str(eqLogicId) in failed_attempts:
                         failed_attempts[str(eqLogicId)] = {
                             "count": 0,
                             "timestamp": time.time(),
                         }
-                else:
-                    logging.error("Connection avec le Token échouée. Regénérez le QR code.")
-                    eqLogicId = message.get("CmdId", "")
-                    check_and_update_failed_attempts(eqLogicId, increment=True)
-                    return
             else:
-                logging.error("Aucun token disponible. Configurez la connexion via QR code.")
-                jeedom_com.send_change_immediate(
-                    {
-                        "error": "Aucun token disponible, connexion impossible. Configurez via QR code.",
-                        "CmdId": message.get("CmdId", ""),
-                        "connection_status": "disconnected",
-                    }
-                )
+                logging.error("Connection avec le Token échouée. Regénérez le QR code.")
+                eqLogicId = message.get("CmdId", "")
+                check_and_update_failed_attempts(eqLogicId, increment=True)
                 return
-            # ==================================================================================
-            #  3 :  Je récupére les informations de l'élève
-            # ==================================================================================
-            if client is not None and client.logged_in:
-                logging.debug("Nous sommes loggué")
-                # Je récupére les informations de l'élève
-                jsondata = {}
-                jsondata["CmdId"] = message["CmdId"]
-                jsondata["ConnectionDate"] = datetime.datetime.now().strftime(
-                    " %H:%M:%S %d/%m/%Y"
+        else:
+            logging.error("Aucun token disponible. Configurez la connexion via QR code.")
+            jeedom_com.send_change_immediate(
+                {
+                    "error": "Aucun token disponible, connexion impossible. Configurez via QR code.",
+                    "CmdId": message.get("CmdId", ""),
+                    "connection_status": "disconnected",
+                }
+            )
+            return
+        # ==================================================================================
+        #  3 :  Je récupére les informations de l'élève
+        # ==================================================================================
+        if client is not None and client.logged_in:
+            logging.debug("Nous sommes loggué")
+            # Je récupére les informations de l'élève
+            jsondata = {}
+            jsondata["CmdId"] = message["CmdId"]
+            jsondata["ConnectionDate"] = datetime.datetime.now().strftime(
+                " %H:%M:%S %d/%m/%Y"
+            )
+            jsondata["connection_status"] = "connected"
+            logging.debug(
+                "Validation Token %s",
+                tokenconnected,
+            )
+            if (tokenconnected == "true") and (
+                "parent.html" in message["TokenUrl"]
+            ):
+                logging.debug("Le nom de l'élève %s", client._selected_child.name)
+                jsondata["Eleve"] = identites(client._selected_child)
+                # Ajouter la liste des enfants pour les comptes parents
+                list_enfant = []
+                for child in client.children:
+                    list_enfant.append(child.name)
+                jsondata["Liste_Enfant"] = json.dumps(
+                    list_enfant, separators=(",", ":")
                 )
-                jsondata["connection_status"] = "connected"
-                logging.debug(
-                    "Validation Token %s",
-                    tokenconnected,
-                )
-                if (tokenconnected == "true") and (
-                    "parent.html" in message["TokenUrl"]
-                ):
-                    logging.debug("Le nom de l'élève %s", client._selected_child.name)
-                    jsondata["Eleve"] = identites(client._selected_child)
-                    # Ajouter la liste des enfants pour les comptes parents
-                    list_enfant = []
-                    for child in client.children:
-                        list_enfant.append(child.name)
-                    jsondata["Liste_Enfant"] = json.dumps(
-                        list_enfant, separators=(",", ":")
-                    )
-                else:
-                    jsondata["Eleve"] = identites(client.info)
-                # Téléchargement de la photo
-                local_picture_path = download_photo(
-                    client, message["CmdId"], tokenconnected, message
-                )
-                if local_picture_path:
-                    jsondata["Local_Picture"] = local_picture_path
-                # je renew le token
-                logging.info("Je renew le Token")
-                jsondata["Token"] = RenewToken(client)
-                # Je valide que le fichier équipement est à jours
-                # je lance la foncton qui recherche si le nom de l'enfant à changer dans l'équipement
-                Checkeleve(client, message["CmdId"])
-                # J'ajoute l'emploi du temps
-                logging.info("Je récupére l'emploi du temps")
-                edt_data = Emploidutemps(client)
-                jsondata["Emploi_du_temps"] = edt_data
-                if "error" in edt_data:
-                    jsondata["error"] = edt_data["error"]
-                # J'ajoute les notes
-                logging.info("Je récupére les notes")
-                notes_data = notes(client)
-                jsondata["Notes"] = notes_data
-                if "error" in notes_data:
-                    jsondata["error"] = notes_data["error"]
-                # j'ajoute les menus
-                logging.info("Je récupére les menus")
-                jsondata["Menus"] = menus(client)
-                # J'ajoute les Notifications
-                logging.info("Je récupére les notifications")
-                jsondata["Notifications"] = notifications(client)
-                # j'ajoutes les absences
-                logging.info("Je récupére les absences")
-                jsondata["Absences"] = absences(client)
-                # J'ajoutes les retards
-                logging.info("Je récupére les retards")
-                jsondata["Retards"] = retards(client)
-                # J'ajoutes les punitions
-                logging.info("Je récupére les punitions")
-                jsondata["Punitions"] = punitions(client)
-                # J'ajoute les devoirs
-                logging.info("Je récupére les devoirs")
-                jsondata["Devoirs"] = devoirs(client)
-                # J'ajoutes des évaluations -- à finir
-                logging.info("Je récupére les évaluations")
-                jsondata["Competences"] = evaluations(client)
-                # J'ajoutes l'ICAL
-                logging.info("Je récupére l'ICAL")
-                jsondata["Ical"] = ical(client)
-                # J'envoie les données à Jeedom
-                logging.debug(
-                    "Projoted.py :: Données JSON à envoyer : %s", json.dumps(jsondata)
-                )
-                jeedom_com.send_change_immediate(jsondata)
-                logging.info("Fin de récupération d'info depuis Projoted.py")
             else:
-                echo = "Le compte n'est pas loggué"
-                logging.error(echo)
-                jeedom_com.send_change_immediate(
-                    {
-                        "error": echo,
-                        "CmdId": message.get("CmdId", ""),
-                        "connection_status": "disconnected",
-                    }
-                )
-                return False
+                jsondata["Eleve"] = identites(client.info)
+            # Téléchargement de la photo
+            local_picture_path = download_photo(
+                client, message["CmdId"], tokenconnected, message
+            )
+            if local_picture_path:
+                jsondata["Local_Picture"] = local_picture_path
+            # je renew le token
+            logging.info("Je renew le Token")
+            jsondata["Token"] = RenewToken(client)
+            # Je valide que le fichier équipement est à jours
+            # je lance la foncton qui recherche si le nom de l'enfant à changer dans l'équipement
+            Checkeleve(client, message["CmdId"])
+            # J'ajoute l'emploi du temps
+            logging.info("Je récupére l'emploi du temps")
+            edt_data = Emploidutemps(client)
+            jsondata["Emploi_du_temps"] = edt_data
+            if "error" in edt_data:
+                jsondata["error"] = edt_data["error"]
+            # J'ajoute les notes
+            logging.info("Je récupére les notes")
+            notes_data = notes(client)
+            jsondata["Notes"] = notes_data
+            if "error" in notes_data:
+                jsondata["error"] = notes_data["error"]
+            # j'ajoute les menus
+            logging.info("Je récupére les menus")
+            jsondata["Menus"] = menus(client)
+            # J'ajoute les Notifications
+            logging.info("Je récupére les notifications")
+            jsondata["Notifications"] = notifications(client)
+            # j'ajoutes les absences
+            logging.info("Je récupére les absences")
+            jsondata["Absences"] = absences(client)
+            # J'ajoutes les retards
+            logging.info("Je récupére les retards")
+            jsondata["Retards"] = retards(client)
+            # J'ajoutes les punitions
+            logging.info("Je récupére les punitions")
+            jsondata["Punitions"] = punitions(client)
+            # J'ajoute les devoirs
+            logging.info("Je récupére les devoirs")
+            jsondata["Devoirs"] = devoirs(client)
+            # J'ajoutes des évaluations -- à finir
+            logging.info("Je récupére les évaluations")
+            jsondata["Competences"] = evaluations(client)
+            # J'ajoutes l'ICAL
+            logging.info("Je récupére l'ICAL")
+            jsondata["Ical"] = ical(client)
+            # J'envoie les données à Jeedom
+            logging.debug(
+                "Projoted.py :: Données JSON à envoyer : %s", json.dumps(jsondata)
+            )
+            jeedom_com.send_change_immediate(jsondata)
+            logging.info("Fin de récupération d'info depuis Projoted.py")
+        else:
+            echo = "Le compte n'est pas loggué"
+            logging.error(echo)
+            jeedom_com.send_change_immediate(
+                {
+                    "error": echo,
+                    "CmdId": message.get("CmdId", ""),
+                    "connection_status": "disconnected",
+                }
+            )
+            return False
     except Exception as e:
         line_number = e.__traceback__.tb_lineno if e.__traceback__ else "unknown"
         error_msg = f"Erreur d'éxécution du daemon : ligne {line_number} - {str(e)}"
         logging.error(error_msg)
         logging.debug("Traceback complet : %s", traceback.format_exc())
-        # Envoyer une notification d'erreur à Jeedom avec le CmdId si disponible
-        cmd_id = message.get("CmdId", "") if "message" in locals() else ""
         jeedom_com.send_change_immediate(
             {
                 "error": error_msg,
-                "CmdId": cmd_id,
+                "CmdId": message.get("CmdId", ""),
                 "connection_status": "error",
             }
         )
+    finally:
+        # Libérer le slot pour cet équipement une fois le traitement terminé
+        with _active_eq_lock:
+            _active_eq.pop(eq_id, None)
+
+
+def read_socket():
+    global JEEDOM_SOCKET_MESSAGE
+    try:
+        if JEEDOM_SOCKET_MESSAGE.empty():
+            return
+
+        raw_message = JEEDOM_SOCKET_MESSAGE.get()
+        decoded_message = raw_message.decode("utf-8")
+        if not decoded_message.strip():
+            logging.error("Notification vide ou invalide reçu depuis le socket.")
+            return
+        try:
+            message = json.loads(decoded_message)
+        except json.JSONDecodeError as e:
+            logging.error("Erreur de décodage JSON : %s", e)
+            logging.debug("Notification en erreur : %s", raw_message)
+            return
+
+        logging.debug("Le MESSAGE reçu est : %s", message)
+
+        eq_id = str(message.get("CmdId", ""))
+
+        # Un seul thread actif par équipement — évite les traitements simultanés
+        with _active_eq_lock:
+            existing = _active_eq.get(eq_id)
+            if existing and existing.is_alive():
+                logging.warning(
+                    "Équipement %s déjà en cours de traitement — requête ignorée.", eq_id
+                )
+                return
+            t = threading.Thread(
+                target=process_message,
+                args=(message,),
+                daemon=True,
+                name=f"eq-{eq_id}",
+            )
+            _active_eq[eq_id] = t
+            t.start()
+            logging.debug("Thread démarré pour l'équipement %s", eq_id)
+
+    except Exception as e:
+        logging.error("Erreur dans read_socket : %s", e)
 
 
 def listen():
