@@ -1112,9 +1112,9 @@ def ical(client):
 def download_photo(client, eqLogicId, tokenconnected, message):
     """
     Télécharge la photo de profil de l'élève ou de l'enfant sélectionné.
-    Note: pour les comptes parent avec Pronote 2024+ (N au format '46#...'), le téléchargement
-    de la photo n'est pas supporté — FichiersExternes requiert une session web (cookies)
-    que les sessions mobile API ne possèdent pas.
+    Pour les comptes parent (Pronote 2024+) : la photo est extraite en base64
+    depuis la réponse de l'API Pronote (PageEmploiDuTemps), car FichiersExternes
+    retourne systématiquement 404 avec les sessions mobiles/token.
 
     Args:
         client: Objet client PronotePy
@@ -1127,37 +1127,119 @@ def download_photo(client, eqLogicId, tokenconnected, message):
     """
     try:
         is_parent = (tokenconnected == "true") and ("parent.html" in message["TokenUrl"])
-        photo = None
-
-        if is_parent:
-            if client._selected_child and client._selected_child.profile_picture:
-                # DEBUG TEMPORAIRE : dump complet du raw_resource pour analyser les champs photo
-                logging.info(
-                    "DEBUG raw_resource enfant : %s",
-                    client._selected_child.raw_resource,
-                )
-                child_n = client._selected_child.raw_resource.get("N", "")
-                if "#" in str(child_n):
-                    logging.info(
-                        "Photo parent Pronote 2024+ (N=%s…) — "
-                        "FichiersExternes peut nécessiter une session web. Tentative quand même.",
-                        str(child_n)[:10],
-                    )
-                photo = client._selected_child.profile_picture
-                logging.debug("Photo trouvée pour l'enfant : %s", client._selected_child.name)
-        else:
-            if client.info.profile_picture:
-                photo = client.info.profile_picture
-                logging.debug("Photo trouvée pour l'élève")
-
-        if not photo:
-            logging.debug("Aucune photo trouvée dans Pronote")
-            return None
 
         data_dir = os.path.join(_data_dir, str(eqLogicId)) + "/"
         verifdossier(data_dir)
         final_path = f"{data_dir}profile_picture.jpg"
         temp_path = f"{data_dir}profile_picture_temp.jpg"
+
+        # ── Compte parent : extraction base64 depuis l'API Pronote ───────────
+        if is_parent:
+            if not client._selected_child:
+                logging.debug("Pas d'enfant sélectionné, photo ignorée")
+                return None
+
+            raw = client._selected_child.raw_resource
+            if not raw.get("avecPhoto"):
+                logging.debug("Pas de photo pour cet enfant (avecPhoto=False)")
+                return None
+
+            photo_bytes = None
+            child_n = raw.get("N", "")
+
+            # Stratégie A : photo base64 dans parametres_utilisateur.listeRessources
+            # (retournée lors de la connexion sur certaines versions Pronote)
+            try:
+                _pu = client.parametres_utilisateur.get("dataSec", {}).get("data", {})
+                _liste = _pu.get("ressource", {}).get("listeRessources", {}).get("V", [])
+                for _child in _liste:
+                    if _child.get("N") == child_n:
+                        pb64 = _child.get("photoBase64", {})
+                        if isinstance(pb64, dict) and pb64.get("_T") == 23 and pb64.get("V"):
+                            photo_bytes = base64.b64decode(pb64["V"])
+                            logging.info("Photo parent récupérée depuis parametres_utilisateur")
+                        break
+            except Exception as _e:
+                logging.debug("Stratégie A photo (parametres_utilisateur) échouée : %s", _e)
+
+            # Stratégie B : appel PageEmploiDuTemps et extraction base64 de la réponse complète
+            if not photo_bytes:
+                try:
+                    week = client.get_week(datetime.date.today())
+                    data = {
+                        "ressource": raw,
+                        "avecAbsencesEleve": False,
+                        "avecConseilDeClasse": True,
+                        "estEDTPermanence": False,
+                        "avecAbsencesRessource": True,
+                        "avecDisponibilites": True,
+                        "avecInfosPrefsGrille": True,
+                        "Ressource": raw,
+                        "NumeroSemaine": week,
+                        "numeroSemaine": week,
+                    }
+                    response = client.post("PageEmploiDuTemps", 16, data)
+                    resp_data = response.get("dataSec", {}).get("data", {})
+
+                    # La photo base64 peut être dans resp_data["ressource"] ou resp_data["Ressource"]
+                    for field in ("ressource", "Ressource"):
+                        res_field = resp_data.get(field, {})
+                        if isinstance(res_field, dict):
+                            pb64 = res_field.get("photoBase64", {})
+                            if isinstance(pb64, dict) and pb64.get("_T") == 23 and pb64.get("V"):
+                                photo_bytes = base64.b64decode(pb64["V"])
+                                logging.info(
+                                    "Photo parent récupérée depuis PageEmploiDuTemps.%s", field
+                                )
+                                break
+
+                    if not photo_bytes:
+                        logging.info(
+                            "Photo non trouvée dans PageEmploiDuTemps — clés réponse : %s — "
+                            "clés ressource : %s",
+                            list(resp_data.keys()),
+                            list(resp_data.get("ressource", {}).keys())
+                            if isinstance(resp_data.get("ressource"), dict) else "N/A",
+                        )
+                except Exception as _e:
+                    logging.warning("Stratégie B photo (PageEmploiDuTemps) échouée : %s", _e)
+
+            if not photo_bytes:
+                logging.warning(
+                    "ProJote — Photo introuvable pour l'équipement %s "
+                    "(compte parent, base64 non retournée par l'API Pronote).",
+                    eqLogicId,
+                )
+                return None
+
+            # Sauvegarde de la photo base64 décodée
+            try:
+                with open(temp_path, "wb") as f:
+                    f.write(photo_bytes)
+                if os.path.exists(final_path):
+                    with open(final_path, "rb") as f2:
+                        if f2.read() == photo_bytes:
+                            os.remove(temp_path)
+                            logging.info("Photo parent identique, pas de remplacement")
+                            return f"/plugins/ProJote/data/{eqLogicId}/profile_picture.jpg"
+                os.rename(temp_path, final_path)
+                logging.info("Photo parent mise à jour : %s", final_path)
+                return f"/plugins/ProJote/data/{eqLogicId}/profile_picture.jpg"
+            except Exception as _e:
+                logging.error("Erreur écriture photo parent : %s", _e)
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+                return None
+
+        # ── Compte élève : méthode standard FichiersExternes ─────────────────
+        photo = None
+        if client.info.profile_picture:
+            photo = client.info.profile_picture
+            logging.debug("Photo trouvée pour l'élève")
+
+        if not photo:
+            logging.debug("Aucune photo trouvée dans Pronote")
+            return None
 
         downloaded = False
         logging.info("Téléchargement photo — URL : %s", photo.url)
@@ -1193,7 +1275,7 @@ def download_photo(client, eqLogicId, tokenconnected, message):
             except Exception as e:
                 logging.info("Stratégie 2 échouée (%s) — essai stratégie 3", e)
 
-        # ── Stratégie 3 : cookies de la session HTTP (Pronote 2024+ web) ─────
+        # ── Stratégie 3 : cookies de la session HTTP ──────────────────────────
         if not downloaded:
             try:
                 session_cookies = client.communication.session.cookies
@@ -1204,13 +1286,12 @@ def download_photo(client, eqLogicId, tokenconnected, message):
                 if resp.status_code == 200 and len(resp.content) > 100:
                     with open(temp_path, "wb") as f:
                         f.write(resp.content)
-                    logging.info("Photo téléchargée — stratégie 3 (cookies session web)")
+                    logging.info("Photo téléchargée — stratégie 3 (cookies session)")
                     downloaded = True
                 else:
                     logging.warning(
                         "ProJote — Photo introuvable pour l'équipement %s "
-                        "(toutes stratégies échouées — HTTP %d). "
-                        "URL : %s",
+                        "(toutes stratégies échouées — HTTP %d). URL : %s",
                         eqLogicId, resp.status_code, photo.url,
                     )
             except Exception as e:
