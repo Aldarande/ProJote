@@ -1489,7 +1489,61 @@ def load_persistent_token(eqLogicId):
                                 uuid=backup_token.get("uuid", "ProJote"),
                             )
                         if client and client.logged_in:
-                            logging.info("Reconnexion avec token backup réussie !")
+                            logging.warning(
+                                "ProJote — Token principal expiré pour l'équipement %s. "
+                                "Token backup utilisé. Renouvellement automatique des tokens en cours.",
+                                eqLogicId,
+                            )
+                            # Tenter de renouveler le token backup via une 2e session indépendante
+                            new_backup_credentials = None
+                            try:
+                                backup_uuid = backup_token.get("uuid", "ProJote")
+                                # Utiliser un UUID distinct pour la nouvelle session backup
+                                renew_uuid = backup_uuid + "2" if backup_uuid.endswith("-bk") else backup_uuid + "-bk"
+                                if "parent.html" in backup_token["pronote_url"]:
+                                    new_backup_client = pronotepy.ParentClient.token_login(
+                                        pronote_url=backup_token["pronote_url"],
+                                        username=backup_token["username"],
+                                        password=backup_token["password"],
+                                        client_identifier=backup_token["client_identifier"],
+                                        uuid=renew_uuid,
+                                    )
+                                else:
+                                    new_backup_client = pronotepy.Client.token_login(
+                                        pronote_url=backup_token["pronote_url"],
+                                        username=backup_token["username"],
+                                        password=backup_token["password"],
+                                        client_identifier=backup_token["client_identifier"],
+                                        uuid=renew_uuid,
+                                    )
+                                if new_backup_client and new_backup_client.logged_in:
+                                    new_backup_credentials = new_backup_client.export_credentials()
+                                    logging.info("Token backup renouvelé avec succès")
+                                else:
+                                    logging.warning(
+                                        "ProJote — Token backup non renouvelé pour l'équipement %s. "
+                                        "Reconnexion via QR recommandée pour régénérer un token de secours.",
+                                        eqLogicId,
+                                    )
+                            except Exception as e_bk:
+                                logging.warning(
+                                    "ProJote — Renouvellement du token backup échoué pour l'équipement %s : %s. "
+                                    "Reconnexion via QR recommandée.",
+                                    eqLogicId, e_bk,
+                                )
+                            # Sauvegarder le nouveau token principal + backup (si disponible)
+                            try:
+                                writedataPronotepy(client, _data_dir, eqLogicId, backup_token=new_backup_credentials)
+                                logging.warning(
+                                    "ProJote — Tokens renouvelés pour l'équipement %s. Token backup : %s.",
+                                    eqLogicId,
+                                    "régénéré avec succès" if new_backup_credentials else "non régénéré — reconnexion QR recommandée",
+                                )
+                            except Exception as e_save:
+                                logging.warning(
+                                    "ProJote — Sauvegarde des tokens renouvelés échouée pour l'équipement %s : %s",
+                                    eqLogicId, e_save,
+                                )
                             return client, "true", enfant
                 except Exception as e2:
                     logging.warning("Reconnexion avec token backup échouée : %s", e2)
