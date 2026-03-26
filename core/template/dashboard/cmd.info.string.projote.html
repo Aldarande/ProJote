@@ -382,12 +382,19 @@
         var ts_ = el('pjwts' + ID); if (ts_ && ts) ts_.textContent = fmtTs(ts);
         var av  = el('pjwav' + ID);
         if (av) {
+            /* Pré-calcul des initiales, stockées en data-attribute pour l'onerror */
+            var initials = (d.eleve || '?').split(' ')
+                .map(function(w){ return w[0] || ''; }).join('').slice(0, 2).toUpperCase();
+            av.setAttribute('data-initials', initials);
+
             if (d.photo) {
-                av.innerHTML = '<img src="' + esc(d.photo) + '" alt="">';
+                /* onerror : si l'image est introuvable (404, permissions…),
+                   on bascule sur les initiales sans image cassée visible */
+                av.innerHTML = '<img src="' + esc(d.photo) + '" alt=""'
+                    + ' onerror="var p=this.parentNode;p.innerHTML=\'\';p.textContent=p.getAttribute(\'data-initials\')||\'?\';">';
             } else {
-                /* Initiales si pas de photo */
-                av.textContent = (d.eleve || '?').split(' ')
-                    .map(function(w){ return w[0]; }).join('').slice(0,2).toUpperCase();
+                av.innerHTML = '';
+                av.textContent = initials;
             }
         }
     }
