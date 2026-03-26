@@ -421,8 +421,7 @@ try:
         # Définition du niveau de log par défaut
         _log_level = "INFO"
 
-        # type de commande python3 ../../resources/ProJoted/LoginConnect.py 'E2A24D72F39BA48F2E400CA838E5CCB5F5F6733C64FA762F8FEF473AA7D5BBAD05F641FFE8C6CFE9486564470BB8FCD0F9E4EAE77338B2B45B9A28DB85EC79AE0729E20FF4D0D60D79A7E0CA0380364CB05DC4C1FC3D71E2575423FECF4A0BDD74ADE24A020B222916617B30B189C724' '4C0B20E070291B38E256452F80138CBE' 'https://0912109y.index-education.net/pronote/parent.html?identifiant=7tTQmnp4Qyu7ZR58#/mobile.parent.html' '1234'
-        # get Arguments in right order : Jeton, Login, Url, Pin, Loglevel
+        # Exemple : python3 LoginConnect.py --URL https://... --Login user --Password pass --Eqid 1 --Uuid xxx
         parser = argparse.ArgumentParser(
             description="Script de conexion à Pronote avec Login"
         )
@@ -436,9 +435,8 @@ try:
         parser.add_argument("--Eqid", help="ID de l'équipement", type=str)
         parser.add_argument("--Loglevel", help="Niveau de log", type=str)
         parser.add_argument("--Uuid", help="UUID unique de l'équipement", type=str)
-        parser.add_argument(
-            "--Pin", help="Code PIN pour la génération du jeton", type=str
-        )
+        parser.add_argument("--Pin", help="Code PIN pour la génération du jeton", type=str)
+        parser.add_argument("--datadir", help="Chemin du dossier data du plugin", type=str)
         args = parser.parse_args()
 
         if args.URL:
@@ -465,7 +463,8 @@ try:
             logging.debug("Utilisation du code PIN par défaut : 4321")
         if args.Loglevel:
             _log_level = args.Loglevel
-        Uuid = args.Uuid if args.Uuid else "ProJote"
+        Uuid = args.Uuid or None
+        DataDir = args.datadir or "/var/www/html/plugins/ProJote/data"
 
         jeedom_utils.set_log_level(_log_level)
 
@@ -496,15 +495,15 @@ try:
             )
 
         if Account.logged_in:
-            logging.info("LOG : Je suis connecté et je demande le QR LOG")
+            logging.info("LOG : Connecté à Pronote, demande du token QR")
             logging.info("Login : %s", Account.username)
             logging.info("URL : %s", Account.pronote_url)
-            logging.info("Password : %s", Account.password)
+            # Ne jamais logger Account.password
             logging.info("ENT : %s", Account.ent)
-            logging.info("Picture : %s", Account.info.profile_picture)
+            logging.debug("Picture : %s", Account.info.profile_picture)
             # je requête le QR code
             Qrcode_data = Account.request_qr_code_data(Pin)
-            logging.debug("QR_code : %s", Qrcode_data)
+            # Ne pas logger Qrcode_data : contient le jeton et le login (credentials)
             # JE me loggue avec le QR code
 
             # Tentative de connexion via le QR code
@@ -521,8 +520,8 @@ try:
                 if NomEnfant != "":
                     Account.set_child(NomEnfant)
 
-            # Je crée le fichier pou le Token.
-            writedataPronotepy(Account, "/var/www/html/plugins/ProJote/data", EqID)
+            # Je crée le fichier pour le Token.
+            writedataPronotepy(Account, DataDir, EqID)
 
 except Exception as e:
     line_number = e.__traceback__.tb_lineno

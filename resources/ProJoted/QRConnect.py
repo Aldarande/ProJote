@@ -71,6 +71,7 @@ try:
         parser.add_argument("--Eqid", help="ID de l'équipement", type=str)
         parser.add_argument("--Loglevel", help="Niveau de log", type=str)
         parser.add_argument("--Uuid", help="UUID unique de l'équipement", type=str)
+        parser.add_argument("--datadir", help="Chemin du dossier data du plugin", type=str)
         args = parser.parse_args()
 
         if args.QRUrl:
@@ -85,7 +86,8 @@ try:
             EqID = str(args.Eqid)
         if args.Loglevel:
             _log_level = args.Loglevel
-        Uuid = args.Uuid if args.Uuid else "ProJote"
+        Uuid = args.Uuid or None
+        DataDir = args.datadir or "/var/www/html/plugins/ProJote/data"
 
         jeedom_utils.set_log_level(_log_level)
 
@@ -94,9 +96,7 @@ try:
             "login": QRLogin,
             "url": QRUrl,
         }
-
-        Qrcode_data_json = json.dumps(Qrcode_data)
-        logging.debug(f"QRConnect.py :: {Qrcode_data_json}")
+        # Ne pas logger Qrcode_data : contient le jeton et le login (credentials)
 
         # Tentative de connexion via le QR code.
         # L'URL Pronote indique si c'est un compte parent ("parent.html") ou élève.
@@ -117,7 +117,7 @@ try:
         if Account.logged_in:
             logging.info("Client connecté")
             # Sauvegarde du token et des infos élève dans le fichier JSON de l'équipement
-            writedataPronotepy(Account, "/var/www/html/plugins/ProJote/data", EqID)
+            writedataPronotepy(Account, DataDir, EqID)
 except Exception as e:
     line_number = e.__traceback__.tb_lineno
     print("An error occurred: line ", line_number, e)

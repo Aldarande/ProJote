@@ -72,21 +72,17 @@ try {
             log::add('ProJote', 'error', '[CONNEXION ÉCHOUÉE] ' . $eqLogic->getHumanName() . ' - ' . $error_message);
         }
 
-        // Ajoute un message au centre de messages Jeedom + toaster
-        // Format: message::add($plugin_id, $title, $message, $type)
+        // Ajoute un message au centre de messages Jeedom
+        // Signature: message::add($_type, $_message, $_action='', $_logicalId='')
         if ($connection_status === 'disconnected') {
             message::add(
                 'ProJote',
-                'ProJote - Session expirée',
-                '[' . $eqLogic->getHumanName() . '] La session ProNote a expiré. Veuillez rescanner le QR code ou re-valider les identifiants.',
-                'warning'
+                '[' . $eqLogic->getHumanName() . '] Session expirée — Veuillez rescanner le QR code ou re-valider les identifiants.'
             );
         } else {
             message::add(
                 'ProJote',
-                'ProJote - Connexion échouée',
-                '[' . $eqLogic->getHumanName() . '] ' . $error_message,
-                'error'
+                '[' . $eqLogic->getHumanName() . '] Connexion échouée : ' . $error_message
             );
         }
 

@@ -6,12 +6,9 @@ if (!isConnect('admin')) {
 // Déclaration des variables obligatoires
 $plugin = plugin::byId('ProJote');
 if ($plugin === null) {
-	error_log('Plugin ProJote non trouvé');
 	throw new Exception('{{Plugin ProJote non trouvé}}');
-} else {
-	error_log('Plugin ProJote trouvé : ' . print_r($plugin, true));
-	$eqLogics = eqLogic::byType($plugin->getId());
 }
+$eqLogics = eqLogic::byType($plugin->getId());
 sendVarToJS('eqType', $plugin->getId());
 sendVarToJS('LogLevel', log::convertLogLevel(log::getLogLevel($plugin->getId())));
 sendVarToJS('eqLogicId', $eqLogic);
