@@ -1173,23 +1173,24 @@ def download_photo(client, eqLogicId, tokenconnected, message):
             except Exception as _e:
                 logging.warning("Stratégie A photo (FichiersExternes P) échouée : %s", _e)
 
-            # Stratégie B : FichiersExternes avec le N standard (46#...) — peut fonctionner
-            # sur certaines configurations Pronote
+            # Stratégie B : ParametresUtilisateur avec la resource de l'enfant
+            # (peut déclencher le retour de photoBase64 _T=23 côté serveur)
             if not photo_bytes:
                 try:
-                    photo_obj = client._selected_child.profile_picture
-                    if photo_obj:
-                        logging.info("Tentative photo via N standard — URL : %s", photo_obj.url)
-                        _resp = client.communication.session.get(photo_obj.url, timeout=15)
-                        if _resp.status_code == 200 and len(_resp.content) > 100:
-                            photo_bytes = _resp.content
-                            logging.info("Photo parent récupérée via FichiersExternes(N standard)")
-                        else:
-                            logging.info(
-                                "Stratégie B (N standard) échouée — HTTP %d", _resp.status_code
-                            )
+                    resp_pu = client.post("ParametresUtilisateur", 7, {"ressource": raw})
+                    pu_data = resp_pu.get("dataSec", {}).get("data", {})
+                    logging.info("DEBUG ParametresUtilisateur(7,ressource) — clés : %s", list(pu_data.keys()))
+                    # Chercher photoBase64 _T=23 dans toute la réponse (récursif niveau 1)
+                    for _k, _v in pu_data.items():
+                        if isinstance(_v, dict):
+                            pb64 = _v.get("photoBase64", {})
+                            if isinstance(pb64, dict) and pb64.get("_T") == 23 and pb64.get("V"):
+                                photo_bytes = base64.b64decode(pb64["V"])
+                                logging.info("Photo parent récupérée depuis ParametresUtilisateur(7).%s", _k)
+                                break
+                            logging.info("DEBUG pu_data[%s] keys : %s", _k, list(_v.keys())[:10])
                 except Exception as _e:
-                    logging.warning("Stratégie B photo (FichiersExternes N) échouée : %s", _e)
+                    logging.warning("Stratégie B photo (ParametresUtilisateur 7) échouée : %s", _e)
 
             if not photo_bytes:
                 logging.warning(
