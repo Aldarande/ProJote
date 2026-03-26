@@ -305,7 +305,7 @@ try:
             logging.error(f"Erreur lors du téléchargement de l'image : {e}")
             return False
 
-    def writedataPronotepy(client, dossier, eqid):
+    def writedataPronotepy(client, dossier, eqid, backup_token=None):
         """
         Sauvegarde toutes les données de l'élève dans un fichier JSON sur le disque.
 
@@ -350,6 +350,8 @@ try:
                 "Name": client.info.name,
                 "Token": credentials,
             }
+            if backup_token is not None:
+                data["BackupToken"] = backup_token
             if client._selected_child:
                 logging.debug(
                     "Je recherche l'enfants : %s", client._selected_child.name
@@ -501,27 +503,50 @@ try:
             # Ne jamais logger Account.password
             logging.info("ENT : %s", Account.ent)
             logging.debug("Picture : %s", Account.info.profile_picture)
-            # je requête le QR code
-            Qrcode_data = Account.request_qr_code_data(Pin)
-            # Ne pas logger Qrcode_data : contient le jeton et le login (credentials)
-            # JE me loggue avec le QR code
 
-            # Tentative de connexion via le QR code
+            # Demander deux QR codes depuis la session mot de passe (avant tout qrcode_login)
+            # Ne pas logger les QR codes : ils contiennent des credentials temporaires
+            Qrcode_data = Account.request_qr_code_data(Pin)
+            Qrcode_data_backup = None
+            try:
+                Qrcode_data_backup = Account.request_qr_code_data(Pin)
+                logging.debug("Second QR code demandé pour le token backup")
+            except Exception as e:
+                logging.warning("Impossible de demander le second QR code (backup) : %s", e)
+
+            # Connexion principale via le QR code principal
             if "parent" not in Qrcode_data["url"]:
-                # Test de connection en tant que Eleve
-                Account = pronotepy.Client.qrcode_login(
+                PrimaryAccount = pronotepy.Client.qrcode_login(
                     qr_code=Qrcode_data, pin=Pin, uuid=Uuid
                 )
             else:
-                # Test de connection en tant que Parent
-                Account = pronotepy.ParentClient.qrcode_login(
+                PrimaryAccount = pronotepy.ParentClient.qrcode_login(
                     qr_code=Qrcode_data, pin=Pin, uuid=Uuid
                 )
                 if NomEnfant != "":
-                    Account.set_child(NomEnfant)
+                    PrimaryAccount.set_child(NomEnfant)
 
-            # Je crée le fichier pour le Token.
-            writedataPronotepy(Account, DataDir, EqID)
+            # Génération du token backup depuis le second QR code
+            backup_credentials = None
+            if Qrcode_data_backup is not None:
+                try:
+                    backup_uuid = (Uuid + "-bk") if Uuid else None
+                    if "parent" not in Qrcode_data_backup["url"]:
+                        BackupAccount = pronotepy.Client.qrcode_login(
+                            qr_code=Qrcode_data_backup, pin=Pin, uuid=backup_uuid
+                        )
+                    else:
+                        BackupAccount = pronotepy.ParentClient.qrcode_login(
+                            qr_code=Qrcode_data_backup, pin=Pin, uuid=backup_uuid
+                        )
+                    if BackupAccount.logged_in:
+                        backup_credentials = BackupAccount.export_credentials()
+                        logging.info("Token backup généré avec succès")
+                except Exception as e:
+                    logging.warning("Génération du token backup échouée : %s", e)
+
+            # Sauvegarde du token principal + backup
+            writedataPronotepy(PrimaryAccount, DataDir, EqID, backup_token=backup_credentials)
 
 except Exception as e:
     line_number = e.__traceback__.tb_lineno

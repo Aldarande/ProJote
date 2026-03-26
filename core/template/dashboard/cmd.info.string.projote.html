@@ -17,12 +17,12 @@
     padding: 4px 2px;
 }
 
-/* ── En-tête : photo centrée + nom ─────────────────── */
+/* ── En-tête : 3 colonnes (photo | nom + date | classe + établissement) ─ */
 .pjw-#id# .ph {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
-    gap: 5px;
+    gap: 8px;
     margin-bottom: 10px;
 }
 .pjw-#id# .ph-av {
@@ -33,13 +33,25 @@
     font-size: 18px; font-weight: 700;
 }
 .pjw-#id# .ph-av img { width:100%; height:100%; object-fit:cover; display:block; }
+/* Colonne centrale : nom en haut, date en bas */
+.pjw-#id# .ph-mid {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: space-between;
+    min-height: 56px; padding: 2px 0;
+}
+/* Colonne droite : classe + établissement */
+.pjw-#id# .ph-right {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: flex-start; justify-content: center;
+    gap: 3px;
+}
 .pjw-#id# .ph-name {
-    font-weight: 800; font-size: 15px;
+    font-weight: 800; font-size: 14px;
     text-transform: uppercase; letter-spacing: .5px;
     text-align: center;
 }
-.pjw-#id# .ph-class  { font-size: 11px; opacity: .55; text-align: center; }
-.pjw-#id# .ph-school { font-size: 11px; opacity: .55; text-align: center; }
+.pjw-#id# .ph-class  { font-size: 11px; opacity: .55; }
+.pjw-#id# .ph-school { font-size: 11px; opacity: .55; }
 .pjw-#id# .ph-ts     { font-size: 9px;  opacity: .3;  text-align: center; }
 
 /* ── Vie scolaire : badges circulaires ─────────────── */
@@ -145,6 +157,12 @@
     transition: width .5s;
 }
 
+/* ── EDT : compteur cours annulés (bas droite) ─────── */
+.pjw-#id# .edt-cancel-count {
+    text-align: right; font-size: 9px; opacity: .4;
+    margin-top: 3px;
+}
+
 /* ── Bas de widget : devoirs + dernières notes ──────── */
 .pjw-#id# .bottom {
     display: grid;
@@ -192,13 +210,17 @@
 
 <div class="pjw-#id#">
 
-    <!-- ══ EN-TÊTE ══════════════════════════════════════ -->
+    <!-- ══ EN-TÊTE (3 colonnes) ═══════════════════════ -->
     <div class="ph">
         <div class="ph-av" id="pjwav#id#">?</div>
-        <div class="ph-name"  id="pjwnm#id#">–</div>
-        <div class="ph-class" id="pjwcl#id#"></div>
-        <div class="ph-school"id="pjwsc#id#"></div>
-        <span class="ph-ts"   id="pjwts#id#"></span>
+        <div class="ph-mid">
+            <div class="ph-name" id="pjwnm#id#">–</div>
+            <span class="ph-ts"  id="pjwts#id#"></span>
+        </div>
+        <div class="ph-right">
+            <div class="ph-class"  id="pjwcl#id#"></div>
+            <div class="ph-school" id="pjwsc#id#"></div>
+        </div>
     </div>
 
     <!-- ══ VIE SCOLAIRE ══════════════════════════════════ -->
@@ -245,6 +267,7 @@
             <div id="pjwec-dem#id#"><div class="p-empty">Pas de cours</div></div>
         </div>
     </div>
+    <div class="edt-cancel-count" id="pjwcancel#id#"></div>
 
     <hr>
 
@@ -415,6 +438,13 @@
         if (lbl_dem) lbl_dem.textContent = d.edt_prochainjour_date || 'Demain';
         if (rng_dem) rng_dem.textContent = timeRange(courses_dem);
         if (ec_dem)  ec_dem.innerHTML    = edtGridHtml(courses_dem);
+
+        /* Compteur cours annulés depuis le début de l'année */
+        var cancelEl = el('pjwcancel' + ID);
+        if (cancelEl) {
+            var nb = d.nb_cours_annules;
+            cancelEl.textContent = (nb != null && nb > 0) ? nb + ' cours annulé' + (nb > 1 ? 's' : '') + ' depuis la rentrée' : '';
+        }
     }
 
     /* ─── BARRE DE MOYENNE ────────────────────────────── */

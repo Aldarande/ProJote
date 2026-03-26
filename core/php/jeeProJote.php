@@ -376,6 +376,7 @@ try {
         'edt_aujourdhui'        => isset($result['Emploi_du_temps']['edt_aujourdhui'])        ? $result['Emploi_du_temps']['edt_aujourdhui']        : array(),
         'edt_prochainjour'      => isset($result['Emploi_du_temps']['edt_prochainjour'])      ? $result['Emploi_du_temps']['edt_prochainjour']      : array(),
         'edt_prochainjour_date' => isset($result['Emploi_du_temps']['edt_prochainjour_date']) ? $result['Emploi_du_temps']['edt_prochainjour_date'] : '',
+        'nb_cours_annules'      => isset($result['Emploi_du_temps']['edt_Cours_canceled'])    ? (int)$result['Emploi_du_temps']['edt_Cours_canceled']    : 0,
         'nb_absences'           => isset($result['Absences']['nb_absences'])                  ? $result['Absences']['nb_absences']                  : 0,
         'nb_retards'            => isset($result['Retards']['nb_retard'])                     ? $result['Retards']['nb_retard']                     : 0,
         'nb_punitions'          => isset($result['Punitions']['Nb_Punitions'])                ? $result['Punitions']['Nb_Punitions']                : 0,

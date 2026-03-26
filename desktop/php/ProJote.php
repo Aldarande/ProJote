@@ -454,4 +454,3 @@ sendVarToJS('eqLogicId', $eqLogic);
 		/* Empêche le texte de passer à la ligne */
 	}
 </style>
-</div>

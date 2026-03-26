@@ -1,573 +1,648 @@
 <!DOCTYPE html>
 <html lang="fr">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Documentation Plugin ProJote de Jeedom</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <title>Documentation — Plugin ProJote</title>
     <link rel="icon" href="../../plugin_info/ProJote_icon.png" type="image/png">
     <style>
+        /* ── Reset & base ─────────────────────────────── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
         body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-size: 15px;
+            line-height: 1.65;
+            color: #1a1a2e;
+            background: #f7f9fc;
             display: flex;
-            flex-direction: column;
             min-height: 100vh;
-            overflow-x: hidden;
-            /* Empêcher le défilement horizontal */
         }
 
+        /* ── Sidebar ──────────────────────────────────── */
         .sidebar {
-            width: 250px;
-            background-color: #d8f3dc;
-            padding: 20px;
-            box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+            width: 230px;
+            flex-shrink: 0;
+            background: #1b4332;
+            color: #d8f3dc;
             position: fixed;
-            height: 100%;
+            top: 0; left: 0; bottom: 0;
             overflow-y: auto;
-            box-shadow: none;
-            /* Supprimer l'ombre */
+            padding: 24px 0 40px;
+        }
+
+        .sidebar-logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 0 20px 20px;
+            border-bottom: 1px solid rgba(255,255,255,.12);
+        }
+        .sidebar-logo img { width: 32px; height: 32px; }
+        .sidebar-logo span {
+            font-size: 18px;
+            font-weight: 700;
+            color: #fff;
+            letter-spacing: .5px;
+        }
+
+        .sidebar nav { padding: 16px 0; }
+
+        .sidebar-section {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 1.2px;
+            text-transform: uppercase;
+            color: rgba(255,255,255,.35);
+            padding: 14px 20px 4px;
         }
 
         .sidebar a {
             display: block;
-            color: #2d6a4f;
+            padding: 7px 20px;
+            color: rgba(255,255,255,.75);
             text-decoration: none;
-            margin: 10px 0;
-            font-weight: bold;
+            font-size: 14px;
+            border-left: 3px solid transparent;
+            transition: background .15s, color .15s, border-color .15s;
         }
-
         .sidebar a:hover {
-            text-decoration: underline;
+            background: rgba(255,255,255,.08);
+            color: #fff;
+            border-left-color: #52b788;
         }
+        .sidebar a.sub { padding-left: 34px; font-size: 13px; }
 
+        /* ── Main content ─────────────────────────────── */
         .content {
-            margin-left: 290px;
-            /* Augmenter la marge pour ajouter un espace */
-            padding: 20px;
-            width: calc(100% - 290px);
-            /* Ajuster la largeur en conséquence */
-            flex: 1;
+            margin-left: 230px;
+            padding: 48px 56px 80px;
+            max-width: 900px;
+            width: 100%;
         }
 
-        h1,
+        /* ── Headings ─────────────────────────────────── */
+        h1 {
+            font-size: 26px;
+            font-weight: 700;
+            color: #1b4332;
+            margin: 48px 0 16px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #d8f3dc;
+        }
+        h1:first-of-type { margin-top: 0; }
+
         h2 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #2d6a4f;
+            margin: 28px 0 10px;
+        }
+
+        h3 {
+            font-size: 15px;
+            font-weight: 600;
+            color: #40916c;
+            margin: 20px 0 8px;
+        }
+
+        /* ── Paragraphs & lists ───────────────────────── */
+        p { margin-bottom: 12px; }
+
+        ul, ol {
+            padding-left: 22px;
+            margin-bottom: 14px;
+        }
+        li { margin-bottom: 5px; }
+
+        /* ── Links ────────────────────────────────────── */
+        a { color: #2d6a4f; text-decoration: underline; }
+        a:hover { color: #1b4332; }
+
+        /* ── Code ─────────────────────────────────────── */
+        code {
+            background: #e9f5ee;
+            border: 1px solid #b7e4c7;
+            border-radius: 4px;
+            padding: 1px 6px;
+            font-family: "SFMono-Regular", Consolas, monospace;
+            font-size: 13px;
             color: #1b4332;
         }
-
-        .center {
-            text-align: center;
+        pre {
+            background: #1a1a2e;
+            color: #d8f3dc;
+            border-radius: 8px;
+            padding: 16px 20px;
+            overflow-x: auto;
+            margin: 12px 0 18px;
+            font-size: 13px;
+            line-height: 1.5;
         }
+        pre code { background: none; border: none; color: inherit; padding: 0; }
 
-        .highlight {
-            background-color: rgba(255, 0, 0, 0.75);
-        }
-
-
-        table,
-        th,
-        td {
-            border: 1px solid black;
-        }
-
-        th,
-        td {
-            padding: 10px;
-            text-align: left;
-        }
-
-        th {
-            background-color: #f2f2f2;
-        }
-
-        .table-offset {
-            margin: 20px;
-            /* Décaler le tableau de 20 pixels */
-        }
-
-        footer {
-            text-align: right;
-            padding: 5px;
-            background-color: #d8f3dc;
+        /* ── Tables ───────────────────────────────────── */
+        table {
             width: 100%;
-            box-shadow: none;
-            /* Supprimer l'ombre */
+            border-collapse: collapse;
+            margin: 16px 0 24px;
+            font-size: 14px;
+        }
+        th {
+            background: #d8f3dc;
+            color: #1b4332;
+            font-weight: 600;
+            padding: 10px 14px;
+            text-align: left;
+            border-bottom: 2px solid #b7e4c7;
+        }
+        td {
+            padding: 9px 14px;
+            border-bottom: 1px solid #e9f5ee;
+            vertical-align: top;
+        }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: #f0faf3; }
+
+        /* ── Callouts ─────────────────────────────────── */
+        .callout {
+            border-left: 4px solid;
+            border-radius: 0 6px 6px 0;
+            padding: 12px 16px;
+            margin: 16px 0;
+            font-size: 14px;
+        }
+        .callout-warning {
+            border-color: #e76f51;
+            background: #fff3ef;
+            color: #7f3b2a;
+        }
+        .callout-info {
+            border-color: #52b788;
+            background: #edfaf1;
+            color: #1b4332;
+        }
+        .callout-tip {
+            border-color: #f4a261;
+            background: #fff8ef;
+            color: #7a4e1e;
+        }
+        .callout strong { display: block; margin-bottom: 4px; }
+
+        /* ── Badge version ────────────────────────────── */
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 700;
+            margin-right: 6px;
+        }
+        .badge-new  { background: #d8f3dc; color: #1b4332; }
+        .badge-fix  { background: #fde8d8; color: #7f3b2a; }
+        .badge-sec  { background: #e8d8f8; color: #3a1860; }
+        .badge-perf { background: #daeaf8; color: #173a5e; }
+
+        /* ── kbd ──────────────────────────────────────── */
+        kbd {
+            background: #eee;
+            border: 1px solid #bbb;
+            border-radius: 4px;
+            padding: 1px 7px;
+            font-size: 13px;
+            font-family: monospace;
         }
 
-        p {
-            word-wrap: break-word;
-            word-break: break-word;
-            padding: 20px;
-            /* Augmenter la marge pour ajouter un espace */
-            width: calc(100% - 290px);
+        /* ── Images ───────────────────────────────────── */
+        img {
+            max-width: 100%;
+            border-radius: 6px;
+            border: 1px solid #d8f3dc;
+            margin: 8px 0;
+        }
+
+        /* ── Footer ───────────────────────────────────── */
+        footer {
+            margin-left: 230px;
+            padding: 14px 56px;
+            font-size: 12px;
+            color: #888;
+            border-top: 1px solid #e0e8e4;
+            background: #f7f9fc;
         }
     </style>
 </head>
-
 <body>
-    <div class="sidebar">
-        <h1><img src="../../plugin_info/ProJote_icon.png" alt="ProJote Icon" style="width: 10%; height: auto;"> ProJote
-        </h1>
-        <h2>Sommaire</h2>
+
+<!-- ═══════════════ SIDEBAR ═══════════════ -->
+<aside class="sidebar">
+    <div class="sidebar-logo">
+        <img src="../../plugin_info/ProJote_icon.png" alt="ProJote">
+        <span>ProJote</span>
+    </div>
+    <nav>
+        <div class="sidebar-section">Démarrage</div>
         <a href="#presentation">Présentation</a>
         <a href="#installation">Installation</a>
-        <a href="#connexion">Connexion</a>
-        <a href="#login">&nbsp;&nbsp;&nbsp;Méthode Login</a>
-        <a href="#qrcode">&nbsp;&nbsp;&nbsp;Méthode QR Code</a>
-        <a href="#utilisation">Utilisation</a>
-        <a href="#Version">Historique Versions</a>
-        <a href="#faq">❓ FAQ</a>
-        <a href="#security">🔐 Sécurité</a>
-        <a href="#troubleshooting">🛠️ Dépannage</a>
-        <a href="#support">📞 Support</a>
+
+        <div class="sidebar-section">Connexion</div>
+        <a href="#connexion">Vue d'ensemble</a>
+        <a href="#login" class="sub">Par identifiants</a>
+        <a href="#qrcode" class="sub">Par QR Code</a>
+
+        <div class="sidebar-section">Référence</div>
+        <a href="#utilisation">Commandes disponibles</a>
+        <a href="#widget">Widget</a>
+        <a href="#version">Historique des versions</a>
+
+        <div class="sidebar-section">Aide</div>
+        <a href="#faq">FAQ</a>
+        <a href="#securite">Sécurité</a>
+        <a href="#depannage">Dépannage</a>
+        <a href="#support">Support</a>
+
+        <div class="sidebar-section">Développeurs</div>
+        <a href="dev.html">Guide de développement</a>
+    </nav>
+</aside>
+
+<!-- ═══════════════ CONTENU ═══════════════ -->
+<main class="content">
+
+    <!-- ── Présentation ───────────────────── -->
+    <h1 id="presentation">Présentation</h1>
+    <p>
+        <strong>ProJote</strong> est un plugin Jeedom qui récupère automatiquement les informations
+        scolaires depuis <strong>PRONOTE</strong> : notes, emploi du temps, devoirs, absences, retards et punitions.
+    </p>
+    <p>
+        Il s'appuie sur la bibliothèque open source
+        <a href="https://github.com/bain3/pronotepy">pronotepy</a>
+        pour communiquer avec l'API Pronote, et expose les données sous forme de commandes Jeedom
+        utilisables dans vos scénarios et widgets.
+    </p>
+    <div class="callout callout-tip">
+        <strong>Développé avec l'aide de l'IA</strong>
+        Depuis la version 0.9, l'évolution du plugin est assistée par intelligence artificielle
+        (<a href="https://claude.ai">Claude — Anthropic</a>), notamment pour la refonte du widget,
+        les améliorations de sécurité, et la génération du token de secours.
+    </div>
+    <div class="callout callout-info">
+        <strong>Compatibilité</strong>
+        Jeedom 4.4+ · Python 3.9+ · Debian 11/12 · Comptes élèves et parents.
     </div>
 
-    <div class="content">
-
-        <h1 id="presentation">Présentation</h1>
-        <p>Le rôle de ce plugin Jeedom est de récupérer les informations de l'élève publiées sur PRONOTE.</p>
-        <p>Pour cela, nous utilisons l'API Wrapper PronotePy (<a href="https://github.com/bain3/pronotepy"
-                target="_blank">https://github.com/bain3/pronotepy</a>).</p>
-
-        <h1 id="installation">Installation</h1>
-        <p>Pour installer le plugin ProJote, suivez les étapes suivantes :</p>
-        <ul>
-            <li>Accédez au Market Jeedom.</li>
-            <li>Recherchez le plugin ProJote.</li>
-            <li>Cliquez sur "Installer" pour ajouter le plugin à votre Jeedom.</li>
-            <li>Une fois l'installation terminée, activez le plugin depuis le menu des plugins.</li>
-            <li>Puis lancer l'installation des dépendances.
-                <br>&nbsp;&nbsp;&nbsp;&nbsp;Lors de la prémiére éxécution cela peut être long et vous devrez peut être
-                la relancer.
-            </li>
-        </ul>
-
-        <p>Dans le menu Plugins / Organisations / Plugin Pronote, cliquez sur <strong>Ajouter</strong>. Choisissez un
-            nom identifiant l’équipement.</p>
-
-        <h1 id="connexion">Connexion</h1>
-        <p>Il existe deux méthodes de connexion : par Login ou par QR code. La méthode par QR code est recommandée.</p>
-        <img src="../picture/Image - connexion.png" alt="Picture connection" style="width: 50%; height: auto;">
-        <h2 id="login">Login</h2>
-        <p>Le but de cette méthode est de vous connecter avec les informations de connexion.</p>
-        <img src="../picture/Image - Login.png" alt="Picture login" style="width: 50%; height: auto;">
-        <p>Parcourez la liste des ENT/CAS pour trouver celle qui vous correspond. Si vous ne trouvez pas de
-            correspondance, essayez "Aucun"
-            <i>ou d'autres.</i><br>
-            Si vous utilisez un compte parent, cochez la case.
-        </p>
-        <p>Ensuite, saisissez le login et le mot de passe de votre compte, puis l’URL de Pronote que vous utilisez (par
-            exemple, <code>https://demo.index-education.net/pronote/eleve.html</code>).</p>
-        <p>La page web Pronote recherche ressemble à cela :</p>
-        <img src="../picture/Image - Projote.png" alt="Picture connection" style="width: 50%; height: auto;">
-        <pre><code>
-        >>> Exemple pour un compte parent        
-                https://XXXXXXXy.index-education.net/pronote/parent.html?login=true
-
-        >>> Exemple pour un élève
-                https://demo.index-education.net/pronote/eleve.html
-                </code></pre>
-
-        <h2 id="qrcode">QR Code</h2>
-        <h3>Génération du QRCODE</h3>
-        <p>
-            Nous allons voir en premier lieu comment obtenir le QR CODE. Ensuite, nous verrons comment injecter
-            ce QR code dans ProJote.
-        </p>
-
-        D’abord, connectez-vous au site Pronote et générez un QR Code avec un code PIN à 4 chiffres de votre choix.
-        Récupérez le QR Code sur Pronote.
-        </p>
-        <p>
-            Sur votre site Pronote :<br>
-        </p>
-        <p>
-            <img src="../picture/Image - Entete Pronote.png" alt="Picture Pronote" style="width: 50%; height: auto;">
-            <img src="../picture/Image - Gen QR CODE Pronote.png" alt="Picture Gen QRCode"
-                style="width: 50%; height: auto;">
-        <p style="margin-left: 40px;">1. Entrez le PIN à 4 chiffres de votre choix.</p>
-        <p style="margin-left: 40px;">2. Puis cliquez sur "Générer QR Code".</p><br>
-        <P>Une fenêtre va s’ouvrir avec le QR Code. </p>
-        <img src="../picture/Image- Projote QRCODE.png" alt="Picture QRCode" style="width: 50%; height: auto;">
-        <p><i class="fas fa-lightbulb" style="color: yellow; text-shadow: 0 0 3px black;"></i> Tips :
-            Utilisez l’outil Windows de
-            capture d’écran.
-        </p>
-
-        <p>Utilisez l’outil de capture d’écran Windows pour copier le QR Code dans le presse-papier.
-            En apuyant simultanément sour les touches suvantes : </p>
-
-        <p style="text-align: center;width: 50%; height: auto;"><img src=" ../picture/Image - Racc Touches.png"
-                alt="Picture QRCode" style="width: 20%; height: auto;"></p>
-        <p style="text-align: center;width: 50%; height: auto;">
-            <kbd>Windows</kbd> + <kbd>Shift</kbd> + <kbd>S</kbd>
-        <p>Dessiner un carré autour du QR Code. Et l’image sera copiée dans le presse-papier.
-        </p>
-        <h3 id="transmission">Transmission sur Jeedom</h3>
-        <p>Créez un nouvel équipement ProJote.</p>
-        <p style="text-align: center;width: 50%; height: auto;">
-            <img src="../picture/Image - ProJote add.png" alt="Picture Add"
-                style="text-align: center;width: 25%; height: auto;">
-        <p style="text-align: center;width: 50%; height: auto;"><img src="../picture//Image - ProJote Name equ.png"
-                alt="Picture Name Eqt" style="text-align: center;width: 75%; height: auto;"></P>
-        </p>
-        <p>
-            Sélectionnez le paramètre d’authentification QR Code, puis collez
-            le QR en faisant un clic droit.
-        </p>
-        <img src="../picture/Image - PRojote Qrcode target.png" alt="Picture QRCode Target"
-            style="width: 50%; height: auto;">
-        <p>Code dans le carré gris ou importez l’image enregistrée.</p>
-        <p>Le code PIN sera requis pour finaliser la configuration.</p>
-        <p style="text-align: center;width: 50%; height: auto;">
-            <img src="../picture/Image- Projote  Pin code.png" alt="Picture QRCode Pin"
-                style="width: 75%; height: auto;">
-        </p>
-        <p>Attention, à chaque connexion, on renouvelle le token (car il est à usage unique).
-            Si un cycle échoue, il faudra refaire l’authentification par QR CODE.
-        </p>
-
-        <h1 id="utilisation">Utilisation</h1>
-        <p>Une fois connecté, le plugin va récupérer toutes les heures les mises à jours depuis Pronote.</p>
-        <img src="../picture/Image- Projote Cron Hourly.png" alt="Picture cron Hourly"
-            style="width: 25%; height: auto;">
-        <p>Vous pouvez désactiver ce paramétre dans la configuration de plugin.</p>
-
-        <p>&nbsp;&nbsp;&nbsp;&nbsp;<span style="text-decoration: underline;">Note</span>: La mise à jour horaire est
-            désactivée de <span style="color: #2d6a4f;;"><strong>22h</strong></span> à <span
-                style="color: #2d6a4f;;"><strong>4h</strong></span> du matin.</p>
-        <p>Mais si vous demandez à rafraichir l'équipement, il téléchargera les mises à jour.</p>
-
-
-
-        <p> Voici la liste des paramètres retournés par le plugin :<br></p>
-        <table class="table-offset">
-            <thead>
-                <tr>
-                    <th style="border: 1px solid black; padding: 8px;">Paramètre</th>
-                    <th style="border: 1px solid black; padding: 8px;">Description</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td style="border: 1px solid black; padding: 8px;">Nom de l'élève</td>
-                    <td style="border: 1px solid black; padding: 8px;">Le nom de l'élève</td>
-                </tr>
-                <tr>
-                    <td style="border: 1px solid black; padding: 8px;">Nom de la classe</td>
-                    <td style="border: 1px solid black; padding: 8px;">Le nom de la classe de l'élève</td>
-                </tr>
-                <tr>
-                    <td style="border: 1px solid black; padding: 8px;">Établissement</td>
-                    <td style="border: 1px solid black; padding: 8px;">Le nom de l'établissement scolaire</td>
-                </tr>
-                <tr>
-                    <td style="border: 1px solid black; padding: 8px;">Picture</td>
-                    <td style="border: 1px solid black; padding: 8px;">L'URL de l'image de l'élève sur le serveur
-                        Pronote</td>
-                </tr>
-                <tr>
-                    <td style="border: 1px solid black; padding: 8px;">URL Ical</td>
-                    <td style="border: 1px solid black; padding: 8px;">L'URL du calendrier iCal</td>
-                </tr>
-                <tr>
-                    <td style="border: 1px solid black; padding: 8px;">Nombre d'absence</td>
-                    <td style="border: 1px solid black; padding: 8px;">Le nombre d'absences de l'élève <strong>sur la
-                            période</strong>
-                    </td>
-                </tr>
-                <tr>
-                    <td style="border: 1px solid black; padding: 8px;">Nombre de punition</td>
-                    <td style="border: 1px solid black; padding: 8px;">Le nombre de punitions de l'élève <strong>sur la
-                            période</strong>
-                    </td>
-                </tr>
-                <tr>
-                    <td style="border: 1px solid black; padding: 8px;">Nombre de devoir</td>
-                    <td style="border: 1px solid black; padding: 8px;">Le nombre de devoirs de l'élève Fait et à faire
-                    </td>
-                </tr>
-                <tr>
-                    <td style="border: 1px solid black; padding: 8px;">Nombre de devoir non fait</td>
-                    <td style="border: 1px solid black; padding: 8px;">Le nombre de devoirs non faits par l'élève</td>
-                </tr>
-                <tr>
-                    <td style="border: 1px solid black; padding: 8px;">Nombre de devoir fait</td>
-                    <td style="border: 1px solid black; padding: 8px;">Le nombre de devoirs faits par l'élève</td>
-                </tr>
-                <tr>
-                    <td style="border: 1px solid black; padding: 8px;">Nombre de devoir pour le <em>prochain jour</em>
-                    </td>
-                    <td style="border: 1px solid black; padding: 8px;">Le nombre de devoirs pour le <em>prochain
-                            jour</em>
-                        d'école</td>
-                </tr>
-                <tr>
-                    <td style="border: 1px solid black; padding: 8px;">Nombre de devoir non fait pour le <em>prochain
-                            jour</em>
-                    </td>
-                    <td style="border: 1px solid black; padding: 8px;">Le nombre de devoirs non faits pour le
-                        <em>prochain
-                            jour</em> d'école
-                    </td>
-                </tr>
-                <tr>
-                    <td style="border: 1px solid black; padding: 8px;">Nombre de devoir fait pour le <em>prochain
-                            jour</em>
-                        d'école </td>
-                    <td style="border: 1px solid black; padding: 8px;">Le nombre de devoirs faits pour le <em>prochain
-                            jour</em>
-                    </td>
-                </tr>
-                <tr>
-                    <td style="border: 1px solid black; padding: 8px;">Heure de début aujourd'hui</td>
-                    <td style="border: 1px solid black; padding: 8px;">L'heure de début des cours aujourd'hui</td>
-                </tr>
-                <tr>
-                    <td style="border: 1px solid black; padding: 8px;">Heure de fin aujourd'hui</td>
-                    <td style="border: 1px solid black; padding: 8px;">L'heure de fin des cours aujourd'hui</td>
-                </tr>
-                <tr>
-                    <td style="border: 1px solid black; padding: 8px;">Nombre de cours annulé aujourd'hui</td>
-                    <td style="border: 1px solid black; padding: 8px;">Le nombre de cours annulés aujourd'hui</td>
-                </tr>
-                <tr>
-                    <td style="border: 1px solid black; padding: 8px;">Date du <em>prochain jour</em></td>
-                    <td style="border: 1px solid black; padding: 8px;">La date du <em>prochain jour</em> de cours</td>
-                </tr>
-                <tr>
-                    <td style="border: 1px solid black; padding: 8px;">Heure de début du <em>prochain jour</em></td>
-                    <td style="border: 1px solid black; padding: 8px;">L'heure de début des cours du <em>prochain
-                            jour</em></td>
-                </tr>
-                <tr>
-                    <td style="border: 1px solid black; padding: 8px;">Heure de fin du <em>prochain jour</em></td>
-                    <td style="border: 1px solid black; padding: 8px;">L'heure de fin des cours du <em>prochain
-                            jour</em></td>
-                </tr>
-                <tr>
-                    <td style="border: 1px solid black; padding: 8px;">Nombre de cours annulé du <em>prochain jour</em>
-                        d'école
-                    </td>
-                    <td style="border: 1px solid black; padding: 8px;">Le nombre de cours annulés du <em>prochain
-                            jour</em></td>
-                </tr>
-                <tr>
-                    <td style="border: 1px solid black; padding: 8px;">Nombre de cours annulé
-                    </td>
-                    <td style="border: 1px solid black; padding: 8px;">Le nombre de cours annulés <strong>sur la
-                            période</strong></td>
-                </tr>
-            </tbody>
-        </table>
-
-        <p class="highlight">Le plugin récupère les informations contenues dans Pronote. Si elles ne sont pas présentes
-            sur le site, elles ne remonteront pas dans le plugin.
-            Donc avant toute demande, vous devez valider que l'information recherchée est présente.
-        </p>
-
-        <h1 id="Version">Historique des Versions</h1>
-        <table class="table-offset">
-            <thead>
-                <tr>
-                    <th style="border: 1px solid black; padding: 8px;">Version</th>
-                    <th style="border: 1px solid black; padding: 8px;">Date</th>
-                    <th style="border: 1px solid black; padding: 8px;">Changements</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td style="border: 1px solid black; padding: 8px;">0.8</td>
-                    <td style="border: 1px solid black; padding: 8px;">Février 2024</td>
-                    <td style="border: 1px solid black; padding: 8px;">
-                        ✅ Stabilisation générale<br>
-                        ✅ Amélioration gestion tokens<br>
-                        ✅ Support multi-enfants pour parents<br>
-                        ✅ Optimisations performances
-                    </td>
-                </tr>
-                <tr>
-                    <td style="border: 1px solid black; padding: 8px;">0.5.2</td>
-                    <td style="border: 1px solid black; padding: 8px;">Janvier 2024</td>
-                    <td style="border: 1px solid black; padding: 8px;">
-                        🔧 Correction de bugs<br>
-                        🔧 Améliorations QR Code
-                    </td>
-                </tr>
-                <tr>
-                    <td style="border: 1px solid black; padding: 8px;">0.5</td>
-                    <td style="border: 1px solid black; padding: 8px;">Décembre 2023</td>
-                    <td style="border: 1px solid black; padding: 8px;">
-                        ✨ Ajout connexion par QR Code<br>
-                        ✨ Nouvelle interface de configuration
-                    </td>
-                </tr>
-                <tr>
-                    <td style="border: 1px solid black; padding: 8px;">0.0.2</td>
-                    <td style="border: 1px solid black; padding: 8px;">Novembre 2023</td>
-                    <td style="border: 1px solid black; padding: 8px;">Mise à jour documentation</td>
-                </tr>
-                <tr>
-                    <td style="border: 1px solid black; padding: 8px;">0.0.1</td>
-                    <td style="border: 1px solid black; padding: 8px;">Octobre 2023</td>
-                    <td style="border: 1px solid black; padding: 8px;">Première version officielle</td>
-                </tr>
-                <tr>
-                    <td style="border: 1px solid black; padding: 8px;">Alpha</td>
-                    <td style="border: 1px solid black; padding: 8px;">Septembre 2023</td>
-                    <td style="border: 1px solid black; padding: 8px;">Phase de test initiale</td>
-                </tr>
-            </tbody>
-        </table>
-
-        <h1>❓ FAQ</h1>
-
-        <h2>Puis-je utiliser ce plugin avec un compte parent?</h2>
-        <p>Oui! Le plugin supporte complètement les comptes parents. Lors de la configuration, sélectionnez le type de
-            compte "Parent" et choisissez l'enfant à suivre. Vous pouvez créer plusieurs équipements pour suivre
-            plusieurs enfants.</p>
-
-        <h2>Comment changer mon mot de passe stocké?</h2>
-        <p>Modifiez simplement l'équipement en mettant à jour les identifiants et cliquez sur "Sauvegarde". Les nouveaux
-            identifiants remplacent les anciens. Le mot de passe est chiffré en AES-256.</p>
-
-        <h2>Les données sont-elles envoyées en ligne?</h2>
-        <p>Non. Toutes les données restent locales sur votre installation Jeedom. Aucune télémétrie, aucun appel externe
-            au serveur d'auteur. Seule la connexion vers le serveur Pronote de votre établissement est effectuée.</p>
-
-        <h2>Quel est l'intervalle de synchronisation minimum?</h2>
-        <p>Par défaut, la synchronisation se fait toutes les heures en cron. L'intervalle minimum recommandé est de 5
-            minutes pour ne pas surcharger les serveurs Pronote. Vous pouvez aussi forcer une actualisation manuelle
-            avec la commande "Rafraîchir".</p>
-
-        <h2>Le démon refuse de démarrer, que faire?</h2>
-        <p>Vérifiez :</p>
-        <ul>
-            <li>Que Python 3.7+ est installé : <code>python3 --version</code></li>
-            <li>Que l'environnement virtuel est créé :
-                <code>ls -la /var/www/html/plugins/ProJote/resources/python_venv</code></li>
-            <li>Que le port 55369 est libre : <code>netstat -tuln | grep 55369</code></li>
-            <li>Les permissions du dossier : <code>sudo chown www-data:www-data -R /var/www/html/plugins/ProJote</code>
-            </li>
-            <li>Les logs : Aller dans Administration > Logs > ProJote</li>
-        </ul>
-
-        <h2>Que faire si l'authentification échoue?</h2>
-        <p>Vérifiez :</p>
-        <ul>
-            <li>Que vos identifiants sont corrects (testez sur pronote.net)</li>
-            <li>Que le type CAS/ENT est bon (essayez "Aucun" si doute)</li>
-            <li>L'URL Pronote est correcte (format : https://xxxxx.index-education.net/pronote/...)</li>
-            <li>Si QR Code : que le PIN est bien entré (4 chiffres)</li>
-            <li>Relancez l'authentification (supprimer/recréer l'équipement)</li>
-        </ul>
-
-        <h1>🔐 Sécurité</h1>
-        <p><strong>⚠️ Points importants :</strong></p>
-        <ul>
-            <li><strong>Tokens stockés localement</strong> : Les tokens d'authentification sont sauvegardés dans
-                <code>/data/[equipmentId]/</code>, jamais synchronisés au cloud.</li>
-            <li><strong>Mot de passe chiffré</strong> : Les mots de passe sont chiffrés en AES-256 avec une clé dérivée.
-            </li>
-            <li><strong>HTTPS recommandé</strong> : Accédez toujours à Jeedom en HTTPS, particulièrement pour éviter les
-                interceptions.</li>
-            <li><strong>Port socket local</strong> : Le port 55369 ne communique qu'en localhost (127.0.0.1).</li>
-            <li><strong>Logs sensibles</strong> : En cas de problème, vérifiez les logs car ils peuvent contenir des
-                données sensibles. Ne partagez jamais vos logs publiquement sans les anonymiser.</li>
-            <li><strong>Permissions fichiers</strong> : Assurez-vous que les dossiers de données sont accessibles
-                uniquement par www-data.</li>
-        </ul>
-
-        <h1>🛠️ Dépannage Avancé</h1>
-
-        <h2>Activer le mode debug</h2>
-        <p>Pour activer les logs détaillés :</p>
-        <ol>
-            <li>Allez dans <strong>Administration</strong> → <strong>Configuration</strong> → <strong>Logs</strong></li>
-            <li>Sélectionnez <strong>debug</strong> pour le niveau global</li>
-            <li>Relancez le démon ProJote</li>
-            <li>Consultez les logs dans <strong>Administration</strong> → <strong>Logs</strong> →
-                <strong>ProJote</strong></li>
-        </ol>
-
-        <h2>Erreurs courantes et solutions</h2>
-        <table class="table-offset">
-            <thead>
-                <tr>
-                    <th style="border: 1px solid black; padding: 8px;">Erreur</th>
-                    <th style="border: 1px solid black; padding: 8px;">Solution</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td style="border: 1px solid black; padding: 8px;">"Le démon n'est pas démarré"</td>
-                    <td style="border: 1px solid black; padding: 8px;">Allez dans Plugins → ProJote → Démon et cliquez
-                        sur "Relancer"</td>
-                </tr>
-                <tr>
-                    <td style="border: 1px solid black; padding: 8px;">"Port déjà utilisé"</td>
-                    <td style="border: 1px solid black; padding: 8px;">Changez le port dans Configuration (ex: 55370) ou
-                        tuez le processus : <code>sudo kill $(lsof -t -i :55369)</code></td>
-                </tr>
-                <tr>
-                    <td style="border: 1px solid black; padding: 8px;">"Impossible de lancer le démon"</td>
-                    <td style="border: 1px solid black; padding: 8px;">Vérifiez Python, l'environnement virtuel, et les
-                        permissions. Consultez les logs.</td>
-                </tr>
-                <tr>
-                    <td style="border: 1px solid black; padding: 8px;">"Erreur d'authentification"</td>
-                    <td style="border: 1px solid black; padding: 8px;">Testez vos identifiants sur pronote.net, vérifiez
-                        l'URL et le type CAS/ENT</td>
-                </tr>
-                <tr>
-                    <td style="border: 1px solid black; padding: 8px;">"Timeout socket"</td>
-                    <td style="border: 1px solid black; padding: 8px;">Relancez le démon, vérifiez la connectivité
-                        réseau et Pronote</td>
-                </tr>
-                <tr>
-                    <td style="border: 1px solid black; padding: 8px;">"Fichier JSON introuvable"</td>
-                    <td style="border: 1px solid black; padding: 8px;">Vérifiez les permissions du dossier
-                        <code>/data</code>, relancez une authentification</td>
-                </tr>
-            </tbody>
-        </table>
-
-        <h1>📞 Support & Contribution</h1>
-        <p><strong>Besoin d'aide?</strong></p>
-        <ul>
-            <li>📖 <a href="../../README.md" target="_blank">README.md</a> - Guide complet d'installation et usage</li>
-            <li>🐛 <a href="https://github.com/aldarande/ProJote/issues" target="_blank">Issues GitHub</a> - Signaler un
-                bug</li>
-            <li>💬 <a href="https://community.jeedom.com/" target="_blank">Community Jeedom</a> - Discussions</li>
-            <li>📧 <a href="https://github.com/aldarande" target="_blank">Auteur GitHub</a> - Aldarande</li>
-        </ul>
-
-        <p><strong>Contribution?</strong> Les pull requests sont les bienvenues! N'hésitez pas à proposer des
-            améliorations.</p>
-
-        <h1>📝 Notes Importantes</h1>
-        <p class="highlight">⚠️ <strong>Le plugin récupère UNIQUEMENT les informations présentes dans Pronote.</strong>
-            Si une information n'est pas disponible sur le site Pronote, elle ne remontera pas dans le plugin. Avant
-            toute demande de support, validez que l'information est bien présente sur votre compte Pronote.</p>
-
-        <p><strong>💡 Conseil :</strong> Pour un suivi optimal, configurez un cron toutes les 6-8 heures pendant les
-            heures de classe. La synchronisation est automatiquement désactivée entre 22h et 4h du matin.</p>
-
-        <br>
-        <br>
-        <br>
+    <!-- ── Installation ───────────────────── -->
+    <h1 id="installation">Installation</h1>
+    <ol>
+        <li>Accédez au <strong>Market Jeedom</strong> et recherchez <em>ProJote</em>.</li>
+        <li>Cliquez sur <strong>Installer</strong>.</li>
+        <li>Depuis la page du plugin, cliquez sur <strong>Installer les dépendances</strong>.<br>
+            <small>La première installation peut prendre quelques minutes (téléchargement de pronotepy et ses dépendances).</small>
+        </li>
+        <li>Activez le plugin, puis <strong>démarrez le démon</strong>.</li>
+        <li>Créez un équipement via <strong>Ajouter</strong> et configurez la connexion.</li>
+    </ol>
+    <div class="callout callout-tip">
+        <strong>Conseil</strong>
+        Si les dépendances échouent à la première tentative, relancez l'installation — c'est normal lors du tout premier déploiement.
     </div>
+
+    <!-- ── Connexion ──────────────────────── -->
+    <h1 id="connexion">Connexion</h1>
+    <p>Deux méthodes sont disponibles. La méthode <strong>QR Code</strong> est recommandée car elle ne nécessite pas de stocker votre mot de passe.</p>
+    <img src="../picture/Image - connexion.png" alt="Sélection de la méthode de connexion" style="max-width:480px;">
+
+    <h2 id="login">Par identifiants (Login)</h2>
+    <p>Renseignez les informations suivantes dans la configuration de l'équipement :</p>
+    <table>
+        <thead><tr><th>Champ</th><th>Description</th></tr></thead>
+        <tbody>
+            <tr><td>ENT / CAS</td><td>Sélectionnez votre espace numérique de travail. En cas de doute, essayez <em>Aucun</em>.</td></tr>
+            <tr><td>Type de compte</td><td><em>Élève</em> ou <em>Parent</em></td></tr>
+            <tr><td>Login</td><td>Votre identifiant Pronote</td></tr>
+            <tr><td>Mot de passe</td><td>Votre mot de passe (stocké chiffré, jamais affiché dans les logs)</td></tr>
+            <tr><td>URL</td><td>Adresse Pronote de l'établissement (voir exemples ci-dessous)</td></tr>
+        </tbody>
+    </table>
+    <pre><code># Compte élève
+https://demo.index-education.net/pronote/eleve.html
+
+# Compte parent
+https://xxxxx.index-education.net/pronote/parent.html</code></pre>
+    <img src="../picture/Image - Login.png" alt="Formulaire de connexion par identifiants" style="max-width:480px;">
+    <p>Cliquez sur <strong>Valider</strong>. Le plugin se connecte, génère un token persistant et sauvegarde les données.</p>
+
+    <h2 id="qrcode">Par QR Code</h2>
+    <h3>1 — Générer le QR Code sur Pronote</h3>
+    <p>Depuis votre navigateur, connectez-vous sur le site Pronote de l'établissement, puis :</p>
+    <ol>
+        <li>Cliquez sur votre avatar en haut à droite.</li>
+        <li>Sélectionnez <strong>Générer un QR Code</strong>.</li>
+        <li>Choisissez un <strong>code PIN à 4 chiffres</strong> de votre choix.</li>
+        <li>Cliquez sur <strong>Générer</strong>.</li>
+    </ol>
+    <img src="../picture/Image - Gen QR CODE Pronote.png" alt="Génération QR Code Pronote" style="max-width:400px;">
+
+    <h3>2 — Capturer le QR Code</h3>
+    <p>Sous Windows, utilisez la capture d'écran clavier pour copier le QR Code :</p>
+    <p style="margin-left:16px;"><kbd>Windows</kbd> + <kbd>Shift</kbd> + <kbd>S</kbd> → dessinez un rectangle autour du QR Code.</p>
+    <p>L'image est copiée dans le presse-papier.</p>
+
+    <h3>3 — Coller le QR Code dans ProJote</h3>
+    <ol>
+        <li>Dans la configuration de l'équipement, sélectionnez l'authentification <strong>QR Code</strong>.</li>
+        <li>Faites un <strong>clic droit → Coller</strong> dans le cadre gris, ou importez l'image enregistrée.</li>
+        <li>Saisissez le PIN à 4 chiffres choisi précédemment.</li>
+        <li>Cliquez sur <strong>Valider</strong>.</li>
+    </ol>
+    <img src="../picture/Image - PRojote Qrcode target.png" alt="Zone de dépôt du QR Code" style="max-width:400px;">
+
+    <div class="callout callout-info">
+        <strong>Token backup automatique</strong>
+        Depuis la version 0.9, ProJote génère automatiquement un <em>second token de secours</em> lors de la connexion initiale.
+        Si le token principal expire, le token de secours est utilisé en silence — aucune re-authentification n'est nécessaire.
     </div>
-    <footer>
-        <p>Dernière modification : <span id="saveDate"></span></p>
-    </footer>
-    <script>
-        document.getElementById('saveDate').textContent = new Date().toLocaleDateString('fr-FR');
-    </script>
+    <div class="callout callout-warning">
+        <strong>QR Code à usage unique</strong>
+        Chaque QR Code Pronote ne peut être utilisé qu'une seule fois. Si l'authentification échoue,
+        retournez sur Pronote pour en générer un nouveau.
+    </div>
+
+    <!-- ── Utilisation ────────────────────── -->
+    <h1 id="utilisation">Commandes disponibles</h1>
+    <p>Une fois connecté, le démon synchronise les données Pronote <strong>toutes les heures</strong> (désactivé de 22h à 4h).
+    Vous pouvez forcer une actualisation avec la commande <em>Rafraîchir</em>.</p>
+
+    <table>
+        <thead><tr><th>Commande</th><th>Description</th></tr></thead>
+        <tbody>
+            <tr><td>Nom de l'élève</td><td>Prénom et nom</td></tr>
+            <tr><td>Classe</td><td>Intitulé de la classe</td></tr>
+            <tr><td>Établissement</td><td>Nom de l'établissement scolaire</td></tr>
+            <tr><td>Photo</td><td>Chemin local de la photo de profil</td></tr>
+            <tr><td>URL iCal</td><td>Lien d'abonnement au calendrier Pronote</td></tr>
+            <tr><td>Nb absences</td><td>Nombre d'absences sur la période en cours</td></tr>
+            <tr><td>Nb retards</td><td>Nombre de retards sur la période</td></tr>
+            <tr><td>Nb punitions</td><td>Nombre de punitions sur la période</td></tr>
+            <tr><td>Nb devoirs (fait / non fait)</td><td>Devoirs de la semaine, ventilés par statut</td></tr>
+            <tr><td>Nb devoirs demain (fait / non fait)</td><td>Devoirs pour le prochain jour de cours</td></tr>
+            <tr><td>EDT aujourd'hui — début / fin</td><td>Première et dernière heure de cours du jour</td></tr>
+            <tr><td>EDT aujourd'hui — cours annulés</td><td>Nombre de cours annulés aujourd'hui</td></tr>
+            <tr><td>EDT prochain jour — date / début / fin</td><td>Informations sur le prochain jour de cours</td></tr>
+            <tr><td>EDT prochain jour — cours annulés</td><td>Cours annulés du prochain jour</td></tr>
+            <tr><td>Cours annulés (total période)</td><td>Nombre total de cours annulés depuis la rentrée</td></tr>
+        </tbody>
+    </table>
+
+    <div class="callout callout-warning">
+        <strong>Données manquantes ?</strong>
+        Le plugin ne retourne que ce qui est présent dans Pronote.
+        Si une information n'est pas disponible sur le portail Pronote de l'établissement, elle ne remontera pas.
+    </div>
+
+    <!-- ── Widget ─────────────────────────── -->
+    <h1 id="widget">Widget</h1>
+    <p>Le widget principal (<em>projote</em>) regroupe toutes les informations sur un seul tuile de tableau de bord :</p>
+    <ul>
+        <li><strong>En-tête</strong> — photo de profil · nom de l'élève · classe et établissement · date de dernière sync</li>
+        <li><strong>Vie scolaire</strong> — badges circulaires pour absences, retards, punitions, devoirs non faits</li>
+        <li><strong>Emploi du temps</strong> — cours d'aujourd'hui et du prochain jour, nombre de cours annulés depuis la rentrée</li>
+        <li><strong>Moyenne générale</strong> — barre dégradée rouge→vert avec tendance</li>
+        <li><strong>Bas de widget</strong> — prochains devoirs + dernières notes</li>
+    </ul>
+
+    <!-- ── Historique ─────────────────────── -->
+    <h1 id="version">Historique des versions</h1>
+
+    <h2>0.9 — Mars 2026</h2>
+    <table>
+        <thead><tr><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><span class="badge badge-new">Nouveau</span></td>
+                <td><strong>Token de secours automatique</strong> — lors de la connexion initiale (identifiants ou QR Code), un second token est généré en arrière-plan. Si le token principal expire, le plugin bascule silencieusement sur le token de secours sans demander de re-authentification.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-new">Nouveau</span></td>
+                <td><strong>Nouveau Widget</strong> — photo / nom + date de sync / classe + établissement, plus compact et lisible.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-new">Nouveau</span></td>
+                <td><strong>Widget — cours annulés depuis la rentrée</strong> — compteur affiché sous l'emploi du temps.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sec">Sécurité</span></td>
+                <td>Suppression des mots de passe et jetons dans les logs (tous niveaux).</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sec">Sécurité</span></td>
+                <td>UUID de session au format RFC 4122 standard — le plugin ne s'identifie plus comme "ProJote" auprès de Pronote.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-fix">Corrections</span></td>
+                <td>Divers correctifs : chemins Python codés en dur, date de test dans l'emploi du temps, mauvais binaire Python sur Debian 12, page de configuration tronquée en hauteur, signature incorrecte de <code>message::add()</code>.</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>0.8 — Février 2024</h2>
+    <table>
+        <thead><tr><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+            <tr><td><span class="badge badge-new">Nouveau</span></td><td>Support multi-enfants pour comptes parents.</td></tr>
+            <tr><td><span class="badge badge-perf">Amélioration</span></td><td>Stabilisation générale et optimisation des performances.</td></tr>
+            <tr><td><span class="badge badge-perf">Amélioration</span></td><td>Gestion améliorée des tokens de reconnexion.</td></tr>
+        </tbody>
+    </table>
+
+    <h2>0.5.2 — Janvier 2024</h2>
+    <table>
+        <thead><tr><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+            <tr><td><span class="badge badge-fix">Correction</span></td><td>Corrections de bugs divers sur la connexion QR Code.</td></tr>
+        </tbody>
+    </table>
+
+    <h2>0.5 — Décembre 2023</h2>
+    <table>
+        <thead><tr><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+            <tr><td><span class="badge badge-new">Nouveau</span></td><td>Connexion par QR Code.</td></tr>
+            <tr><td><span class="badge badge-new">Nouveau</span></td><td>Nouvelle interface de configuration.</td></tr>
+        </tbody>
+    </table>
+
+    <h2>Versions antérieures</h2>
+    <table>
+        <thead><tr><th>Version</th><th>Date</th><th>Description</th></tr></thead>
+        <tbody>
+            <tr><td>0.0.2</td><td>Novembre 2023</td><td>Mise à jour de la documentation.</td></tr>
+            <tr><td>0.0.1</td><td>Octobre 2023</td><td>Première version officielle.</td></tr>
+            <tr><td>Alpha</td><td>Septembre 2023</td><td>Phase de test initiale.</td></tr>
+        </tbody>
+    </table>
+
+    <!-- ── FAQ ───────────────────────────── -->
+    <h1 id="faq">FAQ</h1>
+
+    <h2>Puis-je utiliser ce plugin avec un compte parent ?</h2>
+    <p>Oui. Sélectionnez <em>Parent</em> comme type de compte et choisissez l'enfant à suivre après validation.
+    Vous pouvez créer plusieurs équipements pour suivre plusieurs enfants.</p>
+
+    <h2>Les données transitent-elles par un serveur externe ?</h2>
+    <p>Non. Toutes les données restent sur votre installation Jeedom. Seule la connexion vers le serveur Pronote
+    de l'établissement est effectuée — aucune télémétrie, aucun appel vers un serveur tiers.</p>
+
+    <h2>À quelle fréquence les données sont-elles synchronisées ?</h2>
+    <p>Toutes les heures par défaut, automatiquement désactivé entre 22h et 4h. Vous pouvez forcer
+    une synchronisation manuelle avec la commande <em>Rafraîchir</em> de l'équipement.</p>
+
+    <h2>Mon QR Code ne fonctionne pas, pourquoi ?</h2>
+    <p>Chaque QR Code Pronote est à <strong>usage unique</strong>. Si la connexion a échoué ou si vous avez
+    rechargé la page, retournez sur Pronote pour en générer un nouveau.</p>
+
+    <h2>Comment changer mes identifiants stockés ?</h2>
+    <p>Modifiez les champs dans la configuration de l'équipement et cliquez sur <strong>Valider</strong> pour
+    re-générer un nouveau token. Les anciens identifiants sont immédiatement remplacés.</p>
+
+    <h2>Le démon refuse de démarrer, que faire ?</h2>
+    <p>Consultez la section <a href="#depannage">Dépannage</a> ci-dessous.</p>
+
+    <!-- ── Sécurité ───────────────────────── -->
+    <h1 id="securite">Sécurité</h1>
+
+    <table>
+        <thead><tr><th>Point</th><th>Détail</th></tr></thead>
+        <tbody>
+            <tr>
+                <td>Mots de passe</td>
+                <td>Chiffrés par Jeedom (AES-256) en base de données. Jamais écrits dans les logs.</td>
+            </tr>
+            <tr>
+                <td>Tokens</td>
+                <td>Stockés dans <code>/plugins/ProJote/data/[id]/</code>, jamais synchronisés vers le cloud.
+                Les jetons ne sont pas loggés.</td>
+            </tr>
+            <tr>
+                <td>Identifiant de session</td>
+                <td>UUID RFC 4122 aléatoire — le plugin ne s'identifie pas comme "ProJote" auprès de Pronote.</td>
+            </tr>
+            <tr>
+                <td>Socket</td>
+                <td>Le port de communication interne (55369 par défaut) n'écoute que sur <code>127.0.0.1</code>.</td>
+            </tr>
+            <tr>
+                <td>HTTPS</td>
+                <td>Accédez toujours à Jeedom via HTTPS pour éviter l'interception des tokens.</td>
+            </tr>
+            <tr>
+                <td>Logs</td>
+                <td>En mode debug, certaines métadonnées de connexion peuvent apparaître. Ne partagez jamais vos logs publiquement sans les avoir anonymisés.</td>
+            </tr>
+            <tr>
+                <td>Permissions fichiers</td>
+                <td>Le dossier <code>data/</code> doit appartenir à <code>www-data</code> :
+                <code>sudo chown www-data:www-data -R /var/www/html/plugins/ProJote/data</code></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- ── Dépannage ──────────────────────── -->
+    <h1 id="depannage">Dépannage</h1>
+
+    <h2>Activer les logs détaillés</h2>
+    <ol>
+        <li>Allez dans <strong>Administration → Configuration → Logs</strong>.</li>
+        <li>Passez le niveau de <em>ProJote</em> en <strong>Debug</strong>.</li>
+        <li>Relancez le démon ProJote.</li>
+        <li>Consultez <strong>Administration → Logs → ProJote</strong>.</li>
+    </ol>
+
+    <h2>Erreurs courantes</h2>
+    <table>
+        <thead><tr><th>Message / Symptôme</th><th>Solution</th></tr></thead>
+        <tbody>
+            <tr>
+                <td>Le démon ne démarre pas</td>
+                <td>
+                    Vérifiez que Python 3.9+ est installé : <code>python3 --version</code><br>
+                    Vérifiez l'environnement virtuel : <code>ls /var/www/html/plugins/ProJote/resources/python_venv</code><br>
+                    Relancez les dépendances depuis la page du plugin.
+                </td>
+            </tr>
+            <tr>
+                <td>Port déjà utilisé</td>
+                <td>
+                    Changez le port dans la configuration (ex : 55370), ou libérez-le :<br>
+                    <code>sudo kill $(lsof -t -i :55369)</code>
+                </td>
+            </tr>
+            <tr>
+                <td>Erreur d'authentification</td>
+                <td>
+                    Testez vos identifiants directement sur le site Pronote.<br>
+                    Vérifiez le type CAS/ENT (essayez <em>Aucun</em> en cas de doute).<br>
+                    Pour le QR Code : assurez-vous que le PIN saisi est bien celui utilisé à la génération.
+                </td>
+            </tr>
+            <tr>
+                <td>Session expirée (message dans le centre)</td>
+                <td>
+                    Depuis la v0.9, un token de secours est utilisé automatiquement.<br>
+                    Si l'erreur persiste, re-validez la connexion depuis la configuration de l'équipement.
+                </td>
+            </tr>
+            <tr>
+                <td>Fichier JSON introuvable</td>
+                <td>
+                    Vérifiez les permissions du dossier <code>data/</code> et relancez une authentification.
+                </td>
+            </tr>
+            <tr>
+                <td>Données non mises à jour</td>
+                <td>
+                    Vérifiez que le démon est actif. Forcez un rafraîchissement via la commande <em>Rafraîchir</em>.
+                    Vérifiez que l'information est bien présente sur votre compte Pronote.
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- ── Support ────────────────────────── -->
+    <h1 id="support">Support</h1>
+
+    <p>Avant de signaler un problème, vérifiez que :</p>
+    <ul>
+        <li>Le démon est démarré et les dépendances sont installées.</li>
+        <li>L'information est bien présente sur votre compte Pronote (connexion directe sur le site).</li>
+        <li>Vous avez consulté la section <a href="#depannage">Dépannage</a> et les logs en mode debug.</li>
+    </ul>
+
+    <table>
+        <thead><tr><th>Ressource</th><th>Lien</th></tr></thead>
+        <tbody>
+            <tr><td>Signaler un bug</td><td><a href="https://github.com/aldarande/ProJote/issues">Issues GitHub — aldarande/ProJote</a></td></tr>
+            <tr><td>Forum communauté Jeedom</td><td><a href="https://community.jeedom.com/">community.jeedom.com</a></td></tr>
+            <tr><td>Auteur</td><td><a href="https://github.com/aldarande">github.com/aldarande</a></td></tr>
+        </tbody>
+    </table>
+
+    <div class="callout callout-tip">
+        <strong>Contribution</strong>
+        Les pull requests sont les bienvenues. N'hésitez pas à proposer des corrections ou des améliorations via GitHub.
+    </div>
+
+</main>
+
+<footer>
+    Documentation ProJote · Dernière mise à jour : <span id="saveDate"></span>
+</footer>
+
+<script>
+    document.getElementById('saveDate').textContent = new Date().toLocaleDateString('fr-FR', {
+        year: 'numeric', month: 'long', day: 'numeric'
+    });
+</script>
 </body>
-
-</html>
-
 </html>
