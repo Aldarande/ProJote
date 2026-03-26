@@ -1145,112 +1145,51 @@ def download_photo(client, eqLogicId, tokenconnected, message):
                 return None
 
             photo_bytes = None
-            child_n = raw.get("N", "")
 
-            # Stratégie A : tous les champs du raw_resource de l'enfant + appel ParametresUtilisateur frais
+            # Stratégie A : FichiersExternes avec l'ID numérique P (au lieu du N UUID 46#...)
+            # Pronote stocke les photos avec l'ID numérique interne, pas le N UUID parent-context
             try:
-                # Log de tous les champs du raw_resource pour repérer un champ photo caché
-                logging.info(
-                    "DEBUG raw_resource keys : %s",
-                    list(raw.keys()),
-                )
-                pb64_raw = raw.get("photoBase64", {})
-                logging.info(
-                    "DEBUG raw_resource.photoBase64 : _T=%s V_debut=%s",
-                    pb64_raw.get("_T") if isinstance(pb64_raw, dict) else "N/A",
-                    str(pb64_raw.get("V", ""))[:120] if isinstance(pb64_raw, dict) else str(pb64_raw)[:120],
-                )
+                from Crypto.Util import Padding as _CryptoPadding
 
-                # Appel ParametresUtilisateur frais pour voir si Pronote retourne la photo
-                fresh = client.post("ParametresUtilisateur")
-                fresh_data = fresh.get("dataSec", {}).get("data", {})
-                fresh_ressource = fresh_data.get("ressource", {})
-                fresh_children = fresh_ressource.get("listeRessources", {}).get("V", [])
-                logging.info(
-                    "DEBUG ParametresUtilisateur fresh — clés data : %s — clés ressource : %s",
-                    list(fresh_data.keys()),
-                    list(fresh_ressource.keys()),
-                )
-                for _child in fresh_children:
-                    if _child.get("N") == child_n:
+                p_value = raw.get("P")  # ID numérique interne (ex : 472)
+                if p_value:
+                    _padd = _CryptoPadding.pad(
+                        json.dumps({"N": p_value, "Actif": True}).replace(" ", "").encode(), 16
+                    )
+                    _magic = client.communication.encryption.aes_encrypt(_padd).hex()
+                    _photo_url = (
+                        f"{client.communication.root_site}/FichiersExternes/{_magic}/"
+                        f"photo.jpg?Session={client.attributes['h']}"
+                    )
+                    logging.info("Tentative photo via P=%s — URL : %s", p_value, _photo_url)
+                    _resp = client.communication.session.get(_photo_url, timeout=15)
+                    if _resp.status_code == 200 and len(_resp.content) > 100:
+                        photo_bytes = _resp.content
+                        logging.info("Photo parent récupérée via FichiersExternes(P=%s)", p_value)
+                    else:
                         logging.info(
-                            "DEBUG enfant frais keys : %s",
-                            list(_child.keys()),
+                            "Stratégie A (P=%s) échouée — HTTP %d", p_value, _resp.status_code
                         )
-                        pb64 = _child.get("photoBase64", {})
-                        logging.info(
-                            "DEBUG photoBase64 frais : _T=%s V_debut=%s",
-                            pb64.get("_T") if isinstance(pb64, dict) else "N/A",
-                            str(pb64.get("V", ""))[:120] if isinstance(pb64, dict) else str(pb64)[:120],
-                        )
-                        if isinstance(pb64, dict) and pb64.get("_T") == 23 and pb64.get("V"):
-                            photo_bytes = base64.b64decode(pb64["V"])
-                            logging.info("Photo parent récupérée depuis ParametresUtilisateur frais")
-                        break
             except Exception as _e:
-                logging.debug("Stratégie A photo (ParametresUtilisateur) échouée : %s", _e)
+                logging.warning("Stratégie A photo (FichiersExternes P) échouée : %s", _e)
 
-            # Stratégie B : appel PageEmploiDuTemps et extraction base64 de la réponse complète
+            # Stratégie B : FichiersExternes avec le N standard (46#...) — peut fonctionner
+            # sur certaines configurations Pronote
             if not photo_bytes:
                 try:
-                    week = client.get_week(datetime.date.today())
-                    data = {
-                        "ressource": raw,
-                        "avecAbsencesEleve": False,
-                        "avecConseilDeClasse": True,
-                        "estEDTPermanence": False,
-                        "avecAbsencesRessource": True,
-                        "avecDisponibilites": True,
-                        "avecInfosPrefsGrille": True,
-                        "Ressource": raw,
-                        "NumeroSemaine": week,
-                        "numeroSemaine": week,
-                    }
-                    response = client.post("PageEmploiDuTemps", 16, data)
-                    resp_data = response.get("dataSec", {}).get("data", {})
-
-                    # La photo base64 peut être dans resp_data["ressource"] ou resp_data["Ressource"]
-                    for field in ("ressource", "Ressource"):
-                        res_field = resp_data.get(field, {})
-                        if isinstance(res_field, dict):
-                            pb64 = res_field.get("photoBase64", {})
-                            if isinstance(pb64, dict) and pb64.get("_T") == 23 and pb64.get("V"):
-                                photo_bytes = base64.b64decode(pb64["V"])
-                                logging.info(
-                                    "Photo parent récupérée depuis PageEmploiDuTemps.%s", field
-                                )
-                                break
-
-                    if not photo_bytes:
-                        # Chercher photoBase64 dans tous les champs dict de la réponse
-                        for _key, _val in resp_data.items():
-                            if isinstance(_val, dict) and "photoBase64" in _val:
-                                _pb64 = _val["photoBase64"]
-                                logging.info(
-                                    "DEBUG photoBase64 trouvé dans resp_data[%s] : %s",
-                                    _key,
-                                    str(_pb64)[:200],
-                                )
-                                if isinstance(_pb64, dict) and _pb64.get("_T") == 23 and _pb64.get("V"):
-                                    photo_bytes = base64.b64decode(_pb64["V"])
-                                    logging.info(
-                                        "Photo parent récupérée depuis PageEmploiDuTemps.%s.photoBase64",
-                                        _key,
-                                    )
-                                    break
-                        if not photo_bytes:
+                    photo_obj = client._selected_child.profile_picture
+                    if photo_obj:
+                        logging.info("Tentative photo via N standard — URL : %s", photo_obj.url)
+                        _resp = client.communication.session.get(photo_obj.url, timeout=15)
+                        if _resp.status_code == 200 and len(_resp.content) > 100:
+                            photo_bytes = _resp.content
+                            logging.info("Photo parent récupérée via FichiersExternes(N standard)")
+                        else:
                             logging.info(
-                                "Photo non trouvée dans PageEmploiDuTemps — clés réponse : %s",
-                                list(resp_data.keys()),
+                                "Stratégie B (N standard) échouée — HTTP %d", _resp.status_code
                             )
-                            # Log prefsGrille pour debug
-                            if isinstance(resp_data.get("prefsGrille"), dict):
-                                logging.info(
-                                    "DEBUG prefsGrille keys : %s",
-                                    list(resp_data["prefsGrille"].keys()),
-                                )
                 except Exception as _e:
-                    logging.warning("Stratégie B photo (PageEmploiDuTemps) échouée : %s", _e)
+                    logging.warning("Stratégie B photo (FichiersExternes N) échouée : %s", _e)
 
             if not photo_bytes:
                 logging.warning(
