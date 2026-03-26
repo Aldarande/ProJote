@@ -558,6 +558,8 @@
         if (!av) return;
         av.classList.add('ph-av-loading');
         av.innerHTML = '<img src="/plugins/ProJote/plugin_info/ProJote_icon.png" alt="">';
+        /* Sécurité : stoppe le spinner après 60s si aucune réponse du daemon */
+        setTimeout(function() { if (_spinning) hideSpinner(); }, 60000);
     }
 
     function hideSpinner() {

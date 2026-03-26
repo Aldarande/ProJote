@@ -239,6 +239,7 @@
         <div class="sidebar-section">Qualité</div>
         <a href="#securite">11. Sécurité</a>
         <a href="#checklist">12. Checklist</a>
+        <a href="#logs">Logs &amp; dépannage</a>
 
         <div class="sidebar-section">Retour</div>
         <a href="index.html">← Documentation utilisateur</a>
@@ -1183,6 +1184,98 @@ $cmd .= ' --datadir ' . escapeshellarg($data_dir);
 // Éviter les injections dans les requêtes DB
 // → Utiliser les méthodes Jeedom (getConfiguration, setConfiguration)
 // → Éviter les requêtes SQL directes</code></pre>
+
+    <!-- ── Logs et dépannage ──────────────── -->
+    <h1 id="logs">Logs et dépannage du daemon</h1>
+
+    <h2>Structure des logs en mode séquentiel</h2>
+
+    <p>
+        Depuis la version 0.9, le daemon utilise une <strong>file d'attente unique</strong> :
+        un seul équipement est traité à la fois. Les logs sont donc parfaitement linéaires
+        et faciles à lire.
+    </p>
+
+<pre><code># Exemple de séquence normale avec 2 équipements
+[INFO]  Équipement 42 ajouté à la file (taille file : 1).
+[INFO]  Équipement 43 ajouté à la file (taille file : 2).
+[INFO]  === Début traitement équipement 42 (file restante : 1) ===
+[INFO]  Reconnexion avec token persistant réussie !
+[INFO]  Je récupère l'emploi du temps
+[INFO]  Je récupère les notes
+...
+[INFO]  === Fin traitement équipement 42 ===
+[INFO]  === Début traitement équipement 43 (file restante : 0) ===
+...
+[INFO]  === Fin traitement équipement 43 ===</code></pre>
+
+    <h2>Identifier un équipement bloqué</h2>
+
+    <p>
+        Le watchdog émet un <code>WARNING</code> si un équipement monopolise le worker
+        plus de 120 secondes :
+    </p>
+
+<pre><code>[WARNING] ProJote — Watchdog : équipement 42 en cours depuis 121s
+          (timeout 120s). Le worker est peut-être bloqué (Pronote injoignable ?).
+          Libération forcée du slot.</code></pre>
+
+    <p>Causes possibles et solutions :</p>
+
+    <table>
+        <thead><tr><th>Symptôme dans les logs</th><th>Cause probable</th><th>Action</th></tr></thead>
+        <tbody>
+            <tr>
+                <td>Watchdog déclenché toutes les synchros</td>
+                <td>Timeout réseau sur le serveur Pronote de l'établissement</td>
+                <td>Vérifier la connectivité réseau depuis le serveur Jeedom vers Pronote</td>
+            </tr>
+            <tr>
+                <td><code>=== Début eq-X ===</code> sans <code>=== Fin ===</code> correspondant</td>
+                <td>Crash silencieux dans <code>process_message</code></td>
+                <td>Passer en mode <strong>Debug</strong> et relancer</td>
+            </tr>
+            <tr>
+                <td><code>Équipement X déjà dans la file — requête ignorée</code></td>
+                <td>Normal : double clic ou cron en avance</td>
+                <td>Aucune action requise</td>
+            </tr>
+            <tr>
+                <td><code>Token principal expiré … Token backup utilisé</code></td>
+                <td>Token principal Pronote périmé (normal après quelques semaines)</td>
+                <td>Les deux tokens sont renouvelés automatiquement — surveiller le WARNING suivant</td>
+            </tr>
+            <tr>
+                <td><code>Token backup non renouvelé</code></td>
+                <td>Les deux tokens sont expirés simultanément</td>
+                <td>Re-valider la connexion via QR Code ou identifiants</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>Commandes utiles pour le dépannage</h2>
+
+<pre><code># Voir les logs en temps réel (remplacer par le bon chemin Jeedom)
+tail -f /var/www/html/log/ProJote
+
+# Filtrer les lignes d'un seul équipement (ex: id 42)
+grep "équipement 42\|eq-42" /var/www/html/log/ProJote
+
+# Voir uniquement les débuts/fins de traitement
+grep "=== " /var/www/html/log/ProJote
+
+# Voir les avertissements et erreurs uniquement
+grep -E "\[WARNING\]|\[ERROR\]" /var/www/html/log/ProJote
+
+# Vérifier que le daemon tourne
+ps aux | grep ProJoted</code></pre>
+
+    <div class="callout callout-info">
+        <strong>Plage nocturne 22h–4h</strong>
+        Les synchronisations automatiques (cron Jeedom) sont désactivées pendant cette fenêtre.
+        Un rafraîchissement <em>manuel</em> (commande Rafraîchir ou clic sur le widget) reste
+        exécuté immédiatement à toute heure — le daemon ne filtre pas les requêtes manuelles.
+    </div>
 
     <!-- ── 12. Checklist ──────────────────── -->
     <h1 id="checklist">12. Checklist de mise en production</h1>
