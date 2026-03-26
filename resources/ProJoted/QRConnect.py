@@ -116,8 +116,29 @@ try:
 
         if Account.logged_in:
             logging.info("Client connecté")
-            # Sauvegarde du token et des infos élève dans le fichier JSON de l'équipement
-            writedataPronotepy(Account, DataDir, EqID)
+
+            # Génération d'un token backup depuis la session persistante principale
+            # La session token (issue de qrcode_login) supporte request_qr_code_data
+            backup_credentials = None
+            try:
+                backup_uuid = (Uuid + "-bk") if Uuid else None
+                Qrcode_backup = Account.request_qr_code_data(Pin)
+                if "parent" not in QRUrl:
+                    BackupAccount = pronotepy.Client.qrcode_login(
+                        qr_code=Qrcode_backup, pin=Pin, uuid=backup_uuid
+                    )
+                else:
+                    BackupAccount = pronotepy.ParentClient.qrcode_login(
+                        qr_code=Qrcode_backup, pin=Pin, uuid=backup_uuid
+                    )
+                if BackupAccount.logged_in:
+                    backup_credentials = BackupAccount.export_credentials()
+                    logging.info("Token backup généré avec succès")
+            except Exception as e:
+                logging.warning("Génération du token backup échouée : %s", e)
+
+            # Sauvegarde du token principal + backup
+            writedataPronotepy(Account, DataDir, EqID, backup_token=backup_credentials)
 except Exception as e:
     line_number = e.__traceback__.tb_lineno
     print("An error occurred: line ", line_number, e)

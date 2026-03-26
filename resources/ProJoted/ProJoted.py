@@ -1458,6 +1458,42 @@ def load_persistent_token(eqLogicId):
 
         except Exception as e:
             logging.warning("Reconnexion avec token persistant échouée : %s", e)
+
+            # Tentative avec le token backup si disponible
+            if "BackupToken" in data:
+                logging.info("Tentative de reconnexion avec le token backup...")
+                try:
+                    backup_token = data["BackupToken"]
+                    if not all(key in backup_token for key in required_token_keys):
+                        logging.error("Token backup incomplet, reconnexion requise")
+                    else:
+                        if "parent.html" in backup_token["pronote_url"]:
+                            client = pronotepy.ParentClient.token_login(
+                                pronote_url=backup_token["pronote_url"],
+                                username=backup_token["username"],
+                                password=backup_token["password"],
+                                client_identifier=backup_token["client_identifier"],
+                                uuid=backup_token.get("uuid", "ProJote"),
+                            )
+                            if enfant and enfant != "":
+                                try:
+                                    client.set_child(enfant)
+                                except Exception as e2:
+                                    logging.warning("Impossible de sélectionner l'enfant (backup) : %s", e2)
+                        else:
+                            client = pronotepy.Client.token_login(
+                                pronote_url=backup_token["pronote_url"],
+                                username=backup_token["username"],
+                                password=backup_token["password"],
+                                client_identifier=backup_token["client_identifier"],
+                                uuid=backup_token.get("uuid", "ProJote"),
+                            )
+                        if client and client.logged_in:
+                            logging.info("Reconnexion avec token backup réussie !")
+                            return client, "true", enfant
+                except Exception as e2:
+                    logging.warning("Reconnexion avec token backup échouée : %s", e2)
+
             logging.debug("Le token doit être regénéré via QR code")
             return None, None, None
 
