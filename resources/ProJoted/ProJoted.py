@@ -1133,8 +1133,14 @@ def download_photo(client, eqLogicId, tokenconnected, message):
             if client._selected_child and client._selected_child.profile_picture:
                 child_n = client._selected_child.raw_resource.get("N", "")
                 if "#" in str(child_n):
-                    logging.debug("Photo non disponible : compte parent avec Pronote 2024+ (N=%s...). FichiersExternes requiert une session web.", str(child_n)[:10])
-                    return None
+                    # Pronote 2024+ : FichiersExternes nécessite des cookies web.
+                    # On ne renonce pas : on tente quand même via la session API,
+                    # la stratégie 3 (cookies session) peut suffire.
+                    logging.info(
+                        "Photo parent Pronote 2024+ (N=%s…) — "
+                        "FichiersExternes peut nécessiter une session web. Tentative quand même.",
+                        str(child_n)[:10],
+                    )
                 photo = client._selected_child.profile_picture
                 logging.debug("Photo trouvée pour l'enfant : %s", client._selected_child.name)
         else:
@@ -1152,32 +1158,65 @@ def download_photo(client, eqLogicId, tokenconnected, message):
         temp_path = f"{data_dir}profile_picture_temp.jpg"
 
         downloaded = False
+        logging.info("Téléchargement photo — URL : %s", photo.url)
 
-        logging.debug("URL de la photo : %s", photo.url)
+        # ── Stratégie 1 : méthode native pronotepy (photo.save) ──────────────
         try:
             photo.save(temp_path)
-            logging.info("Photo téléchargée avec succès via FichiersExternes")
+            logging.info("Photo téléchargée — stratégie 1 (FichiersExternes natif)")
             downloaded = True
         except FileNotFoundError:
-            # FichiersExternes retourne 404 — tenter avec headers supplémentaires
-            logging.debug("FichiersExternes 404, tentative avec Referer/Origin")
+            logging.info("Stratégie 1 échouée (404 FichiersExternes) — essai stratégie 2")
+        except Exception as e:
+            logging.info("Stratégie 1 échouée (%s) — essai stratégie 2", e)
+
+        # ── Stratégie 2 : session API + headers Referer/Origin ───────────────
+        if not downloaded:
             try:
                 headers = {
                     "Referer": client.communication.root_site + "/",
-                    "Origin": client.communication.root_site,
+                    "Origin":  client.communication.root_site,
                 }
-                resp = client.communication.session.get(photo.url, headers=headers)
+                resp = client.communication.session.get(photo.url, headers=headers, timeout=15)
                 if resp.status_code == 200 and len(resp.content) > 100:
                     with open(temp_path, "wb") as f:
                         f.write(resp.content)
-                    logging.info("Photo téléchargée avec Referer/Origin")
+                    logging.info("Photo téléchargée — stratégie 2 (Referer/Origin)")
                     downloaded = True
                 else:
-                    logging.error("Échec du téléchargement de la photo : %s (status %d)", photo.url, resp.status_code)
+                    logging.info(
+                        "Stratégie 2 échouée — HTTP %d, taille %d octets — essai stratégie 3",
+                        resp.status_code, len(resp.content),
+                    )
             except Exception as e:
-                logging.error("Échec du téléchargement de la photo : %s", e)
-        except Exception as e:
-            logging.error("Échec du téléchargement de la photo : %s", e)
+                logging.info("Stratégie 2 échouée (%s) — essai stratégie 3", e)
+
+        # ── Stratégie 3 : cookies de la session HTTP (Pronote 2024+ web) ─────
+        if not downloaded:
+            try:
+                session_cookies = client.communication.session.cookies
+                resp = requests.get(photo.url, cookies=session_cookies, timeout=15, headers={
+                    "User-Agent": "Mozilla/5.0",
+                    "Referer": client.communication.root_site + "/",
+                })
+                if resp.status_code == 200 and len(resp.content) > 100:
+                    with open(temp_path, "wb") as f:
+                        f.write(resp.content)
+                    logging.info("Photo téléchargée — stratégie 3 (cookies session web)")
+                    downloaded = True
+                else:
+                    logging.warning(
+                        "ProJote — Photo introuvable pour l'équipement %s "
+                        "(toutes stratégies échouées — HTTP %d). "
+                        "URL : %s",
+                        eqLogicId, resp.status_code, photo.url,
+                    )
+            except Exception as e:
+                logging.warning(
+                    "ProJote — Échec téléchargement photo équipement %s (stratégie 3) : %s. "
+                    "URL : %s",
+                    eqLogicId, e, photo.url,
+                )
 
         if not downloaded:
             return None
