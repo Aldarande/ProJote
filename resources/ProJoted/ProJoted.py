@@ -1147,20 +1147,48 @@ def download_photo(client, eqLogicId, tokenconnected, message):
             photo_bytes = None
             child_n = raw.get("N", "")
 
-            # Stratégie A : photo base64 dans parametres_utilisateur.listeRessources
-            # (retournée lors de la connexion sur certaines versions Pronote)
+            # Stratégie A : tous les champs du raw_resource de l'enfant + appel ParametresUtilisateur frais
             try:
-                _pu = client.parametres_utilisateur.get("dataSec", {}).get("data", {})
-                _liste = _pu.get("ressource", {}).get("listeRessources", {}).get("V", [])
-                for _child in _liste:
+                # Log de tous les champs du raw_resource pour repérer un champ photo caché
+                logging.info(
+                    "DEBUG raw_resource keys : %s",
+                    list(raw.keys()),
+                )
+                pb64_raw = raw.get("photoBase64", {})
+                logging.info(
+                    "DEBUG raw_resource.photoBase64 : _T=%s V_debut=%s",
+                    pb64_raw.get("_T") if isinstance(pb64_raw, dict) else "N/A",
+                    str(pb64_raw.get("V", ""))[:120] if isinstance(pb64_raw, dict) else str(pb64_raw)[:120],
+                )
+
+                # Appel ParametresUtilisateur frais pour voir si Pronote retourne la photo
+                fresh = client.post("ParametresUtilisateur")
+                fresh_data = fresh.get("dataSec", {}).get("data", {})
+                fresh_ressource = fresh_data.get("ressource", {})
+                fresh_children = fresh_ressource.get("listeRessources", {}).get("V", [])
+                logging.info(
+                    "DEBUG ParametresUtilisateur fresh — clés data : %s — clés ressource : %s",
+                    list(fresh_data.keys()),
+                    list(fresh_ressource.keys()),
+                )
+                for _child in fresh_children:
                     if _child.get("N") == child_n:
+                        logging.info(
+                            "DEBUG enfant frais keys : %s",
+                            list(_child.keys()),
+                        )
                         pb64 = _child.get("photoBase64", {})
+                        logging.info(
+                            "DEBUG photoBase64 frais : _T=%s V_debut=%s",
+                            pb64.get("_T") if isinstance(pb64, dict) else "N/A",
+                            str(pb64.get("V", ""))[:120] if isinstance(pb64, dict) else str(pb64)[:120],
+                        )
                         if isinstance(pb64, dict) and pb64.get("_T") == 23 and pb64.get("V"):
                             photo_bytes = base64.b64decode(pb64["V"])
-                            logging.info("Photo parent récupérée depuis parametres_utilisateur")
+                            logging.info("Photo parent récupérée depuis ParametresUtilisateur frais")
                         break
             except Exception as _e:
-                logging.debug("Stratégie A photo (parametres_utilisateur) échouée : %s", _e)
+                logging.debug("Stratégie A photo (ParametresUtilisateur) échouée : %s", _e)
 
             # Stratégie B : appel PageEmploiDuTemps et extraction base64 de la réponse complète
             if not photo_bytes:
