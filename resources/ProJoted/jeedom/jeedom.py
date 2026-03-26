@@ -16,6 +16,7 @@
 
 import time
 import logging
+import re
 import threading
 import requests
 import datetime
@@ -161,14 +162,14 @@ class jeedom_com:
             if response.status_code != requests.codes.ok:
                 logging.error(
                     "Callback error: %s %s. Please check your network configuration page",
-                    response.status.code,
-                    response.status.message,
+                    response.status_code,
+                    response.reason,
                 )
                 return False
         except Exception as e:
             logging.error(
                 "Callback result as a unknown error: %s. Please check your network configuration page",
-                e.message,
+                str(e),
             )
             return False
         return True
@@ -194,12 +195,21 @@ class jeedom_utils:
 
     @staticmethod
     def set_log_level(level="error"):
-        FORMAT = "[%(asctime)-15s][%(levelname)s] : %(message)s"
-        logging.basicConfig(
-            level=jeedom_utils.convert_log_level(level),
-            format=FORMAT,
-            datefmt="%Y-%m-%d %H:%M:%S",
-        )
+        FORMAT = "[%(asctime)-15s][%(levelname)s] : %(filename)s:%(lineno)d - %(message)s"
+
+        class _MaskApikey(logging.Formatter):
+            _RE = re.compile(r'(apikey[=:"\s\']+)[^\s&"\'\\,}\]]+', re.IGNORECASE)
+            def format(self, record):
+                msg = super().format(record)
+                return self._RE.sub(r'\1***', msg)
+
+        root = logging.getLogger()
+        for h in root.handlers[:]:
+            root.removeHandler(h)
+        handler = logging.StreamHandler()
+        handler.setFormatter(_MaskApikey(fmt=FORMAT, datefmt="%Y-%m-%d %H:%M:%S"))
+        root.addHandler(handler)
+        root.setLevel(jeedom_utils.convert_log_level(level))
 
     @staticmethod
     def find_tty_usb(idVendor, idProduct, product=None):

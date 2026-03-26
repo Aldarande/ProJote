@@ -1,0 +1,71 @@
+/* Styles pour le thème clair */
+body.light {
+    background-color: #ffffff;
+    color: #000000;
+}
+
+/* Styles pour le thème sombre */
+body.dark {
+    background-color: #333333;
+    color: #ffffff;
+}
+
+/* Styles pour l'interface Pronote */
+.pronote-interface {
+    padding: 20px;
+    border-radius: 5px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.pronote-interface h2 {
+    margin-top: 0;
+}
+
+.pronote-content {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.pronote-notes,
+.pronote-schedule {
+    flex: 1;
+    min-width: 300px;
+    margin: 10px;
+    padding: 15px;
+    border-radius: 5px;
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+}
+
+.pronote-notes h3,
+.pronote-schedule h3 {
+    margin-top: 0;
+}
+
+.pronote-notes ul,
+.pronote-schedule ul {
+    list-style-type: none;
+    padding: 0;
+}
+
+.pronote-notes li,
+.pronote-schedule li {
+    padding: 5px 0;
+    border-bottom: 1px solid #eee;
+}
+
+/* Styles pour le thème sombre */
+body.dark .pronote-interface {
+    background-color: #444444;
+    color: #ffffff;
+}
+
+body.dark .pronote-notes,
+body.dark .pronote-schedule {
+    background-color: #555555;
+    border-color: #666666;
+}
+
+body.dark .pronote-notes li,
+body.dark .pronote-schedule li {
+    border-bottom-color: #666666;
+}

@@ -21,118 +21,166 @@
 /*********************************************************************
 * Remplit le champs select avec la liste des enfants de l'équipement
 *********************************************************************/
-function getParameterByName(name, url) {
-  // sourcery skip: use-braces
-  // sourcery skip: dont-reassign-parameters
-  if (!url) url = window.location.href;
+function getParameterByName(name, url = window.location.href) {
+  // Cette fonction permet de récupérer la valeur d'un paramètre dans l'URL
   name = name.replace(/[\[\]]/g, '\\$&');
-  var regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)'),
-    results = regex.exec(url);
+  const regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)');
+  const results = regex.exec(url);
   if (!results) return null;
   if (!results[2]) return '';
   return decodeURIComponent(results[2].replace(/\+/g, ' '));
 }
 
-function loadProJoteData(eqLogicId) {
-  if (eqLogicId) {
-    let filePath = '/plugins/ProJote/data/' + eqLogicId + '/enfant.ProJote.json.txt';
-    let profilePicturePath = '/plugins/ProJote/data/' + eqLogicId + '/profile_picture.jpg';
-    console.log('ProJote.js:: emplacement du Fichier ' + filePath);
-    // Vérifier la présence du fichier avant de tenter de récupérer les données
-    $.get(filePath)
-      .done(function () {
-        // Le fichier existe, continuer à récupérer les données
-        data = "";
-        $.getJSON(filePath, function (data) {
-          console.log('ProJote.js:: données récupérées', data);
-          if (data) {
-            // Afficher les informations de l'élève
-            let localPicture = data.Local_Picture ? data.Local_Picture.replace('/var/www/html', '') : '';
+/**
+ * Attend que le fichier JSON soit mis à jour avec les nouvelles données
+ * Cette fonction essaie à intervalle régulier jusqu'à trouver les données mises à jour
+ */
+function waitForDataUpdate(eqLogicId, expectedEleve, maxAttempts = 60, delay = 1000) {
+  let attempts = 0;
+  $('#error-message').html('<i class="fas fa-hourglass-half fa-spin"></i> Mise à jour des données en cours...');
 
-            if (data.Eleve && data.Eleve.trim() !== '') {
-              $('#eleve-name').text(data.Eleve);
-            } else {
-              $('#eleve-name').text('Non trouvé');
-            }
-            if (data.Classe) {
-              $('#eleve-classe').text(data.Classe);
-            } else {
-              $('#eleve-classe').text('Non trouvé');
-            }
-            if (data.Etablissement) {
-              $('#eleve-etablissement').text(data.Etablissement);
-            } else {
-              $('#eleve-etablissement').text('Non trouvé');
-            }
-            // Afficher l'image locale si elle existe
-            if (localPicture) {
-              $('#local-picture').attr('src', localPicture).show();
-              // Je change le timestamp pour forcer la mise à joru de l'image.
-              if ($('#local-picture').length) {
-                let newSrc = localPicture + '?' + new Date().getTime();
-                $('#local-picture').attr('src', newSrc).show();
-              } else {
-                console.error('Element with id "local-picture" not found.');
-              }
-            } else {
-              $('#local-picture').hide();
-            }
-            $('.form-group.Eleve').show(); // Afficher la section Elève
-            // Afficher la section TOKEN
-            if (LogLevel === 'debug') {
-              $('#Token_pronote_url').text(data.Token.pronote_url);
-              $('#Token_username').text(data.Token.username);
-              $('#Token_password').text(data.Token.password);
-              $('#Token_client_identifier').text(data.Token.client_identifier);
-              $('.form-group.Token').show();
-            }
-            if (data.Token.pronote_url && data.Token.pronote_url.includes('.parent.html')) {
-              // La chaîne contient .parent.html
-              console.log('ProJote.js:: Token_pronote_url contient .parent.html');
-              $('#Parent').prop('checked', true); // Coche la case Parent
-              $('.form-group.listenfant').show(); // Affiche le champ listenfant
-            }
-            populateEnfantList(eqLogicId); // Appeler la fonction pour peupler la liste des enfants
-
-          } else {
-            $('#error-message').text('Erreur : Le fichier JSON est invalide.');
-            resetFields();
-          }
-        }).fail(function (jqXHR, textStatus, errorThrown) {
-          console.log('ProJote.js:: erreur lors de la récupération du fichier JSON', textStatus, errorThrown);
-          $('#error-message').text('Erreur : Le fichier n\'existe pas à l\'emplacement spécifié.');
-          resetFields();
-        });
-
-        $.get(profilePicturePath)
-          .done(function () {
-            console.log('ProJote.js:: image profile_picture.jpg récupérée avec succès');
-            $('#profile-picture').attr('src', profilePicturePath);
-          })
-          .fail(function (jqXHR, textStatus, errorThrown) {
-            console.log('ProJote.js:: erreur lors de la récupération de l\'image', textStatus, errorThrown);
-            $('#error-message').append('<p>Le fichier profile_picture.jpg n\'existe pas.</p>');
-            $('#profile-picture').attr('src', ''); // Réinitialiser l'image
-          });
-
-        //populateEnfantList(eqLogicId); // Appeler la fonction pour peupler la liste des enfants
-
-      })
-      .fail(function () {
-        // Le fichier n'existe pas, afficher un message d'erreur et réinitialiser les champs
-        //$('#error-message').text('Erreur : Le fichier enfant.ProJote.json.txt n\'existe pas.');
-
-        resetFields();
-        $('.form-group.Token').hide(); // Masquer la section TOKEN
-        $('.form-group.Eleve').hide(); // Masquer la section Elève
-      });
-  } else {
-    $('#error-message').text('Erreur : ID de l\'équipement non trouvé.');
-    resetFields();
-    $('.form-group.Token').hide(); // Masquer la section TOKEN
-    $('.form-group.Eleve').hide(); // Masquer la section Elève
+  function checkUpdate() {
+    attempts++;
+    $.ajax({
+      type: "POST",
+      url: "/plugins/ProJote/core/ajax/ProJote.ajax.php",
+      data: { action: "GetConfig", eqlogic: eqLogicId },
+      dataType: 'json',
+      global: false,
+      success: function (result) {
+        if (result && result.state === 'ok' && result.result.Eleve === expectedEleve) {
+          console.log('ProJote.js:: Données mises à jour avec le nouvel élève:', expectedEleve);
+          setSyncSpinner(false);
+          $('#error-message').empty();
+          loadProJoteData(eqLogicId);
+        } else if (attempts < maxAttempts) {
+          setTimeout(checkUpdate, delay);
+        } else {
+          console.log('ProJote.js:: Délai maximum atteint, rechargement des données');
+          setSyncSpinner(false);
+          $('#error-message').empty();
+          loadProJoteData(eqLogicId);
+        }
+      },
+      error: function () {
+        if (attempts < maxAttempts) {
+          setTimeout(checkUpdate, delay);
+        } else {
+          setSyncSpinner(false);
+          loadProJoteData(eqLogicId);
+        }
+      }
+    });
   }
 
+  checkUpdate();
+}
+
+function loadProJoteData(eqLogicId) {
+  $('#error-message').empty();
+  if (!eqLogicId) {
+    $('#error-message').text('Erreur : ID de l\'équipement non trouvé.');
+    $('.form-group.Token').hide();
+    $('.form-group.Eleve').hide();
+    return;
+  }
+
+  $.ajax({
+    type: "POST",
+    url: "/plugins/ProJote/core/ajax/ProJote.ajax.php",
+    data: { action: "GetConfig", eqlogic: eqLogicId },
+    dataType: 'json',
+    global: false,
+    success: function (result) {
+      if (!result || result.state !== 'ok') {
+        resetFields();
+        return;
+      }
+      let data = result.result;
+
+      // Afficher et remplir la section Eleve si des données existent
+      if (data.Eleve && data.Eleve.trim() !== '') {
+        $('#eleve-name').text(data.Eleve || '');
+        $('#eleve-classe').text(data.Classe || '');
+        $('#eleve-etablissement').text(data.Etablissement || '');
+        $('.form-group.Eleve').show();
+      } else {
+        $('.form-group.Eleve').hide();
+      }
+
+      // Afficher Token si mode debug
+      if (LogLevel === 'debug') {
+        $('#Token_pronote_url').text(data.Token_pronote_url || '');
+        $('.form-group.Token').show();
+      } else {
+        $('.form-group.Token').hide();
+      }
+
+      // Détecter compte parent via l'URL du token
+      if (data.Token_pronote_url && data.Token_pronote_url.includes('parent.html')) {
+        $('input[name="accountType"][value="parent"]').prop('checked', true);
+        $('.form-group.listenfant').show();
+        populateEnfantList(eqLogicId, data, function(selectedEnfant) {
+          // Après un "Sauvegarder", Jeedom recharge la page avec saveSuccessFull=1
+          // On profite du rechargement pour déclencher la synchro Pronote
+          if (getParameterByName('saveSuccessFull') === '1' && selectedEnfant) {
+            changeEnfant(eqLogicId, selectedEnfant);
+          }
+        });
+      } else {
+        $('input[name="accountType"][value="eleve"]').prop('checked', true);
+        $('.form-group.listenfant').hide();
+      }
+
+      // Photo de profil
+      let profilePicturePath = '/plugins/ProJote/data/' + eqLogicId + '/profile_picture.jpg';
+      $.get(profilePicturePath)
+        .done(function () {
+          $('#local-picture').attr('src', profilePicturePath + '?' + new Date().getTime()).show();
+        })
+        .fail(function () {
+          $('#local-picture').hide();
+        });
+    },
+    error: function () {
+      resetFields();
+      $('.form-group.Token').hide();
+      $('.form-group.Eleve').hide();
+    }
+  });
+}
+
+function setSyncSpinner(active) {
+  if (active) {
+    $('#bt_renameEqLogic_icon').addClass('hidden');
+    $('#bt_renameEqLogic_spin').removeClass('hidden');
+    $('#bt_renameEqLogic').prop('disabled', true);
+  } else {
+    $('#bt_renameEqLogic_spin').addClass('hidden');
+    $('#bt_renameEqLogic_icon').removeClass('hidden');
+    $('#bt_renameEqLogic').prop('disabled', false);
+  }
+}
+
+function changeEnfant(eqLogicId, selectedEnfant) {
+  if (!selectedEnfant || !eqLogicId) return;
+  setSyncSpinner(true);
+  $('#error-message').empty();
+  $.ajax({
+    type: "POST",
+    url: "/plugins/ProJote/core/ajax/ProJote.ajax.php",
+    data: { action: "ChangeEnfant", nomeleve: selectedEnfant, eqlogic: eqLogicId },
+    dataType: 'json',
+    global: false,
+    error: function (request, status, error) {
+      console.error("AJAX Error:", request, status, error);
+      $('#error-message').text('Erreur lors du changement d\'élève. Vérifiez les logs.');
+      setSyncSpinner(false);
+    },
+    success: function () {
+      waitForDataUpdate(eqLogicId, selectedEnfant);
+    }
+  });
 }
 
 function resetFields() {
@@ -147,48 +195,60 @@ function resetFields() {
   $('#enfantlist').empty(); // Vider la liste des enfants
 }
 
-function populateEnfantList(eqLogicId) {
+function populateEnfantList(eqLogicId, configData, callback) {
   console.log('ProJote.js:: populateEnfantList appelée avec eqLogicId:', eqLogicId);
-  if (!$('.form-group.listenfant').is(':visible')) {
-    console.log('ProJote.js:: Liste des enfants non affichée, aucune action.');
+  if ($('input[name="accountType"]:checked').val() !== 'parent') {
     return;
   }
-  console.log('ProJote.js:: Liste des enfants affichée, récupération des enfants pour ID:', eqLogicId);
 
-  let filePath = '/plugins/ProJote/data/' + eqLogicId + '/enfant.ProJote.json.txt';
-  $.getJSON(filePath, function (data) {
-    if (data && data.Liste_Enfant) {
-      let enfants = JSON.parse(data.Liste_Enfant); // Transformer la chaîne en tableau
-      let $enfantList = $('#enfantlist');
-      $enfantList.empty(); // Vider la liste existante
-      let eleveName = $('#eleve-name').text().trim();
+  function fillList(data) {
+    let listeRaw = data.Liste_Enfant || '[]';
+    let enfants = [];
+    try {
+      enfants = typeof listeRaw === 'string' ? JSON.parse(listeRaw) : listeRaw;
+    } catch (e) {
+      console.error('ProJote.js:: Erreur parsing Liste_Enfant', e);
+    }
+
+    let $enfantList = $('#enfantlist');
+    $enfantList.empty();
+    let enfantActuel = data.Eleve || '';
+
+    if (Array.isArray(enfants) && enfants.length > 0) {
       let found = false;
-      if (Array.isArray(enfants)) {
-        enfants.forEach(function (enfant) {
-          let enfantTrim = enfant.trim();
-          let selected = '';
-          if (enfantTrim === eleveName) {
-            selected = ' selected';
-            found = true;
-          }
-          $enfantList.append('<option value="' + htmlspecialchars(enfantTrim) + '"' + selected + '>' + htmlspecialchars(enfantTrim) + '</option>');
-        });
-        // Si aucun enfant ne correspond, sélectionner le premier par défaut
-        if (!found && enfants.length > 0) {
-          $enfantList.find('option:first').prop('selected', true);
-        }
-      } else {
-        $enfantList.append('<option value="">Aucun enfant trouvé</option>');
+      enfants.forEach(function (enfant) {
+        let enfantTrim = enfant.trim();
+        $enfantList.append('<option value="' + htmlspecialchars(enfantTrim) + '">' + htmlspecialchars(enfantTrim) + '</option>');
+        if (enfantTrim === enfantActuel) found = true;
+      });
+      if (found) {
+        $enfantList.val(enfantActuel);
+      } else if (enfants.length > 0) {
+        $enfantList.val(enfants[0].trim());
       }
     } else {
-      $('#error-message').text('Erreur : Liste_Enfant non trouvée ou fichier JSON invalide');
-      $('#enfantlist').empty();
+      $enfantList.append('<option value="">Aucun enfant trouvé</option>');
     }
-  }).fail(function (jqXHR, textStatus, errorThrown) {
-    console.log('ProJote.js:: erreur lors de la récupération de la liste des enfants', textStatus, errorThrown);
-    $('#error-message').text('Erreur : Le fichier n\'existe pas à l\'emplacement spécifié : ' + filePath);
-    $('#enfantlist').empty();
-  });
+
+    if (callback) callback($enfantList.val());
+  }
+
+  if (configData) {
+    fillList(configData);
+  } else {
+    $.ajax({
+      type: "POST",
+      url: "/plugins/ProJote/core/ajax/ProJote.ajax.php",
+      data: { action: "GetConfig", eqlogic: eqLogicId },
+      dataType: 'json',
+      global: false,
+      success: function (result) {
+        if (result && result.state === 'ok') {
+          fillList(result.result);
+        }
+      }
+    });
+  }
 }
 
 function htmlspecialchars(str) {
@@ -196,6 +256,10 @@ function htmlspecialchars(str) {
 }
 
 $(document).ready(function () {
+  // attend que la page web (php) soit entiérement lu.
+  // Masquer la liste des élèves par défaut
+  $('.form-group.listenfant').hide();
+
   // Ajouter un gestionnaire d'événements click pour les cartes d'équipement
   $('.eqLogicDisplayCard').on('click', function () {
     let eqLogicId = $(this).attr('data-eqlogic_id'); // Récupérer l'ID de l'équipement depuis l'attribut data
@@ -212,12 +276,21 @@ $(document).ready(function () {
     //populateEnfantList(eqLogicIdFromUrl); // Appeler la fonction pour peupler la liste des enfants
   }
 
-  // Gestion de l'affichage du champ listenfant en fonction de la case à cocher Parent
-  $('#Parent').change(function () {
-    if ($(this).is(':checked')) {
+  // Gestion de l'affichage du champ listenfant en fonction des radio buttons accountType
+  $('input[name="accountType"]').change(function () {
+    if ($(this).val() === 'parent') {
       $('.form-group.listenfant').show();
     } else {
       $('.form-group.listenfant').hide();
+    }
+  });
+  // Trigger initial pour afficher/masquer selon la valeur par défaut
+  $('input[name="accountType"]:checked').trigger('change');
+
+  // Detection automatique parent dans l'URL lors de la saisie
+  $('[data-l2key="url"]').on('input', function () {
+    if ($(this).val().includes('parent.html')) {
+      $('input[name="accountType"][value="parent"]').prop('checked', true).trigger('change');
     }
   });
 });
@@ -227,8 +300,8 @@ $(document).ready(function () {
 *********************************************************************/
 
 $('[data-l1key="configuration"][data-l2key="AUTH"]').on('change', function () {
-  // Récupère la valeur sélectionnée
-  //let selectedAuth = $(this).val();
+  //Le but est d'afficher le bon menu en fonction de l'authentification choisit
+
   // Masque tous les divs
   $('.form-group.Login, .form-group.QRCode').hide();
   // Affiche le div correspondant à la valeur sélectionnée
@@ -244,48 +317,11 @@ $('[data-l1key="configuration"][data-l2key="AUTH"]').trigger('change');
 /*****************************************************
  * Gestion de l'affichage du champ listenfant
  *****************************************************/
-$('#enfantlist').on('focus', function () {
-  // Ton script ici
-  console.log('Le select enfantlist a été déplié');
-  // Par exemple, tu peux rappeler populateEnfantList ou autre
-  populateEnfantList(getParameterByName('id'));
-});
-// quand un enfant est choisit
-$('#enfantlist').on('change', function () {
-  // Récupérer la valeur sélectionnée
-  let selectedEnfant = $(this).val();
-  console.log('Enfant sélectionné :', selectedEnfant);
-  // Mettre à jour le champ NomEleve avec la valeur sélectionnée
-  document.querySelector('[data-l2key="enfant"]').value = selectedEnfant;
-  // Afficher un message ou effectuer une action si nécessaire
-
-  //compare avec le valeur de la commande info NomEleve
-  let currentNomEleve = document.querySelector('[id="eleve-name"]').value;
-
-  if (currentNomEleve !== selectedEnfant) {
-    console.log('Le nom de l\'élève a changé pour : ', selectedEnfant);
-    $.ajax({
-      type: "POST", // Méthode de transmission des données au fichier php
-      url: "/plugins/ProJote/core/ajax/ProJote.ajax.php", // URL du script PHP AJAX
-
-      data: {
-        action: "ChangeEnfant", // Action à exécuter dans le script PHP        
-        nomeleve: selectedEnfant,
-        eqlogic: $('.eqLogicAttr[data-l1key=id]').value(),
-      },
-      dataType: 'json',
-      global: false,
-      error: function (request, status, error) {
-        // Gestion des erreurs
-        console.error("AJAX Error:", request, status, error);
-      },
-      success: function () {
-        // Traitement de la réponse JSON
-        console.log("AJAX Success: Enfant changé avec succès");
-      }
-    });
-
-  }
+// Applique l'enfant sélectionné et synchronise avec Pronote
+$('#bt_renameEqLogic').on('click', function () {
+  let eqLogicId = $('.eqLogicAttr[data-l1key=id]').val();
+  let selectedEnfant = $('#enfantlist').val();
+  changeEnfant(eqLogicId, selectedEnfant);
 });
 
 /*******************************************************
@@ -308,9 +344,9 @@ $('#bt_Validate').on('click', function () {
   //on valide si Url contient la chaine de caractéres parent.html si oui il faut cocher la case type="checkbox" id="Parent"
   if (Url.includes('parent.html')) {
     console.log('ProJote.js:: URL contient parent.html');
-    // Si l'URL contient "parent.html", cochez la case "Parent" <input type="checkbox" id="Parent" class="eqLogicAttr form-control" data-l1key="configuration" data-l2key="CptParent">
-    document.querySelector('#Parent').checked = true;
-    // Affiche le form-group listenfant en enlevant le style="display:block;"
+    // Si l'URL contient "parent.html", sélectionnez le radio "Parent"
+    $('input[name="accountType"][value="parent"]').prop('checked', true);
+    // Affiche le form-group listenfant
     $('.form-group.listenfant').show();
   }
   // Exécution de la requête AJAX
@@ -325,7 +361,7 @@ $('#bt_Validate').on('click', function () {
       password: Password,
       ent: CasEnt,
       nomeleve: selectedEnfant,
-      eqlogic: $('.eqLogicAttr[data-l1key=id]').value(),
+      eqlogic: $('.eqLogicAttr[data-l1key=id]').val(),
     },
 
     dataType: 'json',
@@ -369,7 +405,7 @@ $('#bt_Validate').on('click', function () {
 /**************************************
  * Tratement de la réception du QR CODE
  ***************************************/
-
+// Les function suivante gére le copier selectionner ou "drop" de l'image QRCODE
 document.querySelector('.rectangle').addEventListener('paste', function (e) {
   let { items } = e.clipboardData;
   for (let i = 0; i < items.length; i++) {
@@ -413,9 +449,9 @@ function sendImageToServer(code, pin) {
     url: "/plugins/ProJote/core/ajax/ProJote.ajax.php",
     data: {
       action: "ValidateQRCode",
-      data: code,
+      QRinfo: code,
       pin: pin,
-      eqlogic: $('.eqLogicAttr[data-l1key=id]').value(),
+      eqlogic: $('.eqLogicAttr[data-l1key=id]').val(),
     },
     dataType: 'json',
     global: false,
@@ -512,15 +548,6 @@ function displayImage(imageData) {
 }
 
 function handleImage(imageData) {
-  // Demande le code PIN à l'utilisateur
-  let pin = prompt('Veuillez entrer votre code PIN de 4 chiffres :');
-  // Vérifie que le code PIN saisi par l'utilisateur contient exactement 4 chiffres
-  let pinRegex = /^\d{4}$/;
-  if (!pinRegex.test(pin)) {
-    alert('Code PIN invalide. Veuillez entrer un code PIN de 4 chiffres.');
-    return;
-  }
-  // Si le code PIN est valide, continue le traitement de l'image
   resizeImage(imageData, 200, 200).then(function (resizedImageData) {
     let img = new Image();
     img.onload = function () {
@@ -535,15 +562,19 @@ function handleImage(imageData) {
       // Si le code QR est décodé avec succès, afficher les données
       if (code) {
         console.log('Données du QR code :', code.data);
-        sendImageToServer(code.data, pin);
+        // Demande le code PIN à l'utilisateur uniquement si le QR est valide
+        let pin = prompt('Veuillez entrer votre code PIN de 4 chiffres :');
+        let pinRegex = /^\d{4}$/;
+        if (pinRegex.test(pin)) {
+          sendImageToServer(code.data, pin);
+        } else {
+          alert('Code PIN invalide. Veuillez entrer un code PIN de 4 chiffres.');
+        }
       } else {
         console.log('Impossible de décoder le code QR');
         $('#error-message').text('Erreur : Impossible de décoder le QRcode ');
-
       }
       displayImage(resizedImageData);
-
-
     };
     img.onerror = function () {
       alert('Erreur lors du chargement de l\'image.');
@@ -601,71 +632,70 @@ function addCmdToTable(_cmd) {
   }
   sortTableById();
   let tr = '<tr class="cmd" data-cmd_id="' + init(_cmd.id) + '">'
-  tr += '<td class="hidden-xs">'
+
+  // ── Colonne ID ────────────────────────────────────────────────
+  tr += '<td>'
   tr += '<span class="cmdAttr" data-l1key="id"></span>'
   tr += '</td>'
+
+  // ── Colonne Commande (nom + icône) ────────────────────────────
   tr += '<td>'
   tr += '<div class="input-group">'
-  tr += '<input class="cmdAttr form-control input-sm roundedLeft" data-l1key="name" placeholder="{{Nom de la commande}}" style="width: 300px;">';
+  tr += '<input class="cmdAttr form-control input-sm roundedLeft" data-l1key="name" placeholder="{{Nom de la commande}}">'
   tr += '<span class="input-group-btn"><a class="cmdAction btn btn-sm btn-default" data-l1key="chooseIcon" title="{{Choisir une icône}}"><i class="fas fa-icons"></i></a></span>'
   tr += '<span class="cmdAttr input-group-addon roundedRight" data-l1key="display" data-l2key="icon" style="font-size:19px;padding:0 5px 0 0!important;"></span>'
   tr += '</div>'
+  // Champ caché pour la commande info liée (requis par le core Jeedom)
   tr += '<select class="cmdAttr form-control input-sm" data-l1key="value" style="display:none;margin-top:5px;" title="{{Commande info liée}}">'
   tr += '<option value="">{{Aucune}}</option>'
   tr += '</select>'
   tr += '</td>'
-  tr += '<td>'
-  tr += '<span class="type" type="' + init(_cmd.type) + '">' + jeedom.cmd.availableType() + '</span>'
-  tr += '<span class="subType" subType="' + init(_cmd.subType) + '"></span>'
+
+  // ── Colonne Valeur ────────────────────────────────────────────
+  tr += '<td style="vertical-align:middle;">'
+  if (_cmd.type === 'info') {
+    tr += '<span class="cmdAttr pjw-hs-raw" data-l1key="htmlstate" style="display:none;"></span>'
+    tr += '<span class="pjw-val-display" style="display:block;word-break:break-all;font-size:11px;opacity:.7;"></span>'
+  }
   tr += '</td>'
-  tr += '<td>'
-  tr += '<label class="checkbox-inline"><input type="checkbox" class="cmdAttr" data-l1key="isVisible" checked/>{{Afficher}}</label> '
 
-  // Liste des logicalId à exclure
-  let excludedLogicalIds = [
-    'edt_prochainjour',
-    'edt_aujourdhui',
-    'devoir',
-    'devoir_Demain',
-    'absence',
-    'derniere_absence',
-    'retard',
-    'dernier_retard',
-    'punition',
-    'derniere_punition',
-    'note',
-    'derniere_note',
-    'notifications',
-    'derniere_notification',
-    'competences'
-  ];
+  // ── Colonne Options ───────────────────────────────────────────
+  // Afficher (isVisible) : pour toutes les commandes — contrôle
+  //   l'affichage de la commande sur le dashboard Jeedom.
+  // Historiser (isHistorized) : uniquement pour les commandes
+  //   de type "numeric" — enregistre l'historique des valeurs.
+  tr += '<td style="white-space:nowrap;vertical-align:middle;">'
+  tr += '<label class="checkbox-inline" style="font-size:12px;">'
+  tr += '<input type="checkbox" class="cmdAttr" data-l1key="isVisible"/> {{Afficher}}'
+  tr += '</label>'
+  if (_cmd.subType === 'numeric') {
+    tr += '<br><label class="checkbox-inline" style="font-size:12px;">'
+    tr += '<input type="checkbox" class="cmdAttr" data-l1key="isHistorized"/> {{Historiser}}'
+    tr += '</label>'
+  }
+  tr += '</td>'
 
-  if (!excludedLogicalIds.includes(_cmd.logicalId)) {
-    tr += '<label class="checkbox-inline"><input type="checkbox" class="cmdAttr" data-l1key="isHistorized" checked/>{{Historiser}}</label> ';
-    tr += '<label class="checkbox-inline"><input type="checkbox" class="cmdAttr" data-l1key="display" data-l2key="invertBinary"/>{{Inverser}}</label> ';
-    tr += '<div style="margin-top:7px;">';
-    tr += '<input class="tooltips cmdAttr form-control input-sm" data-l1key="configuration" data-l2key="minValue" placeholder="{{Min}}" title="{{Min}}" style="width:30%;max-width:80px;display:inline-block;margin-right:2px;">';
-    tr += '<input class="tooltips cmdAttr form-control input-sm" data-l1key="configuration" data-l2key="maxValue" placeholder="{{Max}}" title="{{Max}}" style="width:30%;max-width:80px;display:inline-block;margin-right:2px;">';
+  // ── Colonne Actions ───────────────────────────────────────────
+  // Configurer (⚙) : toujours disponible si la commande existe en BDD.
+  // Tester : uniquement pour les commandes de type "action".
+  // Supprimer (🚫) : toujours à droite, aligné en colonne.
+  tr += '<td style="white-space:nowrap;vertical-align:middle;">'
+  tr += '<div style="display:flex;align-items:center;justify-content:flex-end;gap:4px;">'
+  if (is_numeric(_cmd.id)) {
+    tr += '<a class="btn btn-default btn-xs cmdAction" data-action="configure" title="{{Configuration avancée}}"><i class="fas fa-cogs"></i></a>'
+    if (_cmd.type === 'action') {
+      tr += '<a class="btn btn-default btn-xs cmdAction" data-action="test" title="{{Tester}}"><i class="fas fa-rss"></i></a>'
+    }
   }
-  if (_cmd.unite !== '') {
-    tr += '<input class="tooltips cmdAttr form-control input-sm" data-l1key="unite" placeholder="Unité" title="{{Unité}}" style="width:30%;max-width:80px;display:inline-block;margin-right:2px;">';
-  }
+  tr += '<i class="fas fa-minus-circle cmdAction cursor" data-action="remove" title="{{Supprimer}}" style="color:#e74c3c;font-size:16px;"></i>'
   tr += '</div>'
   tr += '</td>'
-  tr += '<td>';
-  tr += '<span class="cmdAttr" data-l1key="htmlstate"></span>';
-  tr += '</td>';
-  tr += '<td>'
-  if (is_numeric(_cmd.id)) {
-    tr += '<a class="btn btn-default btn-xs cmdAction" data-action="configure"><i class="fas fa-cogs"></i></a> '
-    tr += '<a class="btn btn-default btn-xs cmdAction" data-action="test"><i class="fas fa-rss"></i> {{Tester}}</a>'
-  }
-  tr += '<i class="fas fa-minus-circle pull-right cmdAction cursor" data-action="remove" title="{{Supprimer la commande}}"></i></td>'
+
   tr += '</tr>'
   $('#table_cmd tbody').append(tr)
   let Ntr = $('#table_cmd tbody tr').last()
   jeedom.eqLogic.buildSelectCmd({
-    id: $('.eqLogicAttr[data-l1key=id]').value(),
+    id: $('.eqLogicAttr[data-l1key=id]').val(),
     filter: { type: 'info' },
     error: function (error) {
       $('#div_alert').showAlert({ message: error.message, level: 'danger' })
@@ -674,6 +704,36 @@ function addCmdToTable(_cmd) {
       Ntr.find('.cmdAttr[data-l1key=value]').append(result)
       Ntr.setValues(_cmd, '.cmdAttr')
       jeedom.cmd.changeType(Ntr, init(_cmd.subType))
+      if (_cmd.type === 'info') {
+        const hsRaw = Ntr.find('.pjw-hs-raw')[0]
+        if (hsRaw && hsRaw.innerHTML) {
+          const _tmp = document.createElement('div')
+          _tmp.innerHTML = hsRaw.innerHTML
+          const stateSpan = _tmp.querySelector('.cmdTableState')
+          if (stateSpan) {
+            const txt = (stateSpan.textContent || stateSpan.innerText || '').trim()
+            let display = txt || '—'
+            if (txt) {
+              try {
+                const parsed = JSON.parse(txt)
+                if (Array.isArray(parsed)) {
+                  display = parsed.length > 0 ? '[' + parsed.length + ' élément(s)]' : '[ vide ]'
+                } else if (typeof parsed === 'object' && parsed !== null) {
+                  const keys = Object.keys(parsed)
+                  display = '{' + keys.slice(0, 3).join(', ') + (keys.length > 3 ? ', …' : '') + '}'
+                }
+              } catch (e) {
+                if (txt.startsWith('[')) display = '[ … ]'
+                else if (txt.startsWith('{')) display = '{ … }'
+                else display = txt.length > 60 ? txt.substring(0, 60) + '…' : txt
+              }
+            }
+            Ntr.find('.pjw-val-display').text(display).attr('title', txt)
+          }
+        }
+      }
     }
   })
 }
+
+

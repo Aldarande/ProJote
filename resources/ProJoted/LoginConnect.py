@@ -1,3 +1,25 @@
+"""
+LoginConnect.py — Connexion à Pronote via identifiants login/mot de passe.
+
+Ce script est appelé par le plugin Jeedom (via ProJote.ajax.php) quand l'utilisateur
+valide ses identifiants dans l'interface. Il fait deux choses principales :
+  1. Se connecte à Pronote avec le login/mot de passe fourni.
+  2. Génère un token de connexion (QR code → session persistante) et sauvegarde
+     les informations de l'élève dans un fichier JSON sur le disque.
+
+Ce fichier est aussi importé par QRConnect.py et ProJoted.py pour réutiliser
+ses fonctions utilitaires (writedataPronotepy, verifdossier, etc.).
+
+Arguments attendus en ligne de commande :
+  --URL       : URL de l'établissement sur Pronote
+  --Login     : Identifiant de connexion
+  --Password  : Mot de passe
+  --Ent       : Nom de l'ENT (Espace Numérique de Travail), ex: "ac_montpellier"
+  --Enfant    : Nom de l'enfant à sélectionner (pour les comptes parents)
+  --Eqid      : Identifiant de l'équipement Jeedom (pour sauvegarder au bon endroit)
+  --Uuid      : UUID unique de l'équipement (identifiant de session Pronote)
+  --Loglevel  : Niveau de verbosité des logs (debug, info, warning, error)
+"""
 try:
     # TO DO :: add log to plugin for troubleshoote
     import pronotepy
@@ -21,8 +43,17 @@ try:
         )
         sys.exit(1)
 
+    # ─────────────────────────────────────────────────────────────────────────
+    # FONCTIONS UTILITAIRES
+    # ─────────────────────────────────────────────────────────────────────────
+
     # Import de l'ENT
     def class_for_name(module_name, class_name):
+        """
+        Charge dynamiquement une classe Python par son nom de module et de classe.
+        Utilisé pour charger l'ENT (ex: "pronotepy.ent", "ac_montpellier").
+        Retourne None si le module ou la classe est introuvable.
+        """
         try:
             # load the module, will raise ImportError if module cannot be loaded
             m = importlib.import_module(module_name)
@@ -31,6 +62,24 @@ try:
             return None
 
     def Connectparent(pronote_url, login, password, ent, enfant):
+        """
+        Connecte un compte PARENT à Pronote avec login/mot de passe.
+
+        Un compte parent peut avoir plusieurs enfants. Cette fonction :
+          - Se connecte à Pronote en tant que parent
+          - Récupère la liste des enfants du compte
+          - Sélectionne l'enfant demandé (ou le premier par défaut)
+
+        Args:
+            pronote_url (str): URL complète du portail Pronote de l'établissement
+            login (str):       Identifiant de connexion
+            password (str):    Mot de passe
+            ent (class|None):  Classe ENT si l'établissement utilise un ENT, sinon None
+            enfant (str):      Nom de l'enfant à sélectionner ("" = premier de la liste)
+
+        Returns:
+            pronotepy.ParentClient: Client connecté, ou None si la connexion échoue
+        """
         client = None  # Initialisation de la variable client
         # Je valide que j'ai les bonnes informations pour me connecter en tant que Parent
         try:
@@ -90,6 +139,21 @@ try:
             logging.error("Connection parent échouée : lig. %s -   %s", line_number, e)
 
     def ConnectEleve(pronote_url, login, password, ent):
+        """
+        Connecte un compte ÉLÈVE à Pronote avec login/mot de passe.
+
+        Contrairement au compte parent, un élève n'a pas de sélection d'enfant.
+        La connexion retourne directement le client élève.
+
+        Args:
+            pronote_url (str): URL complète du portail Pronote de l'établissement
+            login (str):       Identifiant de connexion
+            password (str):    Mot de passe
+            ent (class|None):  Classe ENT si nécessaire, sinon None
+
+        Returns:
+            pronotepy.Client: Client connecté, ou None si la connexion échoue
+        """
         if login == "":
             logging.error("Pas de login reçu sur le deamon")
 
@@ -120,7 +184,26 @@ try:
         except Exception as e:
             logging.error("Connection échouée :  %s", e)
 
-    def TokenLogin(Account):
+    def TokenLogin(Account, uuid="ProJote"):
+        """
+        Génère un token de connexion persistant à partir d'un compte déjà connecté.
+
+        Pronote utilise un système de "QR code interne" pour créer des sessions
+        longues durées sans avoir à retaper le mot de passe à chaque fois.
+        Cette fonction demande ce QR code à Pronote, puis l'utilise pour créer
+        une session token associée à cet équipement (identifié par uuid).
+
+        Le token généré contient : URL, username, password (chiffré), client_identifier.
+        Il est ensuite sauvegardé en configuration Jeedom pour les reconnexions futures.
+
+        Args:
+            Account: Client pronotepy déjà connecté (parent ou élève)
+            uuid (str): Identifiant unique de l'équipement Jeedom (évite les conflits
+                        si deux équipements utilisent le même compte Pronote)
+
+        Returns:
+            dict: Dictionnaire contenant les informations du token de reconnexion
+        """
         qrcode_data = Account.request_qr_code_data("4321")
         # Étape 1 : Extraire la partie de l'URL jusqu'à `/pronote/`
         ## We need to change url because
@@ -136,7 +219,7 @@ try:
         Token_data = Account.qrcode_login(
             qrcode_data,
             "4321",
-            uuid="ProJote",
+            uuid=uuid,
         )
 
         return {
@@ -145,7 +228,7 @@ try:
             "Token_Password": Token_data.password,
             "Token_UUID": Token_data.uuid,
             "pin": "4321",
-            "uuid": "ProJote",
+            "uuid": uuid,
         }
 
     def verifdossier(chemin_dossier):
@@ -171,10 +254,27 @@ try:
             logging.error(f"Erreur lors de la création du dossier : {e}")
             return False
 
-    def download_image(url, filepath):
+    def download_image(url, filepath, session=None):
+        """
+        Télécharge une image depuis une URL et la sauvegarde localement.
+
+        Compare l'image distante à l'image locale existante pour éviter
+        de télécharger inutilement si elle n'a pas changé.
+
+        Args:
+            url (str):       URL de l'image à télécharger (ex: photo de profil Pronote)
+            filepath (str):  Chemin local où sauvegarder l'image
+            session:         Session HTTP authentifiée (optionnel, sinon utilise requests)
+
+        Returns:
+            bool: True si le téléchargement a réussi (ou image déjà à jour), False sinon
+        """
         try:
             # Effectuer une requête HTTP pour récupérer le contenu de l'image
-            response = requests.get(url)
+            if session:
+                response = session.get(url)
+            else:
+                response = requests.get(url)
             # Vérifier si la requête a réussi (code de statut 200)
             if response.status_code == 200:
                 # J'aimerai un valider que l'image récupérée via url est bien différente de l'image de filepath
@@ -206,6 +306,22 @@ try:
             return False
 
     def writedataPronotepy(client, dossier, eqid):
+        """
+        Sauvegarde toutes les données de l'élève dans un fichier JSON sur le disque.
+
+        Ce fichier (enfant.ProJote.json.txt) est le "fichier central" du plugin :
+          - Il est lu par jeeProJote.php pour mettre à jour les commandes Jeedom
+          - Il est relu au démarrage du démon pour restaurer la session précédente
+          - Il contient le token de reconnexion + les infos élève + la photo
+
+        Le fichier est créé dans : {dossier}/{eqid}/enfant.ProJote.json.txt
+        Exemple : /var/www/html/plugins/ProJote/data/3/enfant.ProJote.json.txt
+
+        Args:
+            client: Client pronotepy connecté (parent ou élève)
+            dossier (str): Répertoire racine des données du plugin
+            eqid (str/int): ID de l'équipement Jeedom (détermine le sous-dossier)
+        """
         try:
             # nom_fichier = f"{client.name}.ProJote"
             nom_fichier = "enfant.ProJote.json.txt"
@@ -227,10 +343,12 @@ try:
                             existing_data[key.lower().replace(" ", "_")] = value.strip()
             # Ouvrir le fichier en mode écriture, ou créer s'il n'existe pas
             # Préparer les données à écrire
+            credentials = client.export_credentials()
+            logging.debug("export_credentials: %s", {k: v[:8] + "..." if isinstance(v, str) and len(v) > 8 and k not in ("pronote_url", "uuid") else v for k, v in credentials.items()})
             data = {
                 "Date": str(datetime.datetime.now()),
                 "Name": client.info.name,
-                "Token": client.export_credentials(),
+                "Token": credentials,
             }
             if client._selected_child:
                 logging.debug(
@@ -264,12 +382,19 @@ try:
                 # Recherche de l'image et téléchargement
                 # Télécharger l'image localement
             image_filepath = os.path.join(f"{dossier}/{eqid}", "profile_picture.jpg")
+            pronote_session = getattr(getattr(client, 'communication', None), 'session', None)
             if client._selected_child:
                 if download_image(
-                    client._selected_child.profile_picture.url, image_filepath
+                    client._selected_child.profile_picture.url,
+                    image_filepath,
+                    pronote_session,
                 ):
                     data["Local_Picture"] = f"{dossier}/{eqid}/profile_picture.jpg"
-            elif download_image(client.info.profile_picture.url, image_filepath):
+            elif download_image(
+                client.info.profile_picture.url,
+                image_filepath,
+                pronote_session,
+            ):
                 data["Local_Picture"] = f"{dossier}/{eqid}/profile_picture.jpg"
             else:
                 logging.error("Erreur lors du téléchargement de l'image")
@@ -281,6 +406,18 @@ try:
             logging.error("Ecriture du fichier échoué : lig.%s - %s", line_number, e)
 
     if __name__ == "__main__":
+        # ─────────────────────────────────────────────────────────────────────
+        # POINT D'ENTRÉE PRINCIPAL
+        # Ce bloc s'exécute uniquement quand le script est lancé directement
+        # (pas quand il est importé par ProJoted.py ou QRConnect.py).
+        #
+        # Flux d'exécution :
+        #   1. Lecture des arguments de la ligne de commande
+        #   2. Connexion à Pronote (parent ou élève selon l'URL)
+        #   3. Génération d'un token de reconnexion via QR code interne
+        #   4. Sauvegarde des données élève + token dans un fichier JSON
+        # ─────────────────────────────────────────────────────────────────────
+
         # Définition du niveau de log par défaut
         _log_level = "INFO"
 
@@ -298,6 +435,10 @@ try:
         parser.add_argument("--Enfant", help="Nom de l'enfant", type=str)
         parser.add_argument("--Eqid", help="ID de l'équipement", type=str)
         parser.add_argument("--Loglevel", help="Niveau de log", type=str)
+        parser.add_argument("--Uuid", help="UUID unique de l'équipement", type=str)
+        parser.add_argument(
+            "--Pin", help="Code PIN pour la génération du jeton", type=str
+        )
         args = parser.parse_args()
 
         if args.URL:
@@ -316,8 +457,15 @@ try:
             NomEnfant = ""
         if args.Eqid:
             EqID = args.Eqid
+        if args.Pin and len(args.Pin) == 4 and args.Pin.isdigit():
+            Pin = args.Pin
+            logging.debug("Utilisation du code PIN fourni : %s", Pin)
+        else:
+            Pin = "4321"  # Default PIN if not provided or invalid
+            logging.debug("Utilisation du code PIN par défaut : 4321")
         if args.Loglevel:
             _log_level = args.Loglevel
+        Uuid = args.Uuid if args.Uuid else "ProJote"
 
         jeedom_utils.set_log_level(_log_level)
 
@@ -355,28 +503,26 @@ try:
             logging.info("ENT : %s", Account.ent)
             logging.info("Picture : %s", Account.info.profile_picture)
             # je requête le QR code
-            Pin = "4321"
             Qrcode_data = Account.request_qr_code_data(Pin)
             logging.debug("QR_code : %s", Qrcode_data)
             # JE me loggue avec le QR code
 
             # Tentative de connexion via le QR code
+            if "parent" not in Qrcode_data["url"]:
+                # Test de connection en tant que Eleve
+                Account = pronotepy.Client.qrcode_login(
+                    qr_code=Qrcode_data, pin=Pin, uuid=Uuid
+                )
+            else:
+                # Test de connection en tant que Parent
+                Account = pronotepy.ParentClient.qrcode_login(
+                    qr_code=Qrcode_data, pin=Pin, uuid=Uuid
+                )
+                if NomEnfant != "":
+                    Account.set_child(NomEnfant)
 
-        if "parent" not in Qrcode_data["url"]:
-            # Test de connection en tant que Parent
-            Account = pronotepy.Client.qrcode_login(
-                qr_code=Qrcode_data, pin=Pin, uuid="ProJote"
-            )
-        else:
-            Account = pronotepy.ParentClient.qrcode_login(
-                qr_code=Qrcode_data, pin=Pin, uuid="ProJote"
-            )
-            if NomEnfant != "":
-                Account.set_child(NomEnfant)
             # Je crée le fichier pou le Token.
             writedataPronotepy(Account, "/var/www/html/plugins/ProJote/data", EqID)
 
 except Exception as e:
     line_number = e.__traceback__.tb_lineno
-    logging.error("Ecriture du fichier échoué : lig.%s - %s", line_number, e)
-    sys.exit(1)

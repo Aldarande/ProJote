@@ -201,8 +201,11 @@ sendVarToJS('eqLogicId', $eqLogic);
 									</select>
 								</div>
 								<div class="form-group">
-									<label class="col-sm-4 control-label">{{Compte Parent}}<i class="fas fa-question-circle tooltips" title="{{Cochez si vous utilisez une compte parent, donc pas un compte élève}}"></i></label>
-									<input type="checkbox" id="Parent" class="eqLogicAttr form-control" data-l1key="configuration" data-l2key="CptParent">
+									<label class="col-sm-4 control-label">{{Type de compte}}<i class="fas fa-question-circle tooltips" title="{{Choisissez le type de compte : élève ou parent}}"></i></label>
+									<div class="col-sm-6">
+										<label class="radio-inline"><input type="radio" name="accountType" value="eleve" class="eqLogicAttr" data-l1key="configuration" data-l2key="accountType" checked> {{Élève}}</label>
+										<label class="radio-inline"><input type="radio" name="accountType" value="parent" class="eqLogicAttr" data-l1key="configuration" data-l2key="accountType"> {{Parent}}</label>
+									</div>
 								</div>
 								<div class="form-group">
 									<label class="col-sm-4 control-label">{{Login du compte}}<i class="fas fa-question-circle tooltips" title="{{Renseignez le login pour vous connecter à Pronote}}"></i></label>
@@ -246,11 +249,20 @@ sendVarToJS('eqLogicId', $eqLogic);
 								<legend>
 									<i class="fas fa-users"></i> {{Liste des élèves}}
 								</legend>
-
-								<label class="col-sm-4 control-label">{{Enfants}} <i class="fas fa-question-circle tooltips" title="{{Choisissez le nom de l'enfant}}"></i></label>
-								<select id="enfantlist" class="col-sm-6 eqLogicAttr form-control" data-l1key="configuration" data-l2key="enfant">
-									<select id="enfantList" class="col-sm-6 eqLogicAttr form-control" data-l1key="configuration" data-l2key="enfant">
-									</select>
+								<div class="form-group">
+									<label class="col-sm-4 control-label">{{Enfants}} <i class="fas fa-question-circle tooltips" title="{{Choisissez le nom de l'enfant}}"></i></label>
+									<div class="col-sm-6">
+										<div class="input-group">
+											<select id="enfantlist" class="eqLogicAttr form-control" data-l1key="configuration" data-l2key="enfant"></select>
+											<span class="input-group-btn">
+												<a class="btn btn-default" id="bt_renameEqLogic" title="{{Appliquer la sélection et synchroniser avec Pronote}}">
+													<i class="fas fa-sync-alt" id="bt_renameEqLogic_icon"></i>
+													<i class="fas fa-hourglass-half fa-spin hidden" id="bt_renameEqLogic_spin"></i>
+												</a>
+											</span>
+										</div>
+									</div>
+								</div>
 							</div>
 							<div class="form-group text-center" id="error-message" style="color: red; font-weight: bold;text-align: center; margin: 0 auto;"></div>
 						</div>
@@ -273,19 +285,19 @@ sendVarToJS('eqLogicId', $eqLogic);
 										<div class="form-group">
 											<label class="col-sm-4 control-label">{{Nom de l'élève}} :</label>
 											<div class="col-sm-8">
-												<span id="eleve-name"></span>
+												<span id="eleve-name" class="eqLogicAttr" data-l1key="configuration" data-l2key="Eleve"></span>
 											</div>
 										</div>
 										<div class="form-group">
 											<label class="col-sm-4 control-label">{{Classe}} :</label>
 											<div class="col-sm-8">
-												<span id="eleve-classe"></span>
+												<span id="eleve-classe" class="eqLogicAttr" data-l1key="configuration" data-l2key="Classe"></span>
 											</div>
 										</div>
 										<div class="form-group">
 											<label class="col-sm-4 control-label">{{Établissement}} :</label>
 											<div class="col-sm-8">
-												<span id="eleve-etablissement"></span>
+												<span id="eleve-etablissement" class="eqLogicAttr" data-l1key="configuration" data-l2key="Etablissement"></span>
 											</div>
 										</div>
 									</div>
@@ -302,19 +314,19 @@ sendVarToJS('eqLogicId', $eqLogic);
 								<legend><i class="col-sm-1 fas fa-file-code"></i> {{Token Info}} </legend>
 								<div class="form-group">
 									<label class="col-sm-2 control-label">{{pronote_url}} :</label>
-									<span id="Token_pronote_url" class="col-sm-10 eqLogicAttr autogrow" data-l1key="configuration" data-l2key="Token_pronote_url"></span>
+									<span id="Token_pronote_url" class="col-sm-10"></span>
 								</div>
 								<div class="form-group">
 									<label class="col-sm-2 control-label">{{username}} :</label>
-									<span id="Token_username" class="col-sm-10 eqLogicAttr autogrow" data-l1key="configuration" data-l2key="Token_username"></span>
+									<span id="Token_username" class="col-sm-10"></span>
 								</div>
 								<div class="form-group">
 									<label class="col-sm-2 control-label">{{password}} :</label>
-									<span id="Token_password" class="col-sm-10 eqLogicAttr autogrow" data-l1key="configuration" data-l2key="Token_password"></span>
+									<span id="Token_password" class="col-sm-10"></span>
 								</div>
 								<div class="form-group">
 									<label class="col-sm-2 control-label">{{client_identifier}} :</label>
-									<span id="Token_client_identifier" class="col-sm-10 eqLogicAttr autogrow" data-l1key="configuration" data-l2key="Token_client_identifier"></span>
+									<span id="Token_client_identifier" class="col-sm-10"></span>
 								</div>
 							</div>
 						</div>
@@ -327,15 +339,21 @@ sendVarToJS('eqLogicId', $eqLogic);
 				<a class="btn btn-default btn-sm pull-right cmdAction" data-action="add" style="margin-top:5px;"><i class="fas fa-plus-circle"></i> {{Ajouter une commande}}</a>
 				<br><br>
 				<div class="table-responsive">
-					<table id="table_cmd" class="table table-bordered table-condensed">
+					<table id="table_cmd" class="table table-bordered table-condensed" style="table-layout:fixed;width:100%;">
+						<colgroup>
+							<col style="width:50px;">
+							<col style="width:220px;">
+							<col><!-- Valeur : prend le reste -->
+							<col style="width:120px;">
+							<col style="width:120px;">
+						</colgroup>
 						<thead>
 							<tr>
-								<th class="hidden-xs" style="min-width:30px;width:50px;">ID</th>
-								<th style="min-width:200px;width:250px;">{{Nom}}</th>
-								<th>{{Type}}</th>
-								<th style="min-width:500px;">{{Options}}</th>
-								<th>{{Etat}}</th>
-								<th style="min-width:80px;width:200px;">{{Actions}}</th>
+								<th>{{#}}</th>
+								<th>{{Nom}}</th>
+								<th>{{Valeur}}</th>
+								<th>{{Options}}</th>
+								<th>{{Actions}}</th>
 							</tr>
 						</thead>
 						<tbody>

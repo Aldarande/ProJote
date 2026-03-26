@@ -1,4 +1,25 @@
 <?php
+/**
+ * jeeProJote.php — Point de callback HTTP du démon Python vers Jeedom.
+ *
+ * Ce fichier est l'URL que le démon Python (ProJoted.py) appelle pour envoyer
+ * les données Pronote à Jeedom. Il reçoit un JSON en POST et met à jour
+ * toutes les commandes de l'équipement concerné.
+ *
+ * Flux de données :
+ *  ProJoted.py → HTTP POST vers /plugins/ProJote/core/php/jeeProJote.php → ici
+ *
+ * Ce fichier reçoit un JSON structuré contenant :
+ *  - CmdId             : ID de l'équipement Jeedom à mettre à jour
+ *  - connection_status : 'connected', 'disconnected' ou 'error'
+ *  - ConnectionDate    : Date/heure de la dernière connexion réussie
+ *  - Eleve             : Infos élève (Nom_Eleve, Nom_Classe, Etablissement)
+ *  - Emploi_du_temps   : Emploi du temps du jour et du prochain jour
+ *  - Notes, Devoirs, Absences, Retards, Punitions... : Données scolaires
+ *  - Token             : Token de reconnexion Pronote à sauvegarder
+ *
+ * Sécurité : la clé API Jeedom est vérifiée avant tout traitement.
+ */
 try {
     require_once dirname(__FILE__) . "/../../../../core/php/core.inc.php";
 
@@ -37,6 +58,42 @@ try {
         log::add('ProJote', 'error', 'EqLogic désactivé : ' . $eqLogic->getHumanName());
         die();
     }
+
+    // ===== GESTION DU STATUT DE CONNEXION =====
+    $connection_status = isset($result['connection_status']) ? $result['connection_status'] : 'unknown';
+
+    if ($connection_status === 'disconnected' || $connection_status === 'error') {
+        $error_message = isset($result['error']) ? $result['error'] : 'Raison non spécifiée';
+
+        // Log le statut avec différenciation claire
+        if ($connection_status === 'disconnected') {
+            log::add('ProJote', 'warning', '[SESSION EXPIRÉE] ' . $eqLogic->getHumanName() . ' - ' . $error_message);
+        } else {
+            log::add('ProJote', 'error', '[CONNEXION ÉCHOUÉE] ' . $eqLogic->getHumanName() . ' - ' . $error_message);
+        }
+
+        // Ajoute un message au centre de messages Jeedom + toaster
+        // Format: message::add($plugin_id, $title, $message, $type)
+        if ($connection_status === 'disconnected') {
+            message::add(
+                'ProJote',
+                'ProJote - Session expirée',
+                '[' . $eqLogic->getHumanName() . '] La session ProNote a expiré. Veuillez rescanner le QR code ou re-valider les identifiants.',
+                'warning'
+            );
+        } else {
+            message::add(
+                'ProJote',
+                'ProJote - Connexion échouée',
+                '[' . $eqLogic->getHumanName() . '] ' . $error_message,
+                'error'
+            );
+        }
+
+        // Fin du traitement - données non traitées
+        die();
+    }
+
     //Je met à jours la date de dernière communication
     //Mise à jour du nom de l'élève
     if (isset($result['ConnectionDate']) && $eqLogic->getCmd(null, 'LastLogin')) {
@@ -70,8 +127,8 @@ try {
     }
     // saisie unitaire des valeurs
     // Met à jour la photo de l'élève si elle est présente
-    if (isset($result['Photo']) && $eqLogic->getCmd(null, 'Picture')) {
-        $eqLogic->checkAndUpdateCmd('Picture', $result['Photo']);
+    if (isset($result['Local_Picture']) && $eqLogic->getCmd(null, 'Picture')) {
+        $eqLogic->checkAndUpdateCmd('Picture', $result['Local_Picture']);
     }
     // Met à jour le nombre d'absence
     if (isset($result['Absences']['nb_absences']) && $eqLogic->getCmd(null, 'Nb_absences')) {
@@ -231,21 +288,21 @@ try {
     } else {
         $eqLogic->checkAndUpdateCmd('competences', "Pas de compétences retournée");
     }
+    // ── SAUVEGARDE DU TOKEN DE RECONNEXION ──────────────────────────────────
+    // Le token permet au démon de se reconnecter à Pronote sans redemander
+    // le mot de passe. Il est sauvegardé en configuration Jeedom (BDD chiffrée).
+    // Format reçu : { pronote_url, username, password, client_identifier }
     if (is_array($result["Token"])) {
-        // Correspondance des clés JSON avec les commandes Jeedom
-        $cmdMapping = [
-            'pronote_url' => 'TokenUrl',
-            'username' => 'TokenUsername',
-            'password' => 'TokenPassword',
-            'client_identifier' => 'TokenId'
+        $tokenMapping = [
+            'pronote_url'       => 'Token_pronote_url',
+            'username'          => 'Token_username',
+            'password'          => 'Token_password',        // Chiffré automatiquement (voir $_encryptConfigKey)
+            'client_identifier' => 'Token_client_identifier',
         ];
-        // Parcourt toutes les clés possibles
-        foreach ($cmdMapping as $jsonKey => $cmdName) {
-            // Vérifie si la clé existe et met à jour la commande correspondante
-            if (isset($result["Token"][$jsonKey]) && $eqLogic->getCmd(null, $cmdName)) {
-                $value = $result["Token"][$jsonKey];
-                log::add('ProJote', 'debug', 'Champ reçu : ' . $cmdName . ' - Valeur reçue : ' . print_r($value, true));
-                $eqLogic->checkAndUpdateCmd($cmdName, $value);
+        foreach ($tokenMapping as $jsonKey => $configKey) {
+            if (isset($result["Token"][$jsonKey])) {
+                $eqLogic->setConfiguration($configKey, $result["Token"][$jsonKey]);
+                log::add('ProJote', 'debug', 'Token config sauvegardé : ' . $configKey);
             }
         }
     } else {
@@ -292,6 +349,113 @@ try {
     } else {
         $eqLogic->checkAndUpdateCmd('derniere_absence', "Pas de dernière absence retournée");
     }
+
+    // Sauvegarde en configuration Jeedom (BDD)
+    if (isset($result['Eleve']['Nom_Eleve'])) {
+        $eqLogic->setConfiguration('Eleve', $result['Eleve']['Nom_Eleve']);
+    }
+    if (isset($result['Eleve']['Nom_Classe'])) {
+        $eqLogic->setConfiguration('Classe', $result['Eleve']['Nom_Classe']);
+    }
+    if (isset($result['Eleve']['Etablissement'])) {
+        $eqLogic->setConfiguration('Etablissement', $result['Eleve']['Etablissement']);
+    }
+    if (isset($result['Ical']) && !empty($result['Ical'])) {
+        $eqLogic->setConfiguration('Ical', $result['Ical']);
+    }
+    if (isset($result['Liste_Enfant'])) {
+        $listeEnfant = is_array($result['Liste_Enfant']) ? json_encode($result['Liste_Enfant']) : $result['Liste_Enfant'];
+        $eqLogic->setConfiguration('Liste_Enfant', $listeEnfant);
+    }
+    // ── SAUVEGARDE DES DONNÉES DU WIDGET ────────────────────────────────────
+    // Le widget ProJote utilise toHtml() sur l'eqLogic (plus de commande Widget).
+    // Les données sont stockées en configuration de l'équipement sous la clé 'widget_json'.
+    // toHtml() les lit à chaque rendu ; le JS les récupère via l'action GetWidgetData.
+    $widget_data = array(
+        'eleve'                 => isset($result['Eleve']['Nom_Eleve'])                       ? $result['Eleve']['Nom_Eleve']                       : '',
+        'classe'                => isset($result['Eleve']['Nom_Classe'])                      ? $result['Eleve']['Nom_Classe']                      : '',
+        'etablissement'         => isset($result['Eleve']['Etablissement'])                    ? $result['Eleve']['Etablissement']                    : '',
+        'notes'                 => isset($result['Notes']['note'])                            ? $result['Notes']['note']                            : array(),
+        'moyennes_periodes'     => isset($result['Notes']['moyennes_periodes'])               ? $result['Notes']['moyennes_periodes']               : array(),
+        'edt_aujourdhui'        => isset($result['Emploi_du_temps']['edt_aujourdhui'])        ? $result['Emploi_du_temps']['edt_aujourdhui']        : array(),
+        'edt_prochainjour'      => isset($result['Emploi_du_temps']['edt_prochainjour'])      ? $result['Emploi_du_temps']['edt_prochainjour']      : array(),
+        'edt_prochainjour_date' => isset($result['Emploi_du_temps']['edt_prochainjour_date']) ? $result['Emploi_du_temps']['edt_prochainjour_date'] : '',
+        'nb_absences'           => isset($result['Absences']['nb_absences'])                  ? $result['Absences']['nb_absences']                  : 0,
+        'nb_retards'            => isset($result['Retards']['nb_retard'])                     ? $result['Retards']['nb_retard']                     : 0,
+        'nb_punitions'          => isset($result['Punitions']['Nb_Punitions'])                ? $result['Punitions']['Nb_Punitions']                : 0,
+        'nb_devoirs_nf'         => isset($result['Devoirs']['Nb_devoir_NF'])                  ? $result['Devoirs']['Nb_devoir_NF']                  : 0,
+        'absences'              => isset($result['Absences']['absence'])                      ? $result['Absences']['absence']                      : array(),
+        'retards'               => isset($result['Retards']['retard'])                        ? $result['Retards']['retard']                        : array(),
+        'punitions'             => isset($result['Punitions']['punition'])                    ? $result['Punitions']['punition']                    : array(),
+        'devoirs'               => isset($result['Devoirs']['devoir'])                        ? $result['Devoirs']['devoir']                        : array(),
+        'devoirs_demain'        => isset($result['Devoirs']['devoir_Demain'])                 ? $result['Devoirs']['devoir_Demain']                 : array(),
+        'nb_devoirs_f'          => isset($result['Devoirs']['Nb_devoir_F'])                   ? $result['Devoirs']['Nb_devoir_F']                   : 0,
+        'photo'                 => isset($result['Local_Picture'])                            ? $result['Local_Picture']                            : '',
+        'last_update'           => date('c'),
+    );
+    $eqLogic->setConfiguration('widget_json', json_encode($widget_data));
+    log::add('ProJote', 'debug', 'widget_json sauvegardé en configuration pour : ' . $eqLogic->getHumanName());
+
+    $eqLogic->save();
+
+    // Écrire le fichier JSON avec toutes les données reçues
+    saveDataToJsonFile($eqLogic, $result);
 } catch (Exception $e) {
     log::add('ProJote', 'error', displayException($e));
+}
+
+/**
+ * Écrit le fichier JSON enfant.ProJote.json.txt avec toutes les données reçues du démon
+ * Cette fonction garantit que le fichier est toujours à jour avec les dernières données
+ */
+function saveDataToJsonFile($eqLogic, $result)
+{
+    try {
+        $eqid = $eqLogic->getId();
+        $dataDir = dirname(dirname(dirname(__FILE__))) . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . $eqid;
+        $filePath = $dataDir . DIRECTORY_SEPARATOR . 'enfant.ProJote.json.txt';
+
+        // Créer le répertoire s'il n'existe pas
+        if (!is_dir($dataDir)) {
+            if (!mkdir($dataDir, 0755, true)) {
+                log::add('ProJote', 'error', 'Impossible de créer le répertoire : ' . $dataDir);
+                return false;
+            }
+        }
+
+        // Préparer les données à écrire
+        $data = array(
+            'Date' => date('Y-m-d H:i:s'),
+            'Name' => isset($result['Eleve']['Nom_Eleve']) ? $result['Eleve']['Nom_Eleve'] : 'Unknown',
+            'Token' => isset($result['Token']) ? $result['Token'] : [],
+            'Eleve' => isset($result['Eleve']['Nom_Eleve']) ? $result['Eleve']['Nom_Eleve'] : 'Unknown',
+            'Classe' => isset($result['Eleve']['Nom_Classe']) ? $result['Eleve']['Nom_Classe'] : 'Unknown',
+            'Etablissement' => isset($result['Eleve']['Etablissement']) ? $result['Eleve']['Etablissement'] : 'Unknown',
+            'Local_Picture' => isset($result['Local_Picture']) ? $result['Local_Picture'] : '',
+            'Emploi_du_temps' => isset($result['Emploi_du_temps']) ? $result['Emploi_du_temps'] : [],
+            'Notes' => isset($result['Notes']) ? $result['Notes'] : [],
+            'Menus' => isset($result['Menus']) ? $result['Menus'] : [],
+            'Notifications' => isset($result['Notifications']) ? $result['Notifications'] : [],
+            'Absences' => isset($result['Absences']) ? $result['Absences'] : [],
+            'Retards' => isset($result['Retards']) ? $result['Retards'] : [],
+            'Punitions' => isset($result['Punitions']) ? $result['Punitions'] : [],
+            'Devoirs' => isset($result['Devoirs']) ? $result['Devoirs'] : [],
+            'Competences' => isset($result['Competences']) ? $result['Competences'] : [],
+            'Ical' => isset($result['Ical']) ? $result['Ical'] : '',
+            'Liste_Enfant' => isset($result['Liste_Enfant']) ? $result['Liste_Enfant'] : [],
+            'Parent' => strpos($result['Token']['pronote_url'] ?? '', 'parent.html') !== false ? '1' : '0'
+        );
+
+        // Écrire le fichier JSON
+        if (file_put_contents($filePath, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)) !== false) {
+            log::add('ProJote', 'debug', 'Fichier JSON sauvegardé avec succès : ' . $filePath);
+            return true;
+        } else {
+            log::add('ProJote', 'error', 'Impossible d\'écrire le fichier JSON : ' . $filePath);
+            return false;
+        }
+    } catch (Exception $e) {
+        log::add('ProJote', 'error', 'Erreur lors de la sauvegarde du fichier JSON : ' . $e->getMessage());
+        return false;
+    }
 }
