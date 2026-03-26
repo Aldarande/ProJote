@@ -114,10 +114,16 @@ _failed_attempts_lock = threading.Lock()
 # Un seul thread worker traite les messages un par un (séquentiellement).
 # _queued_eq évite d'enqueuer deux fois le même équipement.
 import queue as _queue_module
-_work_queue   = _queue_module.Queue()
-_queued_eq      = set()   # eqLogicId en attente ou en cours de traitement
+_work_queue     = _queue_module.Queue()
+_queued_eq      = set()    # eqLogicId en attente ou en cours de traitement
 _queued_eq_lock = threading.Lock()
-_worker_thread  = None    # Thread worker unique (démarré au premier message)
+_worker_thread  = None     # Thread worker unique (démarré au premier message)
+
+# Watchdog : si le worker bloque plus de N secondes sur un équipement, WARNING
+_WORKER_TIMEOUT   = 120    # secondes
+_worker_eq_id     = None   # équipement actuellement traité
+_worker_eq_start  = None   # horodatage de début du traitement en cours
+_worker_state_lock = threading.Lock()
 
 # Variable globale pour stocker les info de connexion Jeedom
 _callback_url = None
@@ -1460,6 +1466,22 @@ def load_persistent_token(eqLogicId):
 
             if client and client.logged_in:
                 logging.info("Reconnexion avec token persistant réussie !")
+                # Sauvegarder les credentials frais sur disque à chaque connexion réussie
+                # (pronotepy renouvelle les credentials internes à chaque token_login)
+                try:
+                    writedataPronotepy(
+                        client, _data_dir, eqLogicId,
+                        backup_token=data.get("BackupToken"),
+                    )
+                    logging.debug(
+                        "Credentials renouvelés et sauvegardés pour l'équipement %s.",
+                        eqLogicId,
+                    )
+                except Exception as e_save:
+                    logging.warning(
+                        "Sauvegarde des credentials renouvelés échouée pour %s : %s",
+                        eqLogicId, e_save,
+                    )
                 return client, "true", enfant
             else:
                 logging.error(
@@ -1808,6 +1830,7 @@ def _worker_loop():
     Dépile les messages de _work_queue et les traite séquentiellement.
     Les logs sont ainsi linéaires et faciles à lire.
     """
+    global _worker_eq_id, _worker_eq_start
     logging.info("Worker ProJote démarré — traitement séquentiel des équipements.")
     while True:
         try:
@@ -1815,6 +1838,9 @@ def _worker_loop():
         except _queue_module.Empty:
             continue
         eq_id = str(message.get("CmdId", ""))
+        with _worker_state_lock:
+            _worker_eq_id    = eq_id
+            _worker_eq_start = time.time()
         logging.info("=== Début traitement équipement %s (file restante : %d) ===",
                      eq_id, _work_queue.qsize())
         try:
@@ -1822,12 +1848,40 @@ def _worker_loop():
         except Exception as e:
             logging.error("Erreur non capturée pour l'équipement %s : %s", eq_id, e)
         finally:
+            with _worker_state_lock:
+                _worker_eq_id    = None
+                _worker_eq_start = None
             _work_queue.task_done()
             logging.info("=== Fin traitement équipement %s ===", eq_id)
 
 
+def _watchdog_loop():
+    """
+    Surveille le worker toutes les 30 secondes.
+    Si un équipement monopolise le worker plus de _WORKER_TIMEOUT secondes,
+    émet un WARNING et libère son slot dans _queued_eq pour ne pas bloquer
+    les requêtes suivantes.
+    """
+    while True:
+        time.sleep(30)
+        with _worker_state_lock:
+            eq_id = _worker_eq_id
+            start = _worker_eq_start
+        if eq_id is not None and start is not None:
+            elapsed = time.time() - start
+            if elapsed > _WORKER_TIMEOUT:
+                logging.warning(
+                    "ProJote — Watchdog : équipement %s en cours depuis %.0fs "
+                    "(timeout %ds). Le worker est peut-être bloqué (Pronote injoignable ?). "
+                    "Libération forcée du slot.",
+                    eq_id, elapsed, _WORKER_TIMEOUT,
+                )
+                with _queued_eq_lock:
+                    _queued_eq.discard(eq_id)
+
+
 def _ensure_worker():
-    """Démarre le thread worker s'il n'est pas encore actif."""
+    """Démarre le thread worker et le watchdog s'ils ne sont pas encore actifs."""
     global _worker_thread
     if _worker_thread is None or not _worker_thread.is_alive():
         _worker_thread = threading.Thread(
@@ -1835,6 +1889,11 @@ def _ensure_worker():
         )
         _worker_thread.start()
         logging.info("Thread worker ProJote lancé.")
+        watchdog = threading.Thread(
+            target=_watchdog_loop, daemon=True, name="projote-watchdog"
+        )
+        watchdog.start()
+        logging.debug("Thread watchdog ProJote lancé (timeout %ds).", _WORKER_TIMEOUT)
 
 
 def read_socket():

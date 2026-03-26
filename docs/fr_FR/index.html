@@ -505,8 +505,15 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
     de l'établissement est effectuée — aucune télémétrie, aucun appel vers un serveur tiers.</p>
 
     <h2>À quelle fréquence les données sont-elles synchronisées ?</h2>
-    <p>Toutes les heures par défaut, automatiquement désactivé entre 22h et 4h. Vous pouvez forcer
-    une synchronisation manuelle avec la commande <em>Rafraîchir</em> de l'équipement.</p>
+    <p>Toutes les heures par défaut, automatiquement désactivé entre 22h et 4h via le cron Jeedom.
+    Vous pouvez forcer une synchronisation manuelle avec la commande <em>Rafraîchir</em> de l'équipement,
+    ou en cliquant sur la photo/avatar dans le widget — cela fonctionne à toute heure, y compris la nuit.</p>
+    <div class="callout callout-info">
+        <strong>Fenêtre nocturne et rafraîchissement manuel</strong>
+        La plage 22h–4h désactive uniquement les synchronisations <em>automatiques</em> planifiées.
+        Un rafraîchissement manuel (bouton <em>Rafraîchir</em> ou clic sur l'avatar du widget) est toujours
+        exécuté immédiatement, quelle que soit l'heure.
+    </div>
 
     <h2>Mon QR Code ne fonctionne pas, pourquoi ?</h2>
     <p>Chaque QR Code Pronote est à <strong>usage unique</strong>. Si la connexion a échoué ou si vous avez
