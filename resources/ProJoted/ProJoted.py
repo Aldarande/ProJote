@@ -1194,13 +1194,33 @@ def download_photo(client, eqLogicId, tokenconnected, message):
                                 break
 
                     if not photo_bytes:
-                        logging.info(
-                            "Photo non trouvée dans PageEmploiDuTemps — clés réponse : %s — "
-                            "clés ressource : %s",
-                            list(resp_data.keys()),
-                            list(resp_data.get("ressource", {}).keys())
-                            if isinstance(resp_data.get("ressource"), dict) else "N/A",
-                        )
+                        # Chercher photoBase64 dans tous les champs dict de la réponse
+                        for _key, _val in resp_data.items():
+                            if isinstance(_val, dict) and "photoBase64" in _val:
+                                _pb64 = _val["photoBase64"]
+                                logging.info(
+                                    "DEBUG photoBase64 trouvé dans resp_data[%s] : %s",
+                                    _key,
+                                    str(_pb64)[:200],
+                                )
+                                if isinstance(_pb64, dict) and _pb64.get("_T") == 23 and _pb64.get("V"):
+                                    photo_bytes = base64.b64decode(_pb64["V"])
+                                    logging.info(
+                                        "Photo parent récupérée depuis PageEmploiDuTemps.%s.photoBase64",
+                                        _key,
+                                    )
+                                    break
+                        if not photo_bytes:
+                            logging.info(
+                                "Photo non trouvée dans PageEmploiDuTemps — clés réponse : %s",
+                                list(resp_data.keys()),
+                            )
+                            # Log prefsGrille pour debug
+                            if isinstance(resp_data.get("prefsGrille"), dict):
+                                logging.info(
+                                    "DEBUG prefsGrille keys : %s",
+                                    list(resp_data["prefsGrille"].keys()),
+                                )
                 except Exception as _e:
                     logging.warning("Stratégie B photo (PageEmploiDuTemps) échouée : %s", _e)
 
