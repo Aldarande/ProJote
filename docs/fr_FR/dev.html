@@ -702,30 +702,67 @@ jeedom_socket.open()
 jeedom_com = jeedom_com(apikey=_apikey, loglevel=_log_level, url=_callback)
 jeedom_com.send_change_immediate({'CmdId': eqid, 'Notes': [...], ...})</code></pre>
 
-    <h2>7.3 Boucle principale</h2>
+    <h2>7.3 Boucle principale — Architecture multi-thread</h2>
 
-<pre><code>def listen():
-    """Boucle principale du daemon — écoute les commandes entrantes."""
-    while True:
-        try:
-            # Lire les messages entrants du socket (PHP → Python)
-            if not jeedom_socket.presence():
-                time.sleep(0.5)
-                continue
+    <p>
+        Depuis la version 0.9, chaque équipement est traité dans un thread Python dédié.
+        La fonction <code>read_socket()</code> dépile les messages et délègue immédiatement
+        à un thread par <code>eqLogicId</code> — le daemon ne se bloque plus sur un équipement lent.
+    </p>
 
-            message = jeedom_socket.get()
-            if message is None:
-                continue
+<pre><code>import threading
 
-            data = json.loads(message)
-            action = data.get('action')
+# ── Verrous et registre des threads actifs ───────────────
+_failed_attempts_lock = threading.Lock()
+_active_eq_lock       = threading.Lock()
+_active_eq            = {}   # {eqLogicId: threading.Thread}
 
-            if action == 'refresh':
-                eqLogicId = data.get('eqLogicId')
-                # ... déclencher la collecte des données ...
+def process_message(message):
+    """Traitement complet d'un équipement — exécuté dans son propre thread."""
+    eq_id = str(message.get("CmdId", ""))
+    try:
+        # ... connexion Pronote + collecte des données ...
+        with _failed_attempts_lock:
+            failed_attempts[eq_id] = {"count": 0, "timestamp": time.time()}
+    except Exception as e:
+        logging.error("Erreur traitement équipement %s : %s", eq_id, e)
+    finally:
+        # Libère toujours le slot, même en cas d'exception
+        with _active_eq_lock:
+            _active_eq.pop(eq_id, None)
 
-        except Exception as e:
-            logging.error(f"Erreur dans la boucle principale : {e}")</code></pre>
+def read_socket():
+    """Dépile les messages entrants et spawne un thread par équipement."""
+    global JEEDOM_SOCKET_MESSAGE
+    try:
+        if JEEDOM_SOCKET_MESSAGE.empty():
+            return
+        message = json.loads(JEEDOM_SOCKET_MESSAGE.get().decode("utf-8"))
+        eq_id = str(message.get("CmdId", ""))
+
+        with _active_eq_lock:
+            existing = _active_eq.get(eq_id)
+            if existing and existing.is_alive():
+                # Requête ignorée : l'équipement est déjà en cours de traitement
+                logging.warning("Équipement %s déjà en cours — requête ignorée.", eq_id)
+                return
+            t = threading.Thread(
+                target=process_message, args=(message,),
+                daemon=True, name=f"eq-{eq_id}"
+            )
+            _active_eq[eq_id] = t
+            t.start()
+
+    except Exception as e:
+        logging.error("Erreur dans read_socket : %s", e)</code></pre>
+
+    <div class="callout callout-info">
+        <strong>Thread safety</strong>
+        Tous les accès au dictionnaire <code>failed_attempts</code> sont protégés par
+        <code>_failed_attempts_lock</code>. Le registre <code>_active_eq</code> est protégé par
+        <code>_active_eq_lock</code>. Le <code>finally</code> dans <code>process_message</code>
+        garantit la libération du slot même en cas d'exception.
+    </div>
 
     <h2>7.4 Monkey patches pronotepy</h2>
 
@@ -814,67 +851,158 @@ def check_circuit_breaker(eqLogicId, max_attempts=5):
     failed_attempts[eqLogicId]["last_attempt"] = now
     return True</code></pre>
 
+    <h2>7.8 Renouvellement automatique des tokens backup</h2>
+
+    <p>
+        Quand le token principal est expiré, le daemon utilise le token de secours (<em>backup token</em>)
+        pour reconnecter l'équipement. Il profite ensuite de cette session active pour renouveler
+        <strong>les deux tokens</strong> et les sauvegarder — le cycle de vie est ainsi remis à zéro sans
+        intervention de l'utilisateur.
+    </p>
+
+<pre><code># Après connexion réussie via le token backup :
+logging.warning(
+    "ProJote — Token principal expiré pour l'équipement %s. "
+    "Token backup utilisé. Renouvellement automatique des tokens en cours.",
+    eqLogicId,
+)
+
+new_backup_credentials = None
+try:
+    # Créer une seconde session avec un UUID modifié pour obtenir de nouveaux credentials
+    renew_uuid = backup_uuid + "-bk" if not backup_uuid.endswith("-bk") else backup_uuid + "2"
+    new_backup_client = pronotepy.ParentClient.token_login(
+        pronote_url=backup_token["pronote_url"],
+        username=backup_token["username"],
+        password=backup_token["password"],   # = token dans les credentials pronotepy
+        client_identifier=backup_token["client_identifier"],
+        uuid=renew_uuid,
+    )
+    if new_backup_client and new_backup_client.logged_in:
+        new_backup_credentials = new_backup_client.export_credentials()
+        logging.info("Token backup renouvelé avec succès pour l'équipement %s.", eqLogicId)
+    else:
+        logging.warning("ProJote — Token backup non renouvelé pour l'équipement %s.", eqLogicId)
+except Exception as e_bk:
+    logging.warning("ProJote — Renouvellement backup échoué pour %s : %s", eqLogicId, e_bk)
+
+# Sauvegarder les deux tokens (principal via `client`, backup via `new_backup_credentials`)
+writedataPronotepy(client, _data_dir, eqLogicId, backup_token=new_backup_credentials)
+logging.warning(
+    "ProJote — Tokens renouvelés pour l'équipement %s. "
+    "Token backup : %s.",
+    eqLogicId,
+    "OK" if new_backup_credentials else "NON RENOUVELÉ",
+)</code></pre>
+
+    <div class="callout callout-warning">
+        <strong>Logs WARNING obligatoires</strong>
+        Chaque étape du renouvellement émet un message de niveau <code>WARNING</code> dans les logs ProJote :
+        détection du token expiré, tentative de renouvellement, résultat (succès ou échec).
+        Ces messages sont visibles sans activer le mode debug.
+    </div>
+
     <!-- ── 8. Widget ───────────────────────── -->
     <h1 id="widget">8. Widget et templates HTML</h1>
 
-    <h2>8.1 Template widget (cmd.info.string.note.html)</h2>
+    <h2>8.1 Template widget (cmd.info.string.projote.html)</h2>
 
     <p>
-        Le fichier <code>core/template/dashboard/cmd.info.string.note.html</code>
-        définit le rendu visuel de la commande widget sur le dashboard Jeedom.
+        Le fichier <code>core/template/dashboard/cmd.info.string.projote.html</code>
+        définit le rendu visuel complet du tableau de bord. Toutes les règles CSS sont préfixées
+        par <code>.pjw-#id#</code> pour éviter tout conflit avec d'autres widgets Jeedom.
+        Le JavaScript est encapsulé dans une IIFE (<code>(function(){})();</code>).
     </p>
 
-<pre><code>&lt;!-- Variables disponibles dans le template (syntaxe Jeedom) --&gt;
-&lt;!-- #id#        : ID de la commande --&gt;
-&lt;!-- #eqLogic_id# : ID de l'équipement --&gt;
-&lt;!-- #value#     : Valeur courante de la commande --&gt;
-&lt;!-- #name#      : Nom de la commande --&gt;
+    <p>Flux de données :</p>
+    <ol>
+        <li>Au chargement, <code>jeedom.cmd.refreshValue()</code> injecte la valeur en cache — <code>render()</code> est appelé immédiatement si la valeur est non vide.</li>
+        <li>Quand le daemon pousse une nouvelle valeur, <code>jeedom.cmd.addUpdateFunction()</code> déclenche <code>render()</code>.</li>
+        <li>L'objet JSON reçu est parsé et distribué aux renderers (<code>renderHeader</code>, <code>renderStats</code>, <code>renderEDT</code>, <code>renderNotesBar</code>, <code>renderDevoirs</code>, <code>renderDernieresNotes</code>).</li>
+    </ol>
 
-&lt;div class="cmd projote-widget" data-cmd_id="#id#" data-eq_id="#eqLogic_id#"&gt;
-    &lt;div class="projote-header"&gt;
-        &lt;span class="projote-title"&gt;#name#&lt;/span&gt;
-    &lt;/div&gt;
-    &lt;div class="projote-content" id="projote-content-#id#"&gt;
-        &lt;!-- Données chargées dynamiquement via AJAX GetWidgetData --&gt;
-    &lt;/div&gt;
-&lt;/div&gt;
+<pre><code>&lt;script&gt;
+(function () {
+    'use strict';
+    var ID = '#id#';  // Remplacé par Jeedom avec l'ID réel
 
-&lt;script&gt;
-(function() {
-    var cmdId = '#id#';
-    var eqId = '#eqLogic_id#';
-
-    domUtils.ajax({
-        type: 'POST',
-        url: 'plugins/ProJote/core/ajax/ProJote.ajax.php',
-        data: { action: 'GetWidgetData', eqLogicId: eqId },
-        success: function(data) {
-            renderWidget(data.result, cmdId);
+    // Liaison Jeedom : appelé à chaque changement de valeur
+    jeedom.cmd.addUpdateFunction('#id#', function(_opts) {
+        var v = _opts.value;
+        if (!v || v.trim() === '' || v === '{}') return;
+        try {
+            render(JSON.parse(v), _opts.collectDate || _opts.valueDate);
+        } catch(e) {
+            console.error('[ProJote] Erreur JSON :', e);
         }
     });
 
-    function renderWidget(data, cmdId) {
-        var container = document.getElementById('projote-content-' + cmdId);
-        // ... rendu HTML des données ...
-    }
+    // Premier rendu avec la valeur déjà en cache
+    showSpinner();  // Spinner actif pendant le chargement initial
+    jeedom.cmd.refreshValue([{
+        cmd_id:      '#id#',
+        value:       '#value#',
+        collectDate: '#collectDate#',
+    }]);
 })();
 &lt;/script&gt;</code></pre>
 
-    <h2>8.2 Paramètres widget via $_widgetPossibility</h2>
+    <h2>8.2 Spinner de chargement</h2>
 
-<pre><code>// Dans ProJote.class.php
-public static $_widgetPossibility = array(
-    'custom'          => true,   // Widget personnalisé activé
-    'custom::layout'  => false,  // Pas de layout personnalisé
-    'parameters'      => array(
-        'accent_color' => array(
-            'label' => 'Couleur d\'accent',
-            'type'  => 'color',  // Affiche un color picker dans l'UI
-        ),
-    ),
-);</code></pre>
+    <p>
+        Pendant la collecte des données (chargement initial ou rafraîchissement manuel),
+        le logo ProJote tourne dans la zone avatar grâce à une animation CSS scoped.
+    </p>
 
-    <p>Dans le template HTML, accéder au paramètre via : <code>#accent_color#</code></p>
+<pre><code>&lt;!-- CSS : animation scoped par instance de widget --&gt;
+@keyframes pjwSpin#id# {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+.pjw-#id# .ph-av { cursor: pointer; }
+.pjw-#id# .ph-av-loading img {
+    animation: pjwSpin#id# 1.1s linear infinite;
+    border-radius: 12px;
+    opacity: .85;
+}
+
+// JavaScript
+var _spinning = false;
+
+function showSpinner() {
+    _spinning = true;
+    var av = el('pjwav' + ID);
+    if (!av) return;
+    av.classList.add('ph-av-loading');
+    av.innerHTML = '&lt;img src="/plugins/ProJote/plugin_info/ProJote_icon.png" alt=""&gt;';
+}
+
+function hideSpinner() {
+    _spinning = false;
+    var av = el('pjwav' + ID);
+    if (!av) return;
+    av.classList.remove('ph-av-loading');
+}
+
+// Clic sur l'avatar → rafraîchissement manuel
+av.addEventListener('click', function() {
+    if (_spinning) return;   // Ignore si déjà en cours
+    showSpinner();
+    jeedom.cmd.execute({id: ID});
+});
+
+// hideSpinner() est appelé au début de render() pour stopper l'animation
+function render(d, ts) {
+    hideSpinner();
+    // ... rendu des données ...
+}</code></pre>
+
+    <div class="callout callout-info">
+        <strong>Keyframes scoped</strong>
+        Jeedom remplace <code>#id#</code> à l'affichage. Chaque instance du widget obtient
+        donc un nom d'animation unique (<code>pjwSpin42</code>, <code>pjwSpin43</code>…)
+        — plusieurs widgets ProJote sur le même dashboard ne se perturbent pas.
+    </div>
 
     <!-- ── 9. desktop/ ────────────────────── -->
     <h1 id="frontend">9. desktop/ — Interface utilisateur</h1>

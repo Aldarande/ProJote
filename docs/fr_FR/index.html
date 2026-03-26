@@ -361,7 +361,8 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
     <div class="callout callout-info">
         <strong>Token backup automatique</strong>
         Depuis la version 0.9, ProJote génère automatiquement un <em>second token de secours</em> lors de la connexion initiale.
-        Si le token principal expire, le token de secours est utilisé en silence — aucune re-authentification n'est nécessaire.
+        Si le token principal expire, le plugin bascule silencieusement sur le token de secours — aucune re-authentification n'est nécessaire.
+        Les deux tokens sont alors renouvelés automatiquement, et un message de niveau <strong>WARNING</strong> est émis dans les logs ProJote pour traçabilité.
     </div>
     <div class="callout callout-warning">
         <strong>QR Code à usage unique</strong>
@@ -410,6 +411,7 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
         <li><strong>Emploi du temps</strong> — cours d'aujourd'hui et du prochain jour, nombre de cours annulés depuis la rentrée</li>
         <li><strong>Moyenne générale</strong> — barre dégradée rouge→vert avec tendance</li>
         <li><strong>Bas de widget</strong> — prochains devoirs + dernières notes</li>
+        <li><strong>Spinner de chargement</strong> — le logo ProJote tourne dans la zone avatar pendant la collecte des données ; un clic sur l'avatar déclenche un rafraîchissement manuel</li>
     </ul>
 
     <!-- ── Historique ─────────────────────── -->
@@ -421,11 +423,19 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
         <tbody>
             <tr>
                 <td><span class="badge badge-new">Nouveau</span></td>
-                <td><strong>Token de secours automatique</strong> — lors de la connexion initiale (identifiants ou QR Code), un second token est généré en arrière-plan. Si le token principal expire, le plugin bascule silencieusement sur le token de secours sans demander de re-authentification.</td>
+                <td><strong>Token de secours automatique</strong> — lors de la connexion initiale (identifiants ou QR Code), un second token est généré en arrière-plan. Si le token principal expire, le plugin bascule silencieusement sur le token de secours sans demander de re-authentification. Les deux tokens sont ensuite renouvelés automatiquement.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-perf">Amélioration</span></td>
+                <td><strong>Daemon multi-thread</strong> — chaque équipement est traité dans son propre thread Python. Plusieurs équipements peuvent se synchroniser simultanément sans se bloquer mutuellement. Un équipement lent (réseau, Pronote surchargé) n'impacte plus les autres.</td>
             </tr>
             <tr>
                 <td><span class="badge badge-new">Nouveau</span></td>
                 <td><strong>Nouveau Widget</strong> — photo / nom + date de sync / classe + établissement, plus compact et lisible.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-new">Nouveau</span></td>
+                <td><strong>Widget — spinner de chargement</strong> — le logo ProJote tourne dans la zone avatar pendant la collecte. Un clic sur l'avatar déclenche un rafraîchissement manuel.</td>
             </tr>
             <tr>
                 <td><span class="badge badge-new">Nouveau</span></td>
