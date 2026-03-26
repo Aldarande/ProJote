@@ -133,7 +133,7 @@ try {
     $command .= ' --Eqid ' . escapeshellarg($eqLogicId);
     $command .= ' --Uuid ' . escapeshellarg($uuid);
     $command .= ' --Loglevel ' . (log::convertLogLevel(log::getLogLevel("ProJote")));
-    $command .= ' --datadir ' . escapeshellarg(dirname(dirname(__FILE__)) . '/data');
+    $command .= ' --datadir ' . escapeshellarg(dirname(dirname(dirname(__FILE__))) . '/data');
     $command .= ' >> ' . log::getPathToLog('ProJote') . ' 2>&1 ';
 
     // Ne pas logger la commande complète (contient le mot de passe en clair)
@@ -226,7 +226,7 @@ try {
     $command .= ' --Eqid ' . escapeshellarg($eqLogicId);
     $command .= ' --Uuid ' . escapeshellarg($uuid);
     $command .= ' --Loglevel ' . escapeshellarg(log::convertLogLevel(log::getLogLevel("ProJote")));
-    $command .= ' --datadir ' . escapeshellarg(dirname(dirname(__FILE__)) . '/data');
+    $command .= ' --datadir ' . escapeshellarg(dirname(dirname(dirname(__FILE__))) . '/data');
     $command .= ' >> ' . log::getPathToLog('ProJote') . ' 2>&1 ';
 
     // Ne pas logger la commande complète (contient le jeton QR en clair)

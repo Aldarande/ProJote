@@ -139,7 +139,7 @@ class ProJote extends eqLogic
     $pid_file = jeedom::getTmpFolder(__CLASS__) . '/deamon.pid'; // Chemin du fichier PID à créer
 
     // Construction de la commande shell
-    $data_dir = dirname(dirname(__FILE__)) . '/data';
+    $data_dir = dirname(dirname(dirname(__FILE__))) . '/data';
     $cmd = system::getCmdPython3(__CLASS__) . " {$path}/ProJoted.py";
     $cmd .= ' --loglevel ' . $loglevel;
     $cmd .= ' --socketport ' . $socketport;
