@@ -1144,77 +1144,92 @@ def download_photo(client, eqLogicId, tokenconnected, message):
                 logging.debug("Pas de photo pour cet enfant (avecPhoto=False)")
                 return None
 
-            photo_bytes = None
-
-            # Stratégie A : FichiersExternes avec l'ID numérique P (au lieu du N UUID 46#...)
-            # Pronote stocke les photos avec l'ID numérique interne, pas le N UUID parent-context
-            try:
-                from Crypto.Util import Padding as _CryptoPadding
-
-                p_value = raw.get("P")  # ID numérique interne (ex : 472)
-                if p_value:
-                    _padd = _CryptoPadding.pad(
-                        json.dumps({"N": p_value, "Actif": True}).replace(" ", "").encode(), 16
-                    )
-                    _magic = client.communication.encryption.aes_encrypt(_padd).hex()
-                    _photo_url = (
-                        f"{client.communication.root_site}/FichiersExternes/{_magic}/"
-                        f"photo.jpg?Session={client.attributes['h']}"
-                    )
-                    logging.info("Tentative photo via P=%s — URL : %s", p_value, _photo_url)
-                    _resp = client.communication.session.get(_photo_url, timeout=15)
-                    if _resp.status_code == 200 and len(_resp.content) > 100:
-                        photo_bytes = _resp.content
-                        logging.info("Photo parent récupérée via FichiersExternes(P=%s)", p_value)
-                    else:
-                        logging.info(
-                            "Stratégie A (P=%s) échouée — HTTP %d", p_value, _resp.status_code
-                        )
-            except Exception as _e:
-                logging.warning("Stratégie A photo (FichiersExternes P) échouée : %s", _e)
-
-            # Stratégie B : ParametresUtilisateur avec la resource de l'enfant
-            # (peut déclencher le retour de photoBase64 _T=23 côté serveur)
-            if not photo_bytes:
-                try:
-                    resp_pu = client.post("ParametresUtilisateur", 7, {"ressource": raw})
-                    pu_data = resp_pu.get("dataSec", {}).get("data", {})
-                    logging.info("DEBUG ParametresUtilisateur(7,ressource) — clés : %s", list(pu_data.keys()))
-                    # Chercher photoBase64 _T=23 dans toute la réponse (récursif niveau 1)
-                    for _k, _v in pu_data.items():
-                        if isinstance(_v, dict):
-                            pb64 = _v.get("photoBase64", {})
-                            if isinstance(pb64, dict) and pb64.get("_T") == 23 and pb64.get("V"):
-                                photo_bytes = base64.b64decode(pb64["V"])
-                                logging.info("Photo parent récupérée depuis ParametresUtilisateur(7).%s", _k)
-                                break
-                            logging.info("DEBUG pu_data[%s] keys : %s", _k, list(_v.keys())[:10])
-                except Exception as _e:
-                    logging.warning("Stratégie B photo (ParametresUtilisateur 7) échouée : %s", _e)
-
-            if not photo_bytes:
-                logging.warning(
-                    "ProJote — Photo introuvable pour l'équipement %s "
-                    "(compte parent, base64 non retournée par l'API Pronote).",
-                    eqLogicId,
-                )
+            photo = client._selected_child.profile_picture
+            if not photo:
+                logging.debug("Aucune photo trouvée pour l'enfant")
                 return None
 
-            # Sauvegarde de la photo base64 décodée
+            downloaded = False
+            logging.info("Téléchargement photo parent — URL : %s", photo.url)
+
+            # ── Stratégie 1 : méthode native pronotepy ────────────────────────
             try:
-                with open(temp_path, "wb") as f:
-                    f.write(photo_bytes)
-                if os.path.exists(final_path):
-                    with open(final_path, "rb") as f2:
-                        if f2.read() == photo_bytes:
+                photo.save(temp_path)
+                logging.info("Photo téléchargée — stratégie 1 (FichiersExternes natif)")
+                downloaded = True
+            except FileNotFoundError:
+                logging.info("Stratégie 1 échouée (404) — essai stratégie 2")
+            except Exception as e:
+                logging.info("Stratégie 1 échouée (%s) — essai stratégie 2", e)
+
+            # ── Stratégie 2 : session + headers Referer/Origin ────────────────
+            if not downloaded:
+                try:
+                    headers = {
+                        "Referer": client.communication.root_site + "/",
+                        "Origin":  client.communication.root_site,
+                    }
+                    resp = client.communication.session.get(photo.url, headers=headers, timeout=15)
+                    if resp.status_code == 200 and len(resp.content) > 100:
+                        with open(temp_path, "wb") as f:
+                            f.write(resp.content)
+                        logging.info("Photo téléchargée — stratégie 2 (Referer/Origin)")
+                        downloaded = True
+                    else:
+                        logging.info(
+                            "Stratégie 2 échouée — HTTP %d — essai stratégie 3",
+                            resp.status_code,
+                        )
+                except Exception as e:
+                    logging.info("Stratégie 2 échouée (%s) — essai stratégie 3", e)
+
+            # ── Stratégie 3 : cookies de session ─────────────────────────────
+            if not downloaded:
+                try:
+                    resp = requests.get(
+                        photo.url,
+                        cookies=client.communication.session.cookies,
+                        timeout=15,
+                        headers={"User-Agent": "Mozilla/5.0", "Referer": client.communication.root_site + "/"},
+                    )
+                    if resp.status_code == 200 and len(resp.content) > 100:
+                        with open(temp_path, "wb") as f:
+                            f.write(resp.content)
+                        logging.info("Photo téléchargée — stratégie 3 (cookies session)")
+                        downloaded = True
+                    else:
+                        logging.warning(
+                            "ProJote — Photo introuvable équipement %s (HTTP %d)",
+                            eqLogicId, resp.status_code,
+                        )
+                except Exception as e:
+                    logging.warning(
+                        "ProJote — Échec photo équipement %s : %s", eqLogicId, e
+                    )
+
+            if not downloaded:
+                return None
+
+            # Comparer et remplacer
+            if os.path.exists(final_path):
+                try:
+                    with open(temp_path, "rb") as f1, open(final_path, "rb") as f2:
+                        if f1.read() == f2.read():
+                            logging.info("Photo identique, pas de remplacement")
                             os.remove(temp_path)
-                            logging.info("Photo parent identique, pas de remplacement")
                             return f"/plugins/ProJote/data/{eqLogicId}/profile_picture.jpg"
+                except Exception as e:
+                    logging.error("Erreur comparaison photo : %s", e)
+                    if os.path.exists(temp_path):
+                        os.remove(temp_path)
+                    return None
+
+            try:
                 os.rename(temp_path, final_path)
                 logging.info("Photo parent mise à jour : %s", final_path)
                 return f"/plugins/ProJote/data/{eqLogicId}/profile_picture.jpg"
-            except Exception as _e:
-                logging.error("Erreur écriture photo parent : %s", _e)
+            except Exception as e:
+                logging.error("Erreur remplacement photo : %s", e)
                 if os.path.exists(temp_path):
                     os.remove(temp_path)
                 return None
