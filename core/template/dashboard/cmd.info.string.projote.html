@@ -206,6 +206,18 @@
     text-align: center; padding: 6px 0;
     font-size: 10px; opacity: .3;
 }
+
+/* ── Spinner logo (rafraîchissement en cours) ───────── */
+@keyframes pjwSpin#id# {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+.pjw-#id# .ph-av { cursor: pointer; }
+.pjw-#id# .ph-av-loading img {
+    animation: pjwSpin#id# 1.1s linear infinite;
+    border-radius: 12px;
+    opacity: .85;
+}
 </style>
 
 <div class="pjw-#id#">
@@ -537,9 +549,40 @@
         }).join('');
     }
 
+    /* ─── SPINNER (rafraîchissement en cours) ─────────── */
+    var _spinning = false;
+
+    function showSpinner() {
+        _spinning = true;
+        var av = el('pjwav' + ID);
+        if (!av) return;
+        av.classList.add('ph-av-loading');
+        av.innerHTML = '<img src="/plugins/ProJote/plugin_info/ProJote_icon.png" alt="">';
+    }
+
+    function hideSpinner() {
+        _spinning = false;
+        var av = el('pjwav' + ID);
+        if (!av) return;
+        av.classList.remove('ph-av-loading');
+    }
+
+    /* Click sur l'avatar → rafraîchissement manuel */
+    (function() {
+        var av = el('pjwav' + ID);
+        if (av) {
+            av.addEventListener('click', function() {
+                if (_spinning) return;
+                showSpinner();
+                jeedom.cmd.execute({id: ID});
+            });
+        }
+    })();
+
     /* ─── RENDU GLOBAL ────────────────────────────────── */
     /** Point d'entrée principal : reçoit l'objet de données et met à jour tout le widget */
     function render(d, ts) {
+        hideSpinner();
         D = d;
         renderHeader(d, ts);
         renderStats(d);
@@ -563,6 +606,9 @@
             console.error('[ProJote] Erreur de parsing JSON :', e);
         }
     });
+
+    /* Spinner initial : affiché jusqu'à réception des données */
+    showSpinner();
 
     /**
      * refreshValue : déclenche le premier rendu avec la valeur déjà en cache Jeedom.
