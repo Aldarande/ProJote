@@ -110,9 +110,14 @@ except ImportError as e:
 failed_attempts = {}  # Format: {eqLogicId: {"count": N, "timestamp": time.time()}}
 _failed_attempts_lock = threading.Lock()
 
-# Threads actifs par équipement — garantit qu'un seul thread tourne par eqLogicId
-_active_eq_lock = threading.Lock()
-_active_eq = {}  # Format: {eqLogicId: threading.Thread}
+# ── File d'attente sérialisée ────────────────────────────────────────────────
+# Un seul thread worker traite les messages un par un (séquentiellement).
+# _queued_eq évite d'enqueuer deux fois le même équipement.
+import queue as _queue_module
+_work_queue   = _queue_module.Queue()
+_queued_eq      = set()   # eqLogicId en attente ou en cours de traitement
+_queued_eq_lock = threading.Lock()
+_worker_thread  = None    # Thread worker unique (démarré au premier message)
 
 # Variable globale pour stocker les info de connexion Jeedom
 _callback_url = None
@@ -1565,7 +1570,7 @@ def load_persistent_token(eqLogicId):
 def process_message(message):
     """
     Traite un message reçu depuis le socket Jeedom.
-    Exécuté dans un thread dédié par équipement (eqLogicId).
+    Appelé séquentiellement par le thread worker unique (_worker_loop).
     """
     eq_id = str(message.get("CmdId", ""))
     try:
@@ -1792,9 +1797,44 @@ def process_message(message):
             }
         )
     finally:
-        # Libérer le slot pour cet équipement une fois le traitement terminé
-        with _active_eq_lock:
-            _active_eq.pop(eq_id, None)
+        # Retirer l'équipement du set — libère la place pour une prochaine requête
+        with _queued_eq_lock:
+            _queued_eq.discard(eq_id)
+
+
+def _worker_loop():
+    """
+    Boucle du thread worker unique.
+    Dépile les messages de _work_queue et les traite séquentiellement.
+    Les logs sont ainsi linéaires et faciles à lire.
+    """
+    logging.info("Worker ProJote démarré — traitement séquentiel des équipements.")
+    while True:
+        try:
+            message = _work_queue.get(timeout=1.0)
+        except _queue_module.Empty:
+            continue
+        eq_id = str(message.get("CmdId", ""))
+        logging.info("=== Début traitement équipement %s (file restante : %d) ===",
+                     eq_id, _work_queue.qsize())
+        try:
+            process_message(message)
+        except Exception as e:
+            logging.error("Erreur non capturée pour l'équipement %s : %s", eq_id, e)
+        finally:
+            _work_queue.task_done()
+            logging.info("=== Fin traitement équipement %s ===", eq_id)
+
+
+def _ensure_worker():
+    """Démarre le thread worker s'il n'est pas encore actif."""
+    global _worker_thread
+    if _worker_thread is None or not _worker_thread.is_alive():
+        _worker_thread = threading.Thread(
+            target=_worker_loop, daemon=True, name="projote-worker"
+        )
+        _worker_thread.start()
+        logging.info("Thread worker ProJote lancé.")
 
 
 def read_socket():
@@ -1815,27 +1855,23 @@ def read_socket():
             logging.debug("Notification en erreur : %s", raw_message)
             return
 
-        logging.debug("Le MESSAGE reçu est : %s", message)
-
+        logging.debug("Message reçu : %s", message)
         eq_id = str(message.get("CmdId", ""))
 
-        # Un seul thread actif par équipement — évite les traitements simultanés
-        with _active_eq_lock:
-            existing = _active_eq.get(eq_id)
-            if existing and existing.is_alive():
+        with _queued_eq_lock:
+            if eq_id in _queued_eq:
                 logging.warning(
-                    "Équipement %s déjà en cours de traitement — requête ignorée.", eq_id
+                    "Équipement %s déjà dans la file — requête ignorée.", eq_id
                 )
                 return
-            t = threading.Thread(
-                target=process_message,
-                args=(message,),
-                daemon=True,
-                name=f"eq-{eq_id}",
-            )
-            _active_eq[eq_id] = t
-            t.start()
-            logging.debug("Thread démarré pour l'équipement %s", eq_id)
+            _queued_eq.add(eq_id)
+
+        _ensure_worker()
+        _work_queue.put(message)
+        logging.info(
+            "Équipement %s ajouté à la file (taille file : %d).",
+            eq_id, _work_queue.qsize()
+        )
 
     except Exception as e:
         logging.error("Erreur dans read_socket : %s", e)
