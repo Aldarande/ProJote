@@ -32,23 +32,28 @@
 .pjw-#id# .ph-av img { width:100%; height:100%; object-fit:cover; display:block; }
 .pjw-#id# .ph-info {
     flex: 1; min-width: 0;
-    display: flex; flex-direction: column; gap: 3px;
+    display: flex; flex-direction: row; align-items: center; gap: 8px;
+}
+.pjw-#id# .ph-mid {
+    flex: 1; min-width: 0;
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
 }
 .pjw-#id# .ph-name {
     font-weight: 800; font-size: 14px;
     text-transform: uppercase; letter-spacing: .4px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    line-height: 1.2;
+    text-align: center;
 }
+.pjw-#id# .ph-name-row { display: contents; }
 .pjw-#id# .ph-class {
-    display: inline-block; align-self: flex-start;
+    display: inline-block; flex-shrink: 0;
     font-size: 10px; font-weight: 700;
     background: color-mix(in srgb, var(--pjw-a) 15%, transparent); color: var(--pjw-a);
     border: 1px solid color-mix(in srgb, var(--pjw-a) 30%, transparent);
     padding: 1px 8px; border-radius: 20px;
     letter-spacing: .3px;
 }
-.pjw-#id# .ph-school { font-size: 10px; opacity: .5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pjw-#id# .ph-school { font-size: 10px; opacity: .5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
 .pjw-#id# .ph-ts     { font-size: 9px; opacity: .28; }
 
 /* ── Séparateur ─────────────────────────────────────── */
@@ -321,10 +326,12 @@
             <div class="ph-av" id="pjwav#id#">?</div>
         </div>
         <div class="ph-info">
-            <div class="ph-name"   id="pjwnm#id#">–</div>
-            <div class="ph-class"  id="pjwcl#id#"></div>
-            <div class="ph-school" id="pjwsc#id#"></div>
-            <div class="ph-ts"     id="pjwts#id#"></div>
+            <div class="ph-mid">
+                <div class="ph-name"   id="pjwnm#id#">–</div>
+                <div class="ph-school" id="pjwsc#id#"></div>
+                <div class="ph-ts"     id="pjwts#id#"></div>
+            </div>
+            <div class="ph-class" id="pjwcl#id#"></div>
         </div>
     </div>
 

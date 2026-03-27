@@ -116,7 +116,7 @@ try {
 
     // Récupération de l'UUID pour l'identification auprès de Pronote (nécessaire pour certains ENT)
     $eqLogicForUuid = eqLogic::byId($eqLogicId);
-    $uuid = (is_object($eqLogicForUuid)) ? $eqLogicForUuid->getConfiguration('uuid', jeedom::createUniqueId()) : jeedom::createUniqueId();
+    $uuid = (is_object($eqLogicForUuid)) ? $eqLogicForUuid->getConfiguration('uuid', uniqid('projote-', true)) : uniqid('projote-', true);
 
     // Étape 2 : Construire la commande shell à exécuter.
     // C'est ici que l'on assemble la commande qui sera lancée, comme si on la tapait dans un terminal.
@@ -229,7 +229,7 @@ try {
     }
 
     $eqLogicForUuid = eqLogic::byId($eqLogicId);
-    $uuid = (is_object($eqLogicForUuid)) ? $eqLogicForUuid->getConfiguration('uuid', jeedom::createUniqueId()) : jeedom::createUniqueId();
+    $uuid = (is_object($eqLogicForUuid)) ? $eqLogicForUuid->getConfiguration('uuid', uniqid('projote-', true)) : uniqid('projote-', true);
 
     // Construction de la commande shell avec les arguments spécifiques au QR Code
     $command = escapeshellarg($pythonBinary) . ' ' . escapeshellarg($qrScript);
