@@ -92,7 +92,9 @@ try {
     // On utilise des chemins relatifs pour que cela fonctionne sur toutes les installations.
     $resourcePath = realpath(dirname(__FILE__) . '/../../resources');
     if (!$resourcePath) {
-      throw new Exception('Impossible de trouver le dossier des ressources du plugin.');
+      log::add('ProJote', 'error', 'Ajax::Login - Impossible de trouver le dossier des ressources du plugin.');
+      ajax::error('Impossible de trouver le dossier des ressources du plugin.');
+      return;
     }
     // Chemin vers l'exécutable python dans l'environnement virtuel du plugin
     $pythonBinary = $resourcePath . DIRECTORY_SEPARATOR . 'python_venv' . DIRECTORY_SEPARATOR . 'bin' . DIRECTORY_SEPARATOR . 'python3';
@@ -101,10 +103,15 @@ try {
 
     // Vérification que les fichiers existent avant de continuer
     if (!file_exists($pythonBinary)) {
-      throw new Exception('Exécutable Python non trouvé à : ' . $pythonBinary);
+      $msg = 'Dépendances Python non installées. Allez dans la configuration du plugin et cliquez sur "Installer les dépendances".';
+      log::add('ProJote', 'error', 'Ajax::Login - Exécutable Python non trouvé : ' . $pythonBinary);
+      ajax::error($msg);
+      return;
     }
     if (!file_exists($loginScript)) {
-      throw new Exception('Script LoginConnect.py non trouvé à : ' . $loginScript);
+      log::add('ProJote', 'error', 'Ajax::Login - Script LoginConnect.py non trouvé : ' . $loginScript);
+      ajax::error('Script LoginConnect.py introuvable. Vérifiez l\'installation du plugin.');
+      return;
     }
 
     // Récupération de l'UUID pour l'identification auprès de Pronote (nécessaire pour certains ENT)
@@ -202,16 +209,23 @@ try {
 
     $resourcePath = realpath(dirname(__FILE__) . '/../../resources');
     if (!$resourcePath) {
-      throw new Exception('Impossible de déterminer le chemin des ressources');
+      log::add('ProJote', 'error', 'Ajax::QR - Impossible de déterminer le chemin des ressources');
+      ajax::error('Impossible de déterminer le chemin des ressources du plugin.');
+      return;
     }
     $pythonBinary = $resourcePath . DIRECTORY_SEPARATOR . 'python_venv' . DIRECTORY_SEPARATOR . 'bin' . DIRECTORY_SEPARATOR . 'python3';
     $qrScript = $resourcePath . DIRECTORY_SEPARATOR . 'ProJoted' . DIRECTORY_SEPARATOR . 'QRConnect.py';
 
     if (!file_exists($pythonBinary)) {
-      throw new Exception('Exécutable Python non trouvé à : ' . $pythonBinary);
+      $msg = 'Dépendances Python non installées. Allez dans la configuration du plugin et cliquez sur "Installer les dépendances".';
+      log::add('ProJote', 'error', 'Ajax::QR - Exécutable Python non trouvé : ' . $pythonBinary);
+      ajax::error($msg);
+      return;
     }
     if (!file_exists($qrScript)) {
-      throw new Exception('Script QRConnect.py non trouvé à : ' . $qrScript);
+      log::add('ProJote', 'error', 'Ajax::QR - Script QRConnect.py non trouvé : ' . $qrScript);
+      ajax::error('Script QRConnect.py introuvable. Vérifiez l\'installation du plugin.');
+      return;
     }
 
     $eqLogicForUuid = eqLogic::byId($eqLogicId);
@@ -234,6 +248,8 @@ try {
 
     // Exécution de la commande
     exec($command, $output, $return_var);
+
+    log::add('ProJote', 'debug', 'Ajax::QR - Code retour exec : ' . $return_var . (count($output) ? ' | Output : ' . implode(' | ', $output) : ''));
 
     // Analyse du résultat (idem que pour la validation classique)
     if ($return_var === 0) {
