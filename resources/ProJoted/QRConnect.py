@@ -23,14 +23,19 @@ Arguments attendus en ligne de commande :
   --Loglevel : Niveau de verbosité des logs
 """
 try:
-    # TO DO :: add log to plugin for troubleshoote
     import pronotepy
     import sys
     import json
     import argparse
     import logging
-    import json
     import os
+
+    # Activation du logging dès le départ pour que les erreurs précoces soient visibles
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format="%(levelname)s  : QRConnect.py:%(lineno)d - %(message)s",
+        stream=sys.stdout,
+    )
 
     # Ajout du répertoire du script au `path` pour les imports relatifs
     sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -74,20 +79,20 @@ try:
         parser.add_argument("--datadir", help="Chemin du dossier data du plugin", type=str)
         args = parser.parse_args()
 
-        if args.QRUrl:
-            QRUrl = args.QRUrl
-        if args.QRLogin:
-            QRLogin = args.QRLogin
-        if args.Jeton:
-            Jeton = args.Jeton
-        if args.Pin:
-            Pin = str(args.Pin)
-        if args.Eqid:
-            EqID = str(args.Eqid)
+        QRUrl   = args.QRUrl   or ''
+        QRLogin = args.QRLogin or ''
+        Jeton   = args.Jeton   or ''
+        Pin     = str(args.Pin)  if args.Pin   else ''
+        EqID    = str(args.Eqid) if args.Eqid  else ''
         if args.Loglevel:
             _log_level = args.Loglevel
-        Uuid = args.Uuid or None
+        Uuid    = args.Uuid    or None
         DataDir = args.datadir or "/var/www/html/plugins/ProJote/data"
+
+        if not QRUrl or not QRLogin or not Jeton or not Pin:
+            logging.error("QRConnect.py :: Arguments manquants — QRUrl=%s QRLogin=%s Jeton=%s Pin=%s",
+                          bool(QRUrl), bool(QRLogin), bool(Jeton), bool(Pin))
+            sys.exit(1)
 
         jeedom_utils.set_log_level(_log_level)
 
@@ -140,6 +145,8 @@ try:
             # Sauvegarde du token principal + backup
             writedataPronotepy(Account, DataDir, EqID, backup_token=backup_credentials)
 except Exception as e:
-    line_number = e.__traceback__.tb_lineno
-    print("An error occurred: line ", line_number, e)
+    import traceback
+    tb_lineno = e.__traceback__.tb_lineno if e.__traceback__ else '?'
+    print(f"QRConnect.py ERREUR (ligne {tb_lineno}): {e}", flush=True)
+    print(traceback.format_exc(), flush=True)
     sys.exit(1)

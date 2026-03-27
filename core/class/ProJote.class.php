@@ -79,6 +79,43 @@ class ProJote extends eqLogic
    *
    * @return array Un tableau décrivant l'état : ['state' => 'ok' ou 'nok', ...].
    */
+  /**
+   * Vérifie que les dépendances Python (venv + pronotepy) sont installées.
+   * Utilisé par Jeedom pour afficher le statut "Dépendances OK/NOK" dans la config du plugin.
+   */
+  public static function dependancy_info()
+  {
+    $return = array();
+    $return['log'] = __CLASS__ . '_update';
+    $return['state'] = 'ok';
+
+    $venvPython = realpath(dirname(__FILE__) . '/../../resources') . '/python_venv/bin/python3';
+    if (!file_exists($venvPython)) {
+      $return['state'] = 'nok';
+      return $return;
+    }
+
+    exec(escapeshellarg($venvPython) . ' -c "import pronotepy" 2>/dev/null', $output, $rc);
+    if ($rc !== 0) {
+      $return['state'] = 'nok';
+    }
+
+    return $return;
+  }
+
+  /**
+   * Installe les dépendances Python en lançant le script post-install.sh en arrière-plan.
+   * Appelé par Jeedom quand l'utilisateur clique sur "Installer les dépendances".
+   */
+  public static function dependancy_install()
+  {
+    log::add(__CLASS__, 'info', 'Installation des dépendances ProJote (venv Python)...');
+    $script = realpath(dirname(__FILE__) . '/../../resources') . '/post-install.sh';
+    $logFile = log::getPathToLog(__CLASS__ . '_update');
+    exec('/bin/bash ' . escapeshellarg($script) . ' >> ' . escapeshellarg($logFile) . ' 2>&1 &');
+    return array('script' => $script);
+  }
+
   public static function deamon_info()
   {
     $return = array();
@@ -102,8 +139,16 @@ class ProJote extends eqLogic
         unlink($pid_file);
       }
     }
-    // 'launchable' indique à Jeedom si le démon peut être démarré.
-    $return['launchable'] = 'ok';
+
+    // Bloquer le démarrage du démon si les dépendances ne sont pas installées.
+    $dep = self::dependancy_info();
+    if ($dep['state'] !== 'ok') {
+      $return['launchable'] = 'nok';
+      $return['launchable_message'] = __('Les dépendances Python ne sont pas installées. Cliquez sur "Installer les dépendances" dans la page de configuration du plugin.', __FILE__);
+    } else {
+      $return['launchable'] = 'ok';
+    }
+
     return $return;
   }
 
