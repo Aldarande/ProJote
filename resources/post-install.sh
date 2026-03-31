@@ -20,19 +20,17 @@ fi
 PYTHON_VERSION=$(python3 --version 2>&1)
 echo "[ProJote] Python système : $PYTHON_VERSION"
 
-# Supprime l'ancien venv pour garantir une installation propre
-if [ -d "$VENV_DIR" ]; then
-    echo "[ProJote] Suppression de l'ancien venv..."
-    rm -rf "$VENV_DIR"
-fi
-
-# Création du venv
-echo "[ProJote] Création du venv Python..."
-python3 -m venv "$VENV_DIR"
-if [ $? -ne 0 ]; then
-    echo "[ProJote] ERREUR : Impossible de créer le venv."
-    echo "[ProJote] Assurez-vous que python3-venv est installé : apt install python3-venv"
-    exit 1
+# Création du venv s'il n'existe pas
+if [ ! -d "$VENV_DIR" ]; then
+    echo "[ProJote] Création du venv Python..."
+    python3 -m venv "$VENV_DIR"
+    if [ $? -ne 0 ]; then
+        echo "[ProJote] ERREUR : Impossible de créer le venv."
+        echo "[ProJote] Assurez-vous que python3-venv est installé : apt install python3-venv"
+        exit 1
+    fi
+else
+    echo "[ProJote] Le venv existe déjà, passage à la mise à jour des paquets."
 fi
 
 echo "[ProJote] Venv créé : $VENV_DIR/bin/python3"

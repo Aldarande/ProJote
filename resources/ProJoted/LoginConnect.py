@@ -20,6 +20,7 @@ Arguments attendus en ligne de commande :
   --Uuid      : UUID unique de l'équipement (identifiant de session Pronote)
   --Loglevel  : Niveau de verbosité des logs (debug, info, warning, error)
 """
+
 try:
     # TO DO :: add log to plugin for troubleshoote
     import pronotepy
@@ -32,6 +33,12 @@ try:
     import datetime
     import requests
     import argparse
+
+    # Chiffrement
+    import hashlib
+    import base64
+    import binascii
+    from Crypto.Cipher import AES
 
     try:
         from jeedom.jeedom import *
@@ -47,6 +54,29 @@ try:
     # FONCTIONS UTILITAIRES
     # ─────────────────────────────────────────────────────────────────────────
 
+    def my_decrypt(data, apikey, passphrase=None):
+        """
+        Déchiffre des données AES-256-CBC chiffrées par PHP.
+        La clé est dérivée de l'API key Jeedom via SHA-256.
+        """
+        if not data:
+            return ""
+        if passphrase is None:
+            passphrase = hashlib.sha256(apikey.encode()).hexdigest()
+        try:
+            unpad = lambda s: s[: -s[-1]]
+            key = binascii.unhexlify(passphrase)
+            decoded_raw = base64.b64decode(data)
+            encrypted = json.loads(decoded_raw.decode("ascii"))
+            encrypted_data = base64.b64decode(encrypted["data"])
+            iv = base64.b64decode(encrypted["iv"])
+            cipher = AES.new(key, AES.MODE_CBC, iv)
+            decrypted = cipher.decrypt(encrypted_data)
+            return unpad(decrypted).decode("ascii").rstrip()
+        except Exception as e:
+            logging.error("Cannot decrypt datas in LoginConnect: %s", e)
+            return data  # Retourne brut si échec (fallback compatibilité)
+
     # Import de l'ENT
     def class_for_name(module_name, class_name):
         """
@@ -61,7 +91,7 @@ try:
         except Exception:
             return None
 
-    def Connectparent(pronote_url, login, password, ent, enfant):
+    def Connectparent(pronote_url, login, password, ent, enfant, apikey=None):
         """
         Connecte un compte PARENT à Pronote avec login/mot de passe.
 
@@ -96,19 +126,11 @@ try:
                 elif pronote_url.endswith(".index-education.net/pronote/parent.html"):
                     pronote_url += "?login=true"
                     logging.info("URL  modifiée : %s", pronote_url)
-            if password != "":
-                ### neutralisé pour le moment
-                """if isinstance(password, str):
-                    password = my_decrypt(
-                        password,
-                        "084781141BD01304180B9B58120E4E058C1434394DDED646BF4ECC95380B9442",
-                    )
-                else:
-                    logging.error("Le password n'est pas un string")"""
-            else:
+            if password == "":
                 logging.error("pas de password reçu sur le deamon")
             # Maintenant j'essaye de me connecter
-            logging.debug("Tentative de connection en tant que parent")
+            if apikey:
+                password = my_decrypt(password, apikey)
             client = pronotepy.ParentClient(pronote_url, login, password, ent)
             logging.info("Je suis connecté en tant que parent")
 
@@ -138,7 +160,7 @@ try:
             line_number = e.__traceback__.tb_lineno
             logging.error("Connection parent échouée : lig. %s -   %s", line_number, e)
 
-    def ConnectEleve(pronote_url, login, password, ent):
+    def ConnectEleve(pronote_url, login, password, ent, apikey=None):
         """
         Connecte un compte ÉLÈVE à Pronote avec login/mot de passe.
 
@@ -170,14 +192,11 @@ try:
             logging.debug("L'url pour se connecter est  : %s", pronote_url)
         else:
             logging.error("pas d'URL reçu sur le deamon")
-        if password != "":
-            # Neutralisé pour le moment
-            """password = my_decrypt(
-                password, "084781141BD01304180B9B58120E4E058C1434394DDED646BF4ECC95380B9442"
-            )"""
-        else:
+        if password == "":
             logging.error("pas de password reçu sur le deamon")
         try:
+            if apikey:
+                password = my_decrypt(password, apikey)
             client = pronotepy.Client(pronote_url, login, password, ent)
             logging.info("Je suis connecté")
             return client
@@ -344,7 +363,19 @@ try:
             # Ouvrir le fichier en mode écriture, ou créer s'il n'existe pas
             # Préparer les données à écrire
             credentials = client.export_credentials()
-            logging.debug("export_credentials: %s", {k: v[:8] + "..." if isinstance(v, str) and len(v) > 8 and k not in ("pronote_url", "uuid") else v for k, v in credentials.items()})
+            logging.debug(
+                "export_credentials: %s",
+                {
+                    k: (
+                        v[:8] + "..."
+                        if isinstance(v, str)
+                        and len(v) > 8
+                        and k not in ("pronote_url", "uuid")
+                        else v
+                    )
+                    for k, v in credentials.items()
+                },
+            )
             data = {
                 "Date": str(datetime.datetime.now()),
                 "Name": client.info.name,
@@ -384,7 +415,9 @@ try:
                 # Recherche de l'image et téléchargement
                 # Télécharger l'image localement
             image_filepath = os.path.join(f"{dossier}/{eqid}", "profile_picture.jpg")
-            pronote_session = getattr(getattr(client, 'communication', None), 'session', None)
+            pronote_session = getattr(
+                getattr(client, "communication", None), "session", None
+            )
             if client._selected_child:
                 if download_image(
                     client._selected_child.profile_picture.url,
@@ -437,8 +470,15 @@ try:
         parser.add_argument("--Eqid", help="ID de l'équipement", type=str)
         parser.add_argument("--Loglevel", help="Niveau de log", type=str)
         parser.add_argument("--Uuid", help="UUID unique de l'équipement", type=str)
-        parser.add_argument("--Pin", help="Code PIN pour la génération du jeton", type=str)
-        parser.add_argument("--datadir", help="Chemin du dossier data du plugin", type=str)
+        parser.add_argument(
+            "--Pin", help="Code PIN pour la génération du jeton", type=str
+        )
+        parser.add_argument(
+            "--apikey", help="Clé API Jeedom pour déchiffrement", type=str
+        )
+        parser.add_argument(
+            "--datadir", help="Chemin du dossier data du plugin", type=str
+        )
         args = parser.parse_args()
 
         if args.URL:
@@ -467,6 +507,7 @@ try:
             _log_level = args.Loglevel
         Uuid = args.Uuid or None
         DataDir = args.datadir or "/var/www/html/plugins/ProJote/data"
+        ApiKey = args.apikey or None
 
         jeedom_utils.set_log_level(_log_level)
 
@@ -488,12 +529,17 @@ try:
                 password=Password,
                 ent=ClassEnt,
                 enfant=NomEnfant,
+                apikey=ApiKey,
             )
 
         else:
             logging.info("LOG : Je tente de me connecter en tant qu' élève")
             Account = ConnectEleve(
-                pronote_url=Pronote_url, login=Username, password=Password, ent=ClassEnt
+                pronote_url=Pronote_url,
+                login=Username,
+                password=Password,
+                ent=ClassEnt,
+                apikey=ApiKey,
             )
 
         if Account.logged_in:
@@ -512,7 +558,9 @@ try:
                 Qrcode_data_backup = Account.request_qr_code_data(Pin)
                 logging.debug("Second QR code demandé pour le token backup")
             except Exception as e:
-                logging.warning("Impossible de demander le second QR code (backup) : %s", e)
+                logging.warning(
+                    "Impossible de demander le second QR code (backup) : %s", e
+                )
 
             # Connexion principale via le QR code principal
             if "parent" not in Qrcode_data["url"]:
@@ -546,7 +594,9 @@ try:
                     logging.warning("Génération du token backup échouée : %s", e)
 
             # Sauvegarde du token principal + backup
-            writedataPronotepy(PrimaryAccount, DataDir, EqID, backup_token=backup_credentials)
+            writedataPronotepy(
+                PrimaryAccount, DataDir, EqID, backup_token=backup_credentials
+            )
 
 except Exception as e:
     line_number = e.__traceback__.tb_lineno

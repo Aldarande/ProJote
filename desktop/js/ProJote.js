@@ -265,6 +265,7 @@ $(document).ready(function () {
     let eqLogicId = $(this).attr('data-eqlogic_id'); // Récupérer l'ID de l'équipement depuis l'attribut data
     console.log('ProJote.js:: Detection du click pour ', eqLogicId);
     loadProJoteData(eqLogicId);
+    loadManualPhotoPreview(eqLogicId);
     //populateEnfantList(eqLogicId); // Appeler la fonction pour peupler la liste des enfants
   });
 
@@ -273,6 +274,7 @@ $(document).ready(function () {
   if (eqLogicIdFromUrl) {
     console.log('ProJote.js:: Chargement des données pour ', eqLogicIdFromUrl);
     loadProJoteData(eqLogicIdFromUrl);
+    loadManualPhotoPreview(eqLogicIdFromUrl);
     //populateEnfantList(eqLogicIdFromUrl); // Appeler la fonction pour peupler la liste des enfants
   }
 
@@ -625,7 +627,7 @@ function sortTableById(_cmd) {
 ******************************************************************=*/
 function addCmdToTable(_cmd) {
   if (!isset(_cmd)) {
-    let _cmd = { configuration: {} }
+    _cmd = { configuration: {} }   // affectation directe (pas let/var) pour que le paramètre soit réassigné
   }
   if (!isset(_cmd.configuration)) {
     _cmd.configuration = {}
@@ -736,4 +738,189 @@ function addCmdToTable(_cmd) {
   })
 }
 
+/*******************************************************************************
+ * ONGLET AFFICHAGE — Prévisualisation du widget
+ ******************************************************************************/
+
+/**
+ * Charge le rendu live du widget ProJote dans la zone de prévisualisation (#pjw-preview-zone).
+ *
+ * Appelle eqLogic.ajax.php?action=toHtml pour obtenir le HTML généré par ProJote::toHtml().
+ * La réponse a la forme : { state:'ok', result:{ html:'...', id:..., type:... } }
+ * Les scripts inline du widget (IIFE) sont exécutés via $.globalEval().
+ *
+ * Appelé : à l'ouverture de l'onglet Affichage (shown.bs.tab) et sur clic du bouton Rafraîchir.
+ */
+function refreshProJotePreview() {
+  let id = $('.eqLogicAttr[data-l1key=id]').val() || getParameterByName('id');
+  let $zone = $('#pjw-preview-zone');
+  if (!id) {
+    $zone.html('<span class="text-muted" style="font-size:12px;">Sélectionnez un équipement pour prévisualiser.</span>');
+    return;
+  }
+  $zone.css({ 'align-items': 'center', 'justify-content': 'center' })
+       .html('<i class="fas fa-spinner fa-spin"></i>');
+
+  $.ajax({
+    type: 'POST',
+    url: 'core/ajax/eqLogic.ajax.php',
+    data: { action: 'toHtml', id: id, version: 'dashboard' },
+    dataType: 'json',
+    success: function (data) {
+      // La réponse de eqLogic.ajax.php?action=toHtml est : { state:'ok', result:{ html:'...', id:..., ... } }
+      let html = data && data.state === 'ok' && data.result && data.result.html ? data.result.html : null;
+      if (html) {
+        $zone.css({ 'align-items': 'flex-start', 'justify-content': 'flex-start' }).empty();
+        let $wrap = $('<div>').html(html);
+        // Extraire les scripts AVANT injection (les retirer du HTML)
+        let scripts = [];
+        $wrap.find('script').each(function () {
+          scripts.push($(this).text());
+          $(this).remove();
+        });
+        // 1. Injecter le HTML dans le DOM (les éléments existent maintenant)
+        $zone.append($wrap.children());
+        // 2. Exécuter les scripts APRÈS injection — render(D,...) trouve bien les éléments
+        scripts.forEach(function (code) {
+          try { $.globalEval(code); } catch (e) { console.warn('ProJote preview script:', e); }
+        });
+      } else {
+        $zone.css({ 'align-items': 'center', 'justify-content': 'center' })
+             .html('<span class="text-warning" style="font-size:12px;">Sauvegardez l\'équipement avant de prévisualiser.</span>');
+      }
+    },
+    error: function () {
+      $zone.css({ 'align-items': 'center', 'justify-content': 'center' })
+           .html('<span class="text-danger" style="font-size:12px;">Erreur lors du chargement de la prévisualisation.</span>');
+    }
+  });
+}
+
+// Nettoyage des handlers ProJote pour éviter les doublons lors des rechargements AJAX Jeedom.
+// ProJote.js est ré-évalué à chaque navigation AJAX vers la page de config ; sans ce .off(),
+// chaque $(document).on() s'accumule et déclenche l'événement N fois.
+$(document).off('.projote');
+
+// Rafraîchissement auto à l'ouverture de l'onglet Affichage
+$(document).on('shown.bs.tab.projote', 'a[href="#eqlogicDisplaytab"]', function () {
+  refreshProJotePreview();
+});
+
+// Bouton Rafraîchir
+$(document).on('click.projote', '#pjw-preview-refresh', function () {
+  refreshProJotePreview();
+});
+
+/*******************************************************************************
+ * ONGLET AFFICHAGE — Photo de profil manuelle
+ ******************************************************************************/
+
+/**
+ * Charge les miniatures de photo dans l'onglet Affichage pour un équipement donné.
+ *
+ * Teste l'existence des deux fichiers via GET HTTP :
+ *   - /plugins/ProJote/data/{id}/profile_picture.jpg      → photo Pronote (démon)
+ *   - /plugins/ProJote/data/{id}/profile_picture_manual.jpg → photo manuelle (upload)
+ *
+ * Affiche ou masque les blocs #pjw-pronote-photo-wrap / #pjw-manual-photo-wrap en conséquence.
+ * Un timestamp est ajouté à l'URL pour contourner le cache navigateur.
+ *
+ * @param {string|number} eqLogicId  ID de l'équipement ProJote.
+ */
+function loadManualPhotoPreview(eqLogicId) {
+  if (!eqLogicId) return;
+  let ts = '?_=' + Date.now();
+
+  // Photo Pronote (téléchargée par le démon)
+  let pronotePath = '/plugins/ProJote/data/' + eqLogicId + '/profile_picture.jpg';
+  $.get(pronotePath + ts)
+    .done(function () {
+      $('#pjw-pronote-photo-img').attr('src', pronotePath + ts);
+      $('#pjw-pronote-photo-wrap').show();
+      $('#pjw-no-pronote-photo').hide();
+    })
+    .fail(function () {
+      $('#pjw-pronote-photo-wrap').hide();
+      $('#pjw-no-pronote-photo').show();
+    });
+
+  // Photo manuelle (uploadée par l'utilisateur)
+  let manualPath = '/plugins/ProJote/data/' + eqLogicId + '/profile_picture_manual.jpg';
+  $.get(manualPath + ts)
+    .done(function () {
+      $('#pjw-manual-photo-img').attr('src', manualPath + ts);
+      $('#pjw-manual-photo-wrap').show();
+      $('#pjw-no-manual-photo').hide();
+    })
+    .fail(function () {
+      $('#pjw-manual-photo-wrap').hide();
+      $('#pjw-no-manual-photo').show();
+    });
+}
+
+// Upload d'une nouvelle photo manuelle
+$(document).on('change.projote', '#pjw-manual-photo-input', function () {
+  let file = this.files[0];
+  if (!file) return;
+  let eqLogicId = $('.eqLogicAttr[data-l1key=id]').val();
+  if (!eqLogicId) {
+    $('#pjw-manual-photo-status').text('Sauvegardez l\'équipement avant d\'uploader une photo.').css('color', 'red');
+    return;
+  }
+
+  let formData = new FormData();
+  formData.append('action', 'UploadManualPhoto');
+  formData.append('eqlogic', eqLogicId);
+  formData.append('photo', file);
+
+  $('#pjw-manual-photo-status').html('<i class="fas fa-spinner fa-spin"></i> Envoi en cours…').css('color', '');
+
+  $.ajax({
+    type: 'POST',
+    url: '/plugins/ProJote/core/ajax/ProJote.ajax.php',
+    data: formData,
+    contentType: false,
+    processData: false,
+    dataType: 'json',
+    success: function (data) {
+      if (data && data.state === 'ok') {
+        let ts = '?_=' + Date.now();
+        let manualPath = '/plugins/ProJote/data/' + eqLogicId + '/profile_picture_manual.jpg';
+        $('#pjw-manual-photo-img').attr('src', manualPath + ts);
+        $('#pjw-manual-photo-wrap').show();
+        $('#pjw-no-manual-photo').hide();
+        $('#pjw-manual-photo-status').text('Photo enregistrée.').css('color', 'green');
+        setTimeout(function () { $('#pjw-manual-photo-status').text(''); }, 3000);
+      } else {
+        $('#pjw-manual-photo-status').text('Erreur : ' + (data ? data.result : 'inconnue')).css('color', 'red');
+      }
+    },
+    error: function () {
+      $('#pjw-manual-photo-status').text('Erreur lors de l\'envoi.').css('color', 'red');
+    }
+  });
+});
+
+// Suppression de la photo manuelle (bouton ✕ en overlay sur la miniature)
+$(document).on('click.projote', '#pjw-manual-photo-delete', function () {
+  let eqLogicId = $('.eqLogicAttr[data-l1key=id]').val();
+  if (!eqLogicId) return;
+  if (!confirm('Supprimer la photo manuelle ?')) return;
+
+  $.ajax({
+    type: 'POST',
+    url: '/plugins/ProJote/core/ajax/ProJote.ajax.php',
+    data: { action: 'DeleteManualPhoto', eqlogic: eqLogicId },
+    dataType: 'json',
+    success: function (data) {
+      if (data && data.state === 'ok') {
+        $('#pjw-manual-photo-wrap').hide();
+        $('#pjw-no-manual-photo').show();
+        $('#pjw-manual-photo-img').attr('src', '');
+        $('#pjw-manual-photo-status').text('Photo supprimée.').css('color', 'green');
+        setTimeout(function () { $('#pjw-manual-photo-status').text(''); }, 3000);
+      }
+    }
+  });
+});
 

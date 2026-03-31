@@ -1,6 +1,6 @@
 # 📚 ProJote - Plugin JEEDOM Pronote
 
-![Version](https://img.shields.io/badge/version-0.8-blue)
+![Version](https://img.shields.io/badge/version-0.9c-blue)
 ![License](https://img.shields.io/badge/license-AGPL-green)
 ![Jeedom](https://img.shields.io/badge/Jeedom-4.3+-orange)
 
@@ -22,6 +22,12 @@
 - Support des comptes élèves
 - Support des comptes parents
 - Gestion des enfants multiples
+
+✅ **Photo de profil flexible**
+
+- Photo récupérée automatiquement depuis Pronote
+- Photo manuelle uploadable depuis l'interface
+- Sélecteur de source : aucune (initiales), Pronote, manuelle, automatique (Pronote prioritaire)
 
 ✅ **Modes de connexion flexibles**
 - Connexion par QR code

@@ -75,10 +75,10 @@ try:
     def _patched_html_parse(html_text: str) -> str:
         if not html_text:
             return ""
-        text = _re.sub(r'<br\s*/?>', ' ', html_text, flags=_re.IGNORECASE)
-        text = _re.sub(r'<[^>]+>', '', text)
+        text = _re.sub(r"<br\s*/?>", " ", html_text, flags=_re.IGNORECASE)
+        text = _re.sub(r"<[^>]+>", "", text)
         text = _unescape(text)
-        text = _re.sub(r'  +', ' ', text).strip()
+        text = _re.sub(r"  +", " ", text).strip()
         return text
 
     pronotepy.dataClasses.Util.html_parse = _patched_html_parse
@@ -86,10 +86,8 @@ try:
     from LoginConnect import writedataPronotepy
 
     # Chiffrement du password
+    import hashlib
     from Crypto.Cipher import AES
-    from random import Random
-
-    # from Crypto import Random
 except ImportError as e:
     logging.error("Error: importing module lig.%s - %s ", e.__traceback__.tb_lineno, e)
     sys.exit(1)
@@ -114,15 +112,16 @@ _failed_attempts_lock = threading.Lock()
 # Un seul thread worker traite les messages un par un (séquentiellement).
 # _queued_eq évite d'enqueuer deux fois le même équipement.
 import queue as _queue_module
-_work_queue     = _queue_module.Queue()
-_queued_eq      = set()    # eqLogicId en attente ou en cours de traitement
+
+_work_queue = _queue_module.Queue()
+_queued_eq = set()  # eqLogicId en attente ou en cours de traitement
 _queued_eq_lock = threading.Lock()
-_worker_thread  = None     # Thread worker unique (démarré au premier message)
+_worker_thread = None  # Thread worker unique (démarré au premier message)
 
 # Watchdog : si le worker bloque plus de N secondes sur un équipement, WARNING
-_WORKER_TIMEOUT   = 120    # secondes
-_worker_eq_id     = None   # équipement actuellement traité
-_worker_eq_start  = None   # horodatage de début du traitement en cours
+_WORKER_TIMEOUT = 120  # secondes
+_worker_eq_id = None  # équipement actuellement traité
+_worker_eq_start = None  # horodatage de début du traitement en cours
 _worker_state_lock = threading.Lock()
 
 # Variable globale pour stocker les info de connexion Jeedom
@@ -184,58 +183,28 @@ def send_jeedom_message(message, message_type="error"):
         return False
 
 
-# Fonction de chiffrage et déchiffrage
-# function de chiffrage non utilisé à supprimer
-# https://gist.github.com/eoli3n/d6d862feb71102588867516f3b34fef1
-def my_encrypt(data, passphrase):
+def my_decrypt(data, passphrase=None):
     """
-    # cSpell:disable
-    Encrypt using AES-256-CBC with random/shared iv
-    'passphrase' must be in hex, generate with 'openssl rand -hex 32'
+    Déchiffre des données AES-256-CBC chiffrées par my_encrypt() côté PHP.
 
+    Si aucune passphrase n'est fournie, la clé est dérivée de l'API key Jeedom
+    via SHA-256 (produit 64 hex chars = 32 octets), assurant la cohérence PHP↔Python.
+    Format attendu : base64(JSON({iv: base64, data: base64}))
     """
+    if passphrase is None:
+        passphrase = hashlib.sha256(_apikey.encode()).hexdigest()
     try:
+        unpad = lambda s: s[: -s[-1]]
         key = binascii.unhexlify(passphrase)
-        pad = lambda s: s + chr(16 - len(s) % 16) * (16 - len(s) % 16)
-        iv = Random.get_random_bytes(16)
+        encrypted = json.loads(base64.b64decode(data).decode("ascii"))
+        encrypted_data = base64.b64decode(encrypted["data"])
+        iv = base64.b64decode(encrypted["iv"])
         cipher = AES.new(key, AES.MODE_CBC, iv)
-        encrypted_64 = base64.b64encode(cipher.encrypt(pad(data).encode())).decode(
-            "ascii"
-        )
-        iv_64 = base64.b64encode(iv).decode("ascii")
-        json_data = {"iv": iv_64, "data": encrypted_64}
-        clean = base64.b64encode(json.dumps(json_data).encode("ascii"))
+        decrypted = cipher.decrypt(encrypted_data)
+        return unpad(decrypted).decode("ascii").rstrip()
     except Exception as e:
-        logging.error("Cannot encrypt datas...")
-        logging.error(e)
+        logging.error("Cannot decrypt datas: %s", e)
         exit(1)
-    return clean
-
-
-def my_decrypt(data, passphrase):
-    """
-    Decrypt using AES-256-CBC with iv
-    'passphrase' must be in hex, generate with 'openssl rand -hex 32'
-    # https://stackoverflow.com/a/54166852/11061370
-    """
-    try:
-        return _extracted_from_my_decrypt_(passphrase, data)
-    except Exception as e:
-        logging.error("Cannot decrypt datas...")
-        logging.error(e)
-        exit(1)
-
-
-# TODO Rename this here and in `my_decrypt`
-def _extracted_from_my_decrypt_(passphrase, data):
-    unpad = lambda s: s[: -s[-1]]
-    key = binascii.unhexlify(passphrase)
-    encrypted = json.loads(base64.b64decode(data).decode("ascii"))
-    encrypted_data = base64.b64decode(encrypted["data"])
-    iv = base64.b64decode(encrypted["iv"])
-    cipher = AES.new(key, AES.MODE_CBC, iv)
-    decrypted = cipher.decrypt(encrypted_data)
-    return unpad(decrypted).decode("ascii").rstrip()
 
 
 def verifdossier(chemin_dossier):
@@ -459,7 +428,7 @@ def write_listenfant_to_file(listenfant, filename):
 
 def Emploidutemps(client):
     try:
-        # Transformation Json des emplois du temps (J,J+1 et next)
+        # Emploi du temps : aujourd'hui + 4 prochains jours scolaires (v0.9b : 1 appel batch sur 14j)
         # Récupération  emploi du temps du jour
         lessons_today = client.lessons(datetime.date.today())
         data = {
@@ -483,62 +452,76 @@ def Emploidutemps(client):
                     data["edt_aujourdhui_cancel"] = data["edt_aujourdhui_cancel"] + 1
             data["edt_aujourdhui_fin"] = lesson.end.strftime("%H%M")
 
-            # Récupération  emploi du lendemain
-        lessons_tomorrow = client.lessons(
-            datetime.date.today() + datetime.timedelta(days=1)
-        )
-        lessons_tomorrow = sorted(lessons_tomorrow, key=lambda lesson: lesson.start)
-
-        data["edt_demain"] = []
-        data["edt_demain_debut"] = ""
-        data["edt_demain_fin"] = ""
-        data["edt_demain_Annul"] = ""
-        if lessons_tomorrow:
-            for lesson in lessons_tomorrow:
-                index = lessons_tomorrow.index(lesson)
-                if (
-                    lesson.start != lessons_tomorrow[index - 1].start
-                    or lesson.canceled != True
-                ):
-                    data["edt_demain"].append(build_cours_data(lesson))
-                if lesson.canceled == False and data["edt_demain_debut"] == "":
-                    data["edt_demain_debut"] = lesson.start.strftime("%H%M")
-            data["edt_demain_fin"] = lesson.end.strftime("%H%M")
-
-        # Récupération  emploi du prochain jour d'école (ça sert le weekend et les vacances)
-        delta = 1
-        lessons_nextday = client.lessons(
-            datetime.date.today() + datetime.timedelta(days=delta)
-        )
-        while not lessons_nextday and delta < 120:
-            lessons_nextday = client.lessons(
-                datetime.date.today() + datetime.timedelta(days=delta)
+        # Récupération des 4 prochains jours scolaires (1 seul appel API sur 28 jours
+        # pour couvrir les vacances scolaires de 2 semaines)
+        try:
+            lessons_range = client.lessons(
+                datetime.date.today() + datetime.timedelta(days=1),
+                datetime.date.today() + datetime.timedelta(days=28),
             )
-            delta += 1
-        lessons_nextday = sorted(lessons_nextday, key=lambda lesson: lesson.start)
-        # JE compléte l'emploi du temps du prochain jours
-        data["edt_prochainjour"] = []
-        data["edt_prochainjour_debut"] = ""
-        data["edt_prochainjour_fin"] = ""
-        data["edt_prochainjour_cancel"] = 0
-        if lessons_nextday:
-            for lesson in lessons_nextday:
-                index = lessons_nextday.index(lesson)
-                if (
-                    lesson.start != lessons_nextday[index - 1].start
-                    or lesson.canceled != True
-                ):
+        except Exception as e:
+            logging.warning(f"Impossible de récupérer les jours suivants : {e}")
+            lessons_range = []
+
+        # Grouper les cours par date
+        days_by_date = {}
+        for lesson in lessons_range or []:
+            d = lesson.start.date() if hasattr(lesson.start, "date") else lesson.start
+            if d not in days_by_date:
+                days_by_date[d] = []
+            days_by_date[d].append(lesson)
+
+        # Prendre les 4 premières dates avec cours
+        next_school_dates = sorted(days_by_date.keys())[:4]
+
+        # Initialiser les 4 slots à vide
+        for i in range(1, 5):
+            key = f"edt_J{i}"
+            data[key] = []
+            data[f"{key}_date"] = ""
+            data[f"{key}_debut"] = ""
+            data[f"{key}_fin"] = ""
+            data[f"{key}_cancel"] = 0
+
+        # Remplir les slots disponibles
+        for i, school_date in enumerate(next_school_dates, 1):
+            key = f"edt_J{i}"
+            lessons = sorted(days_by_date[school_date], key=lambda l: l.start)
+            data[f"{key}_date"] = school_date.strftime("%d/%m/%Y")
+            for lesson in lessons:
+                index = lessons.index(lesson)
+                if lesson.start != lessons[index - 1].start or lesson.canceled != True:
                     lesson_to_append = build_cours_data(lesson)
                     lesson_to_append["index"] = index
-                    data["edt_prochainjour"].append(lesson_to_append)
-
+                    data[key].append(lesson_to_append)
                 if lesson.canceled == True:
-                    data["edt_prochainjour_cancel"] += 1
+                    data[f"{key}_cancel"] += 1
+                if lesson.canceled == False and data[f"{key}_debut"] == "":
+                    data[f"{key}_debut"] = lesson.start.strftime("%H%M")
+            if lessons:
+                data[f"{key}_fin"] = lessons[-1].end.strftime("%H%M")
 
-                if lesson.canceled == False and data["edt_prochainjour_debut"] == "":
-                    data["edt_prochainjour_debut"] = lesson.start.strftime("%H%M")
-            data["edt_prochainjour_fin"] = lesson.end.strftime("%H%M")
-            data["edt_prochainjour_date"] = lesson.start.strftime("%d/%m/%Y")
+        # Rétro-compatibilité : edt_prochainjour = J1
+        data["edt_prochainjour"] = data["edt_J1"]
+        data["edt_prochainjour_date"] = data["edt_J1_date"]
+        data["edt_prochainjour_debut"] = data["edt_J1_debut"]
+        data["edt_prochainjour_fin"] = data["edt_J1_fin"]
+        data["edt_prochainjour_cancel"] = data["edt_J1_cancel"]
+
+        # Tableau compact pour le widget (évite de répliquer les données)
+        data["edt_next_days"] = []
+        for i in range(1, 5):
+            key = f"edt_J{i}"
+            if data[f"{key}_date"]:
+                data["edt_next_days"].append(
+                    {
+                        "cours": data[key],
+                        "date": data[f"{key}_date"],
+                        "debut": data[f"{key}_debut"],
+                        "fin": data[f"{key}_fin"],
+                        "cancel": data[f"{key}_cancel"],
+                    }
+                )
 
         # Récupération emploi du jour courant (date spécifique)
         lessons_specific = client.lessons(datetime.date.today())
@@ -700,21 +683,25 @@ def notes(client):
             try:
                 period_grades = period.grades
                 period_name = getattr(period, "name", "")
-                for grade in (period_grades or []):
+                for grade in period_grades or []:
                     all_grades.append((grade, period_name))
             except Exception as e:
-                logging.warning(f"Impossible de lire les notes de la période {getattr(period, 'name', '?')} : {e}")
+                logging.warning(
+                    f"Impossible de lire les notes de la période {getattr(period, 'name', '?')} : {e}"
+                )
 
             # Moyennes générales par période (élève + classe)
             try:
                 moy_eleve = getattr(period, "overall_average", "") or ""
                 moy_classe = getattr(period, "class_overall_average", "") or ""
                 if moy_eleve or moy_classe:
-                    data["moyennes_periodes"].append({
-                        "periode": getattr(period, "name", ""),
-                        "moyenne_eleve": str(moy_eleve),
-                        "moyenne_classe": str(moy_classe),
-                    })
+                    data["moyennes_periodes"].append(
+                        {
+                            "periode": getattr(period, "name", ""),
+                            "moyenne_eleve": str(moy_eleve).replace(",", "."),
+                            "moyenne_classe": str(moy_classe).replace(",", "."),
+                        }
+                    )
             except Exception:
                 pass
 
@@ -731,10 +718,14 @@ def notes(client):
                 if hasattr(grade, "subject") and grade.subject:
                     cours_name = getattr(grade.subject, "name", "Inconnu")
 
-                note_value   = getattr(grade, "grade", "")
+                note_value = getattr(grade, "grade", "")
                 out_of_value = getattr(grade, "out_of", "")
-                note_sur     = f"{note_value}\u00a0/\u00a0{out_of_value}" if note_value and out_of_value else ""
-                grade_date   = getattr(grade, "date", None) or datetime.date.today()
+                note_sur = (
+                    f"{note_value}\u00a0/\u00a0{out_of_value}"
+                    if note_value and out_of_value
+                    else ""
+                )
+                grade_date = getattr(grade, "date", None) or datetime.date.today()
 
                 data["note"].append(
                     {
@@ -743,13 +734,17 @@ def notes(client):
                         "date": grade_date.strftime("%d/%m/%Y"),
                         "date_courte": grade_date.strftime("%d/%m"),
                         "cours": cours_name,
-                        "note": note_value,
-                        "sur": out_of_value,
+                        "note": str(note_value).replace(",", "."),
+                        "sur": str(out_of_value).replace(",", "."),
                         "note_sur": note_sur,
-                        "coeff": getattr(grade, "coefficient", "1"),
-                        "moyenne_classe": getattr(grade, "average", ""),
-                        "max": getattr(grade, "max", ""),
-                        "min": getattr(grade, "min", ""),
+                        "coeff": str(getattr(grade, "coefficient", "1")).replace(
+                            ",", "."
+                        ),
+                        "moyenne_classe": str(getattr(grade, "average", "")).replace(
+                            ",", "."
+                        ),
+                        "max": str(getattr(grade, "max", "")).replace(",", "."),
+                        "min": str(getattr(grade, "min", "")).replace(",", "."),
                         "commentaire": getattr(grade, "comment", ""),
                         "optionnel": getattr(grade, "is_optionnal", False),
                         "bonus": getattr(grade, "is_bonus", False),
@@ -764,19 +759,20 @@ def notes(client):
         return data
     except Exception as e:
         line_number = e.__traceback__.tb_lineno if e.__traceback__ else "unknown"
-        error_msg = f"Erreur lors de la récupération des notes : ligne {line_number} - {str(e)}"
+        error_msg = (
+            f"Erreur lors de la récupération des notes : ligne {line_number} - {str(e)}"
+        )
         logging.error(error_msg)
         logging.debug(traceback.format_exc())
         return {"note": [], "derniere_note": [], "error": error_msg}
 
 
-
 def process_homework(homework_list, data, key):
     if not homework_list:
         logging.info(f"Aucun devoir trouvé pour {key}.")
-        data[f"nb_{key}"] = 0
-        data[f"nb_{key}_F"] = 0
-        data[f"nb_{key}_NF"] = 0
+        data[f"Nb_{key}"] = 0
+        data[f"Nb_{key}_F"] = 0
+        data[f"Nb_{key}_NF"] = 0
         return 0, 0, 0
 
     Devoir = 0
@@ -800,11 +796,13 @@ def process_homework(homework_list, data, key):
         fichiers = []
         try:
             for f in homework.files:
-                fichiers.append({
-                    "nom": f.name,
-                    "url": f.url,
-                    "type": f.type,  # 0 = lien externe, 1 = fichier Pronote
-                })
+                fichiers.append(
+                    {
+                        "nom": f.name,
+                        "url": f.url,
+                        "type": f.type,  # 0 = lien externe, 1 = fichier Pronote
+                    }
+                )
         except Exception:
             pass
 
@@ -934,14 +932,18 @@ def retards(client):
         all_retards_map = {}
         for period in all_periods:
             try:
-                for d in (period.delays or []):
+                for d in period.delays or []:
                     all_retards_map[d.id] = d
             except Exception as e:
-                logging.warning(f"Impossible de lire les retards de la période {getattr(period, 'name', '?')} : {e}")
+                logging.warning(
+                    f"Impossible de lire les retards de la période {getattr(period, 'name', '?')} : {e}"
+                )
 
         all_retards = list(all_retards_map.values())
         if all_retards:
-            all_retards = sorted(all_retards, key=lambda delay: delay.date, reverse=True)
+            all_retards = sorted(
+                all_retards, key=lambda delay: delay.date, reverse=True
+            )
             for retard in all_retards:
                 data["retard"].append(
                     {
@@ -972,15 +974,22 @@ def absences(client):
             all_periods = client.periods
         except Exception as e:
             logging.error(f"Erreur lors de l'accès aux périodes (absences) : {e}")
-            return {"absence": [], "nb_absences": 0, "derniere_absence": [], "error": str(e)}
+            return {
+                "absence": [],
+                "nb_absences": 0,
+                "derniere_absence": [],
+                "error": str(e),
+            }
 
         all_absences_map = {}
         for period in all_periods:
             try:
-                for a in (period.absences or []):
+                for a in period.absences or []:
                     all_absences_map[a.id] = a
             except Exception as e:
-                logging.warning(f"Impossible de lire les absences de la période {getattr(period, 'name', '?')} : {e}")
+                logging.warning(
+                    f"Impossible de lire les absences de la période {getattr(period, 'name', '?')} : {e}"
+                )
 
         all_absences = list(all_absences_map.values())
         if all_absences:
@@ -1018,33 +1027,53 @@ def punitions(client):
             all_periods = client.periods
         except Exception as e:
             logging.error(f"Erreur lors de l'accès aux périodes (punitions) : {e}")
-            return {"punition": [], "derniere_punition": [], "Nb_Punitions": 0, "error": str(e)}
+            return {
+                "punition": [],
+                "derniere_punition": [],
+                "Nb_Punitions": 0,
+                "error": str(e),
+            }
 
         all_punitions_map = {}
         for period in all_periods:
             try:
-                for p in (period.punishments or []):
+                for p in period.punishments or []:
                     all_punitions_map[p.id] = p
             except Exception as e:
-                logging.warning(f"Impossible de lire les punitions de la période {getattr(period, 'name', '?')} : {e}")
+                logging.warning(
+                    f"Impossible de lire les punitions de la période {getattr(period, 'name', '?')} : {e}"
+                )
 
         import datetime as _dt
+
         def _punition_sort_key(p):
             g = p.given
             if isinstance(g, _dt.datetime):
                 return g.date()
             return g if isinstance(g, _dt.date) else _dt.date.min
 
-        punitions = sorted(all_punitions_map.values(), key=_punition_sort_key, reverse=True) if all_punitions_map else []
+        punitions = (
+            sorted(all_punitions_map.values(), key=_punition_sort_key, reverse=True)
+            if all_punitions_map
+            else []
+        )
         if punitions:
 
             def format_punition(p):
                 # Créneaux planifiés (ex : retenues programmées)
                 schedule = []
-                for s in (p.schedule or []):
+                for s in p.schedule or []:
                     try:
-                        start_str = s.start.strftime("%d/%m %H:%M") if hasattr(s.start, "strftime") else str(s.start)
-                        duree_min = int(s.duration.total_seconds() // 60) if s.duration else None
+                        start_str = (
+                            s.start.strftime("%d/%m %H:%M")
+                            if hasattr(s.start, "strftime")
+                            else str(s.start)
+                        )
+                        duree_min = (
+                            int(s.duration.total_seconds() // 60)
+                            if s.duration
+                            else None
+                        )
                         schedule.append({"start": start_str, "duree": duree_min})
                     except Exception:
                         pass
@@ -1053,8 +1082,16 @@ def punitions(client):
                     "type": p.nature,
                     "raison": ", ".join(p.reasons) if p.reasons else "",
                     "donneur": p.giver,
-                    "date": p.given.strftime("%d/%m/%Y") if hasattr(p.given, "strftime") else str(p.given),
-                    "date_court": p.given.strftime("%d/%m") if hasattr(p.given, "strftime") else str(p.given),
+                    "date": (
+                        p.given.strftime("%d/%m/%Y")
+                        if hasattr(p.given, "strftime")
+                        else str(p.given)
+                    ),
+                    "date_court": (
+                        p.given.strftime("%d/%m")
+                        if hasattr(p.given, "strftime")
+                        else str(p.given)
+                    ),
                     "circonstances": p.circumstances or "",
                     "exclusion": p.exclusion,
                     "pendant_cours": p.during_lesson,
@@ -1069,7 +1106,9 @@ def punitions(client):
                 nbpunition += 1
             data["Nb_Punitions"] = nbpunition
             # Dernière punition (liste déjà triée par date desc)
-            data["derniere_punition"] = [data["punition"][0]] if data["punition"] else []
+            data["derniere_punition"] = (
+                [data["punition"][0]] if data["punition"] else []
+            )
         else:
             time.sleep(5)
         return data
@@ -1108,7 +1147,6 @@ def ical(client):
         return ""
 
 
-
 def download_photo(client, eqLogicId, tokenconnected, message):
     """
     Télécharge la photo de profil de l'élève ou de l'enfant sélectionné.
@@ -1126,7 +1164,9 @@ def download_photo(client, eqLogicId, tokenconnected, message):
         str or None: Chemin relatif de la photo, ou None si échec
     """
     try:
-        is_parent = (tokenconnected == "true") and ("parent.html" in message["TokenUrl"])
+        is_parent = (tokenconnected == "true") and (
+            "parent.html" in message["TokenUrl"]
+        )
 
         data_dir = os.path.join(_data_dir, str(eqLogicId)) + "/"
         verifdossier(data_dir)
@@ -1167,9 +1207,11 @@ def download_photo(client, eqLogicId, tokenconnected, message):
                 try:
                     headers = {
                         "Referer": client.communication.root_site + "/",
-                        "Origin":  client.communication.root_site,
+                        "Origin": client.communication.root_site,
                     }
-                    resp = client.communication.session.get(photo.url, headers=headers, timeout=15)
+                    resp = client.communication.session.get(
+                        photo.url, headers=headers, timeout=15
+                    )
                     if resp.status_code == 200 and len(resp.content) > 100:
                         with open(temp_path, "wb") as f:
                             f.write(resp.content)
@@ -1190,17 +1232,23 @@ def download_photo(client, eqLogicId, tokenconnected, message):
                         photo.url,
                         cookies=client.communication.session.cookies,
                         timeout=15,
-                        headers={"User-Agent": "Mozilla/5.0", "Referer": client.communication.root_site + "/"},
+                        headers={
+                            "User-Agent": "Mozilla/5.0",
+                            "Referer": client.communication.root_site + "/",
+                        },
                     )
                     if resp.status_code == 200 and len(resp.content) > 100:
                         with open(temp_path, "wb") as f:
                             f.write(resp.content)
-                        logging.info("Photo téléchargée — stratégie 3 (cookies session)")
+                        logging.info(
+                            "Photo téléchargée — stratégie 3 (cookies session)"
+                        )
                         downloaded = True
                     else:
                         logging.warning(
                             "ProJote — Photo introuvable équipement %s (HTTP %d)",
-                            eqLogicId, resp.status_code,
+                            eqLogicId,
+                            resp.status_code,
                         )
                 except Exception as e:
                     logging.warning(
@@ -1217,7 +1265,9 @@ def download_photo(client, eqLogicId, tokenconnected, message):
                         if f1.read() == f2.read():
                             logging.info("Photo identique, pas de remplacement")
                             os.remove(temp_path)
-                            return f"/plugins/ProJote/data/{eqLogicId}/profile_picture.jpg"
+                            return (
+                                f"/plugins/ProJote/data/{eqLogicId}/profile_picture.jpg"
+                            )
                 except Exception as e:
                     logging.error("Erreur comparaison photo : %s", e)
                     if os.path.exists(temp_path):
@@ -1253,7 +1303,9 @@ def download_photo(client, eqLogicId, tokenconnected, message):
             logging.info("Photo téléchargée — stratégie 1 (FichiersExternes natif)")
             downloaded = True
         except FileNotFoundError:
-            logging.info("Stratégie 1 échouée (404 FichiersExternes) — essai stratégie 2")
+            logging.info(
+                "Stratégie 1 échouée (404 FichiersExternes) — essai stratégie 2"
+            )
         except Exception as e:
             logging.info("Stratégie 1 échouée (%s) — essai stratégie 2", e)
 
@@ -1262,9 +1314,11 @@ def download_photo(client, eqLogicId, tokenconnected, message):
             try:
                 headers = {
                     "Referer": client.communication.root_site + "/",
-                    "Origin":  client.communication.root_site,
+                    "Origin": client.communication.root_site,
                 }
-                resp = client.communication.session.get(photo.url, headers=headers, timeout=15)
+                resp = client.communication.session.get(
+                    photo.url, headers=headers, timeout=15
+                )
                 if resp.status_code == 200 and len(resp.content) > 100:
                     with open(temp_path, "wb") as f:
                         f.write(resp.content)
@@ -1273,7 +1327,8 @@ def download_photo(client, eqLogicId, tokenconnected, message):
                 else:
                     logging.info(
                         "Stratégie 2 échouée — HTTP %d, taille %d octets — essai stratégie 3",
-                        resp.status_code, len(resp.content),
+                        resp.status_code,
+                        len(resp.content),
                     )
             except Exception as e:
                 logging.info("Stratégie 2 échouée (%s) — essai stratégie 3", e)
@@ -1282,10 +1337,15 @@ def download_photo(client, eqLogicId, tokenconnected, message):
         if not downloaded:
             try:
                 session_cookies = client.communication.session.cookies
-                resp = requests.get(photo.url, cookies=session_cookies, timeout=15, headers={
-                    "User-Agent": "Mozilla/5.0",
-                    "Referer": client.communication.root_site + "/",
-                })
+                resp = requests.get(
+                    photo.url,
+                    cookies=session_cookies,
+                    timeout=15,
+                    headers={
+                        "User-Agent": "Mozilla/5.0",
+                        "Referer": client.communication.root_site + "/",
+                    },
+                )
                 if resp.status_code == 200 and len(resp.content) > 100:
                     with open(temp_path, "wb") as f:
                         f.write(resp.content)
@@ -1295,13 +1355,17 @@ def download_photo(client, eqLogicId, tokenconnected, message):
                     logging.warning(
                         "ProJote — Photo introuvable pour l'équipement %s "
                         "(toutes stratégies échouées — HTTP %d). URL : %s",
-                        eqLogicId, resp.status_code, photo.url,
+                        eqLogicId,
+                        resp.status_code,
+                        photo.url,
                     )
             except Exception as e:
                 logging.warning(
                     "ProJote — Échec téléchargement photo équipement %s (stratégie 3) : %s. "
                     "URL : %s",
-                    eqLogicId, e, photo.url,
+                    eqLogicId,
+                    e,
+                    photo.url,
                 )
 
         if not downloaded:
@@ -1344,11 +1408,11 @@ def identites(clientinfo):
     try:
         data = {"identiteinfo": []}
         # Création du dictionnaire d'informations d'identité avec des valeurs non vides
-        estab = (clientinfo.establishment or '').strip()
+        estab = (clientinfo.establishment or "").strip()
         words = estab.split()
         mid = len(words) // 2
         if mid > 0 and words[:mid] == words[mid:]:
-            estab = ' '.join(words[:mid])
+            estab = " ".join(words[:mid])
 
         IdentityInfo = {
             "Nom_Eleve": clientinfo.name,
@@ -1402,10 +1466,7 @@ def Connectparent(pronote_url, login, password, ent, enfant):
             logging.error("Pas d'URL reçue sur le daemon")
             return None, []
         if password != "":
-            password = my_decrypt(
-                password,
-                "084781141BD01304180B9B58120E4E058C1434394DDED646BF4ECC95380B9442",
-            )
+            password = my_decrypt(password)
         else:
             logging.error("Pas de password reçu sur le daemon")
             return None, []
@@ -1455,9 +1516,7 @@ def Connect(pronote_url, login, password, ent):
         logging.error("Pas d'URL reçue sur le daemon")
         return None
     if password != "":
-        password = my_decrypt(
-            password, "084781141BD01304180B9B58120E4E058C1434394DDED646BF4ECC95380B9442"
-        )
+        password = my_decrypt(password)
     else:
         logging.error("Pas de password reçu sur le daemon")
         return None
@@ -1595,7 +1654,9 @@ def load_persistent_token(eqLogicId):
                 # (pronotepy renouvelle les credentials internes à chaque token_login)
                 try:
                     writedataPronotepy(
-                        client, _data_dir, eqLogicId,
+                        client,
+                        _data_dir,
+                        eqLogicId,
                         backup_token=data.get("BackupToken"),
                     )
                     logging.debug(
@@ -1605,7 +1666,8 @@ def load_persistent_token(eqLogicId):
                 except Exception as e_save:
                     logging.warning(
                         "Sauvegarde des credentials renouvelés échouée pour %s : %s",
-                        eqLogicId, e_save,
+                        eqLogicId,
+                        e_save,
                     )
                 return client, "true", enfant
             else:
@@ -1637,7 +1699,10 @@ def load_persistent_token(eqLogicId):
                                 try:
                                     client.set_child(enfant)
                                 except Exception as e2:
-                                    logging.warning("Impossible de sélectionner l'enfant (backup) : %s", e2)
+                                    logging.warning(
+                                        "Impossible de sélectionner l'enfant (backup) : %s",
+                                        e2,
+                                    )
                         else:
                             client = pronotepy.Client.token_login(
                                 pronote_url=backup_token["pronote_url"],
@@ -1657,25 +1722,37 @@ def load_persistent_token(eqLogicId):
                             try:
                                 backup_uuid = backup_token.get("uuid", "ProJote")
                                 # Utiliser un UUID distinct pour la nouvelle session backup
-                                renew_uuid = backup_uuid + "2" if backup_uuid.endswith("-bk") else backup_uuid + "-bk"
+                                renew_uuid = (
+                                    backup_uuid + "2"
+                                    if backup_uuid.endswith("-bk")
+                                    else backup_uuid + "-bk"
+                                )
                                 if "parent.html" in backup_token["pronote_url"]:
-                                    new_backup_client = pronotepy.ParentClient.token_login(
-                                        pronote_url=backup_token["pronote_url"],
-                                        username=backup_token["username"],
-                                        password=backup_token["password"],
-                                        client_identifier=backup_token["client_identifier"],
-                                        uuid=renew_uuid,
+                                    new_backup_client = (
+                                        pronotepy.ParentClient.token_login(
+                                            pronote_url=backup_token["pronote_url"],
+                                            username=backup_token["username"],
+                                            password=backup_token["password"],
+                                            client_identifier=backup_token[
+                                                "client_identifier"
+                                            ],
+                                            uuid=renew_uuid,
+                                        )
                                     )
                                 else:
                                     new_backup_client = pronotepy.Client.token_login(
                                         pronote_url=backup_token["pronote_url"],
                                         username=backup_token["username"],
                                         password=backup_token["password"],
-                                        client_identifier=backup_token["client_identifier"],
+                                        client_identifier=backup_token[
+                                            "client_identifier"
+                                        ],
                                         uuid=renew_uuid,
                                     )
                                 if new_backup_client and new_backup_client.logged_in:
-                                    new_backup_credentials = new_backup_client.export_credentials()
+                                    new_backup_credentials = (
+                                        new_backup_client.export_credentials()
+                                    )
                                     logging.info("Token backup renouvelé avec succès")
                                 else:
                                     logging.warning(
@@ -1687,20 +1764,31 @@ def load_persistent_token(eqLogicId):
                                 logging.warning(
                                     "ProJote — Renouvellement du token backup échoué pour l'équipement %s : %s. "
                                     "Reconnexion via QR recommandée.",
-                                    eqLogicId, e_bk,
+                                    eqLogicId,
+                                    e_bk,
                                 )
                             # Sauvegarder le nouveau token principal + backup (si disponible)
                             try:
-                                writedataPronotepy(client, _data_dir, eqLogicId, backup_token=new_backup_credentials)
+                                writedataPronotepy(
+                                    client,
+                                    _data_dir,
+                                    eqLogicId,
+                                    backup_token=new_backup_credentials,
+                                )
                                 logging.warning(
                                     "ProJote — Tokens renouvelés pour l'équipement %s. Token backup : %s.",
                                     eqLogicId,
-                                    "régénéré avec succès" if new_backup_credentials else "non régénéré — reconnexion QR recommandée",
+                                    (
+                                        "régénéré avec succès"
+                                        if new_backup_credentials
+                                        else "non régénéré — reconnexion QR recommandée"
+                                    ),
                                 )
                             except Exception as e_save:
                                 logging.warning(
                                     "ProJote — Sauvegarde des tokens renouvelés échouée pour l'équipement %s : %s",
-                                    eqLogicId, e_save,
+                                    eqLogicId,
+                                    e_save,
                                 )
                             return client, "true", enfant
                 except Exception as e2:
@@ -1765,7 +1853,9 @@ def process_message(message):
                 # send_jeedom_message() est désactivé car la route n'existe pas en Jeedom 4.3+
 
                 with _failed_attempts_lock:
-                    nb_attempts = failed_attempts.get(str(eqLogicId), {"count": 0})["count"]
+                    nb_attempts = failed_attempts.get(str(eqLogicId), {"count": 0})[
+                        "count"
+                    ]
                 jeedom_com.send_change_immediate(
                     {
                         "error": f"Token expiré. Trop de tentatives échouées ({nb_attempts} tentatives). "
@@ -1827,7 +1917,9 @@ def process_message(message):
                 check_and_update_failed_attempts(eqLogicId, increment=True)
                 return
         else:
-            logging.error("Aucun token disponible. Configurez la connexion via QR code.")
+            logging.error(
+                "Aucun token disponible. Configurez la connexion via QR code."
+            )
             jeedom_com.send_change_immediate(
                 {
                     "error": "Aucun token disponible, connexion impossible. Configurez via QR code.",
@@ -1852,9 +1944,7 @@ def process_message(message):
                 "Validation Token %s",
                 tokenconnected,
             )
-            if (tokenconnected == "true") and (
-                "parent.html" in message["TokenUrl"]
-            ):
+            if (tokenconnected == "true") and ("parent.html" in message["TokenUrl"]):
                 logging.debug("Le nom de l'élève %s", client._selected_child.name)
                 jsondata["Eleve"] = identites(client._selected_child)
                 # Ajouter la liste des enfants pour les comptes parents
@@ -1964,17 +2054,20 @@ def _worker_loop():
             continue
         eq_id = str(message.get("CmdId", ""))
         with _worker_state_lock:
-            _worker_eq_id    = eq_id
+            _worker_eq_id = eq_id
             _worker_eq_start = time.time()
-        logging.info("=== Début traitement équipement %s (file restante : %d) ===",
-                     eq_id, _work_queue.qsize())
+        logging.info(
+            "=== Début traitement équipement %s (file restante : %d) ===",
+            eq_id,
+            _work_queue.qsize(),
+        )
         try:
             process_message(message)
         except Exception as e:
             logging.error("Erreur non capturée pour l'équipement %s : %s", eq_id, e)
         finally:
             with _worker_state_lock:
-                _worker_eq_id    = None
+                _worker_eq_id = None
                 _worker_eq_start = None
             _work_queue.task_done()
             logging.info("=== Fin traitement équipement %s ===", eq_id)
@@ -1999,7 +2092,9 @@ def _watchdog_loop():
                     "ProJote — Watchdog : équipement %s en cours depuis %.0fs "
                     "(timeout %ds). Le worker est peut-être bloqué (Pronote injoignable ?). "
                     "Libération forcée du slot.",
-                    eq_id, elapsed, _WORKER_TIMEOUT,
+                    eq_id,
+                    elapsed,
+                    _WORKER_TIMEOUT,
                 )
                 with _queued_eq_lock:
                     _queued_eq.discard(eq_id)
@@ -2054,7 +2149,8 @@ def read_socket():
         _work_queue.put(message)
         logging.info(
             "Équipement %s ajouté à la file (taille file : %d).",
-            eq_id, _work_queue.qsize()
+            eq_id,
+            _work_queue.qsize(),
         )
 
     except Exception as e:
@@ -2115,11 +2211,13 @@ _cycle = int(_cycle)
 
 jeedom_utils.set_log_level(_log_level)
 
+
 # Filtre les messages DEBUG verbeux de PronotePy (champs optionnels absents)
 class _PronotepyNoiseFilter(logging.Filter):
     def filter(self, record):
         msg = record.getMessage()
         return "setting to default" not in msg and "Could not get value for" not in msg
+
 
 for _log_handler in logging.root.handlers:
     _log_handler.addFilter(_PronotepyNoiseFilter())

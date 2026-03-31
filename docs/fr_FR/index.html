@@ -408,16 +408,142 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
     <ul>
         <li><strong>En-tête</strong> — photo de profil · nom de l'élève · classe et établissement · date de dernière sync</li>
         <li><strong>Vie scolaire</strong> — badges circulaires pour absences, retards, punitions, devoirs non faits</li>
-        <li><strong>Emploi du temps</strong> — cours d'aujourd'hui et du prochain jour, nombre de cours annulés depuis la rentrée</li>
-        <li><strong>Moyenne générale</strong> — barre dégradée rouge→vert avec tendance</li>
-        <li><strong>Bas de widget</strong> — prochains devoirs + dernières notes</li>
-        <li><strong>Spinner de chargement</strong> — le logo ProJote tourne dans la zone avatar pendant la collecte des données ; un clic sur l'avatar déclenche un rafraîchissement manuel</li>
+        <li><strong>Emploi du temps</strong> — cours d'aujourd'hui + navigation vers les 4 prochains jours scolaires, nombre de cours annulés depuis la rentrée</li>
+        <li><strong>Moyenne générale</strong> — barre dégradée rouge→vert avec tendance (hausse/baisse)</li>
+        <li><strong>Onglets</strong> — Devoirs · Notes · Absences · Retards · Punitions</li>
+        <li><strong>Spinner de chargement</strong> — le logo ProJote tourne dans la zone avatar pendant la collecte ; un clic déclenche un rafraîchissement manuel</li>
     </ul>
+
+    <h2 id="widget-personnalisation">Personnalisation du widget</h2>
+    <p>Les paramètres suivants sont accessibles dans la configuration de l'équipement, onglet <strong>Affichage</strong> → section <em>Paramètres avancés</em> :</p>
+    <table>
+        <thead><tr><th>Paramètre</th><th>Valeurs</th><th>Défaut</th><th>Description</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><strong>Couleur d'accentuation</strong></td>
+                <td>Sélecteur de couleur</td>
+                <td><code>#94C904</code> (vert ProJote)</td>
+                <td>Couleur des badges, de la barre de moyenne, des cours EDT et des éléments actifs.</td>
+            </tr>
+            <tr>
+                <td><strong>Taille de police</strong></td>
+                <td>10 · 11 · 12 · 13 · 14 · 15 · 16 px</td>
+                <td><code>12px</code></td>
+                <td>Taille de base du texte dans l'ensemble du widget. Les autres tailles (titres, badges…) sont relatives à cette valeur.</td>
+            </tr>
+            <tr>
+                <td><strong>Onglet par défaut</strong></td>
+                <td>Devoirs · Notes · Absences · Retards · Punitions</td>
+                <td>Devoirs</td>
+                <td>Onglet ouvert à l'affichage initial du widget.</td>
+            </tr>
+            <tr>
+                <td><strong>Navigation EDT jours suivants</strong></td>
+                <td>Jour suivant (J+1) · Flèches (J+1 à J+4)</td>
+                <td>Jour suivant (J+1)</td>
+                <td>
+                    <em>Jour suivant</em> : affiche uniquement le prochain jour scolaire (comportement classique).<br>
+                    <em>Flèches</em> : affiche des boutons ‹ › permettant de naviguer entre J+1 et J+4. La flèche gauche est grisée sur J+1, la flèche droite sur J+4.
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2 id="widget-moyenne">Calcul de la moyenne générale</h2>
+
+    <h3>Source de la moyenne</h3>
+    <p>Le widget utilise en priorité la <strong>moyenne officielle Pronote</strong> transmise par le démon. Pronote publie cette valeur dans <code>period.overall_average</code> uniquement lorsque le bilan de la période est clôturé (fin de semestre ou de trimestre).</p>
+    <p>Si aucune moyenne officielle n'est disponible (période en cours, établissement ne la publiant pas), le widget bascule sur un <strong>calcul local</strong> à partir de toutes les notes reçues :</p>
+    <pre><code>moyenne = Σ( (note ÷ sur) × 20 × coeff ) ÷ Σ(coeff)</code></pre>
+
+    <div class="callout callout-warning">
+        Le calcul local peut différer de la moyenne Pronote. Pronote utilise une méthode par <em>moyenne de moyennes de matières</em> (moyenne par matière pondérée par le coefficient matière) alors que le calcul local est une moyenne pondérée directe sur toutes les notes individuelles. L'écart est généralement faible mais peut atteindre quelques dixièmes.
+    </div>
+
+    <h3>Cas particuliers</h3>
+    <table>
+        <thead><tr><th>Cas</th><th>Comportement</th></tr></thead>
+        <tbody>
+            <tr><td><code>sur</code> absent ou nul</td><td>Valeur par défaut <code>20</code> — la note est traitée comme si elle était sur 20</td></tr>
+            <tr><td><code>coeff</code> absent</td><td>Valeur par défaut <code>1</code></td></tr>
+            <tr><td><code>coeff</code> décimal (ex. <code>1.5</code>)</td><td>Pris en compte tel quel</td></tr>
+            <tr><td><code>coeff = 0</code> (note optionnelle / bonus)</td><td>Note exclue de la moyenne (contribue 0 au numérateur et 0 au dénominateur)</td></tr>
+            <tr><td><code>note</code> non numérique (ex. <em>Absent</em>, <em>Dispensé</em>)</td><td>Note exclue du calcul</td></tr>
+        </tbody>
+    </table>
+    <div class="callout callout-info">
+        <strong>Tendance</strong> — L'indicateur ↗/↘ est calculé en comparant la moyenne des 3 dernières notes saisies avec la moyenne des 3 premières notes de l'année (tri chronologique). Il n'apparaît que si au moins 4 notes sont disponibles.
+    </div>
 
     <!-- ── Historique ─────────────────────── -->
     <h1 id="version">Historique des versions</h1>
 
-    <h2>0.9 — Mars 2026</h2>
+    <h2>0.9b — Mars 2026</h2>
+    <table>
+        <thead><tr><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><span class="badge badge-new">Nouveau</span></td>
+                <td>
+                    <strong>Photo de profil manuelle</strong> — il est désormais possible d'uploader une photo depuis l'onglet <em>Affichage</em> de l'équipement. La photo est stockée en local dans <code>data/{id}/profile_picture_manual.jpg</code>. Un bouton ✕ permet de la supprimer.
+                </td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-new">Nouveau</span></td>
+                <td>
+                    <strong>Sélecteur de source photo</strong> — nouveau paramètre <em>Photo à utiliser</em> :
+                    <ul>
+                        <li><strong>Aucune (initiales)</strong> — affiche les initiales de l'élève (défaut).</li>
+                        <li><strong>Photo Pronote</strong> — utilise la photo récupérée depuis Pronote.</li>
+                        <li><strong>Photo manuelle</strong> — utilise la photo uploadée manuellement.</li>
+                        <li><strong>Automatique</strong> — Pronote en priorité, photo manuelle en fallback.</li>
+                    </ul>
+                    La résolution est recalculée à chaque rendu du widget — aucun refresh du démon nécessaire.
+                </td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-new">Nouveau</span></td>
+                <td>
+                    <strong>Prévisualisation du widget en temps réel</strong> — l'onglet <em>Affichage</em> affiche désormais une prévisualisation du widget sur deux colonnes : paramètres à gauche, rendu live à droite (bouton <em>Rafraîchir</em>).
+                </td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-new">Nouveau</span></td>
+                <td><strong>Taille de police configurable</strong> — nouveau paramètre dans l'onglet Affichage (Paramètres avancés). Valeurs disponibles : 10 à 16 px, défaut 12 px. Toutes les tailles du widget s'adaptent proportionnellement.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-new">Nouveau</span></td>
+                <td>
+                    <strong>Onglet par défaut configurable</strong> — nouveau paramètre <em>Onglet par défaut</em> dans l'onglet Affichage (Paramètres avancés). Valeurs : Devoirs (défaut), Notes, Absences, Retards, Punitions.
+                </td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-new">Nouveau</span></td>
+                <td>
+                    <strong>Emploi du temps — navigation sur 4 jours</strong> — le démon collecte les 4 prochains jours scolaires (1 seul appel API). Nouveau paramètre <em>Navigation EDT</em> :
+                    <ul>
+                        <li><strong>Jour suivant (J+1)</strong> — affiche uniquement le prochain jour (comportement précédent).</li>
+                        <li><strong>Flèches (J+1 à J+4)</strong> — affiche le prochain jour avec des flèches ‹ › pour naviguer jusqu'à J+4.</li>
+                    </ul>
+                    Les commandes <code>edt_J1</code> à <code>edt_J4</code> sont disponibles pour les scénarios Jeedom. <code>edt_prochainjour</code> reste inchangé (rétro-compatibilité). La fenêtre de collecte est étendue à 28 jours pour couvrir les vacances scolaires.
+                </td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-perf">Amélioration</span></td>
+                <td><strong>Largeur par défaut du widget</strong> — portée de 300 px à 360 px pour afficher correctement le layout deux colonnes sans redimensionnement manuel.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-perf">Amélioration</span></td>
+                <td><strong>Sécurité — chiffrement AES lié à la clé API Jeedom</strong> — la clé AES-256-CBC utilisée pour chiffrer le mot de passe en transit (PHP → Python) était codée en dur. Elle est désormais dérivée de la clé API Jeedom via SHA-256 (<code>hash('sha256', jeedom::getApiKey('ProJote'))</code> côté PHP, <code>hashlib.sha256(_apikey.encode()).hexdigest()</code> côté Python).</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correction</span></td>
+                <td><strong>Commandes « Nb devoir fait / non fait »</strong> — les compteurs ne se remettaient pas à zéro quand il n'y avait aucun devoir (bug de casse <code>nb_</code> vs <code>Nb_</code> dans le démon Python).</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>0.9a — Mars 2026</h2>
     <table>
         <thead><tr><th>Type</th><th>Description</th></tr></thead>
         <tbody>
