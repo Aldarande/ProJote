@@ -52,7 +52,7 @@ try {
 
   // 3. INITIALISATION DE LA RÉPONSE AJAX
   // Prépare Jeedom à renvoyer une réponse au format JSON pour le JavaScript.
-  ajax::init(['Validate', 'ValidateQRCode', 'ChangeEnfant', 'GetConfig', 'GetWidgetData']);
+  ajax::init(['Validate', 'ValidateQRCode', 'ChangeEnfant', 'GetConfig', 'GetWidgetData', 'UploadManualPhoto', 'DeleteManualPhoto']);
 
   // 4. RÉCUPÉRATION DE L'ACTION DEMANDÉE
   // Le JavaScript envoie un paramètre "action" qui nous dit quoi faire.
@@ -118,6 +118,10 @@ try {
     $eqLogicForUuid = eqLogic::byId($eqLogicId);
     $uuid = (is_object($eqLogicForUuid)) ? $eqLogicForUuid->getConfiguration('uuid', uniqid('projote-', true)) : uniqid('projote-', true);
 
+    // Chiffrement du mot de passe pour le transport sécurisé vers Python
+    $proJote = new ProJote();
+    $encryptedPassword = $proJote->my_encrypt($password);
+
     // Étape 2 : Construire la commande shell à exécuter.
     // C'est ici que l'on assemble la commande qui sera lancée, comme si on la tapait dans un terminal.
     // Ex: /usr/bin/python3 /chemin/vers/script.py --URL "http://pronote.ecole.fr" ...
@@ -130,7 +134,7 @@ try {
     // des injections de commandes malveillantes.
     $command .= ' --URL ' . escapeshellarg($url);
     $command .= ' --Login ' . escapeshellarg($login);
-    $command .= ' --Password ' . escapeshellarg($password);
+    $command .= ' --Password ' . escapeshellarg($encryptedPassword);
     if ($ent != null) {
       $command .= ' --Ent ' . escapeshellarg($ent);
     }
@@ -139,6 +143,7 @@ try {
     }
     $command .= ' --Eqid ' . escapeshellarg($eqLogicId);
     $command .= ' --Uuid ' . escapeshellarg($uuid);
+    $command .= ' --apikey ' . escapeshellarg(jeedom::getApiKey('ProJote'));
     $command .= ' --Loglevel ' . (log::convertLogLevel(log::getLogLevel("ProJote")));
     $command .= ' --datadir ' . escapeshellarg(dirname(dirname(dirname(__FILE__))) . '/data');
     $command .= ' >> ' . log::getPathToLog('ProJote') . ' 2>&1 ';
@@ -239,6 +244,7 @@ try {
     $command .= ' --Pin ' . escapeshellarg($pin);
     $command .= ' --Eqid ' . escapeshellarg($eqLogicId);
     $command .= ' --Uuid ' . escapeshellarg($uuid);
+    $command .= ' --apikey ' . escapeshellarg(jeedom::getApiKey('ProJote'));
     $command .= ' --Loglevel ' . escapeshellarg(log::convertLogLevel(log::getLogLevel("ProJote")));
     $command .= ' --datadir ' . escapeshellarg(dirname(dirname(dirname(__FILE__))) . '/data');
     $command .= ' >> ' . log::getPathToLog('ProJote') . ' 2>&1 ';
@@ -311,13 +317,13 @@ try {
     // Permet de pré-remplir les champs avec les valeurs déjà sauvegardées pour
     // cet équipement (nom de l'élève, classe, établissement, liste des enfants, etc.).
     // ──────────────────────────────────────────────────────────────────────────
-  // ──────────────────────────────────────────────────────────────────────────
-  // ACTION : GetWidgetData — Retourne les données du widget pour le rafraîchissement JS
-  //
-  // Appelée par le JavaScript du widget (dans ProJote.html) quand la commande
-  // LastLogin se met à jour. Retourne le JSON 'widget_json' stocké en configuration,
-  // ce qui permet au widget de se mettre à jour sans recharger la page.
-  // ──────────────────────────────────────────────────────────────────────────
+    // ──────────────────────────────────────────────────────────────────────────
+    // ACTION : GetWidgetData — Retourne les données du widget pour le rafraîchissement JS
+    //
+    // Appelée par le JavaScript du widget (dans ProJote.html) quand la commande
+    // LastLogin se met à jour. Retourne le JSON 'widget_json' stocké en configuration,
+    // ce qui permet au widget de se mettre à jour sans recharger la page.
+    // ──────────────────────────────────────────────────────────────────────────
   } elseif ($action == "GetWidgetData") {
 
     $eqLogicId = init('eqlogic');
@@ -332,7 +338,6 @@ try {
     $widgetJson = $eqLogic->getConfiguration('widget_json', '{}');
     $widgetData = json_decode($widgetJson, true);
     ajax::success(is_array($widgetData) ? $widgetData : []);
-
   } elseif ($action == "GetConfig") {
 
     $eqLogicId = init('eqlogic');
@@ -355,6 +360,75 @@ try {
 
     // On renvoie ce tableau au format JSON au frontend.
     ajax::success($configData);
+    // ──────────────────────────────────────────────────────────────────────────
+    // ACTION : UploadManualPhoto — Enregistre une photo de profil manuelle
+    //
+    // Utilisée quand Pronote ne fournit pas de photo. L'image est stockée dans
+    // data/{eqLogicId}/profile_picture_manual.jpg et sert de fallback dans le widget.
+    // ──────────────────────────────────────────────────────────────────────────
+  } elseif ($action == 'UploadManualPhoto') {
+
+    $eqLogicId = intval(init('eqlogic'));
+    $eqLogic = eqLogic::byId($eqLogicId);
+    if (!is_object($eqLogic)) {
+      ajax::error('Équipement non trouvé.');
+      return;
+    }
+
+    if (!isset($_FILES['photo']) || $_FILES['photo']['error'] !== UPLOAD_ERR_OK) {
+      ajax::error('Fichier non reçu ou erreur d\'upload (code ' . ($_FILES['photo']['error'] ?? -1) . ').');
+      return;
+    }
+
+    $file = $_FILES['photo'];
+
+    // Limite à 5 Mo
+    if ($file['size'] > 5 * 1024 * 1024) {
+      ajax::error('Fichier trop volumineux (max 5 Mo).');
+      return;
+    }
+
+    // Validation MIME via contenu (pas l'extension déclarée par le client)
+    $finfo = new finfo(FILEINFO_MIME_TYPE);
+    $mimeType = $finfo->file($file['tmp_name']);
+    $allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!in_array($mimeType, $allowedMimes, true)) {
+      ajax::error('Format non supporté. Utilisez JPEG, PNG, WebP ou GIF.');
+      return;
+    }
+
+    $dataDir = realpath(dirname(__FILE__) . '/../../data') . DIRECTORY_SEPARATOR . $eqLogicId;
+    if (!is_dir($dataDir)) {
+      mkdir($dataDir, 0755, true);
+    }
+    $destPath = $dataDir . DIRECTORY_SEPARATOR . 'profile_picture_manual.jpg';
+
+    if (!move_uploaded_file($file['tmp_name'], $destPath)) {
+      ajax::error('Impossible d\'enregistrer le fichier.');
+      return;
+    }
+
+    log::add('ProJote', 'info', 'Photo manuelle enregistrée pour eqLogic ' . $eqLogicId);
+    ajax::success('/plugins/ProJote/data/' . $eqLogicId . '/profile_picture_manual.jpg');
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // ACTION : DeleteManualPhoto — Supprime la photo de profil manuelle
+    // ──────────────────────────────────────────────────────────────────────────
+  } elseif ($action == 'DeleteManualPhoto') {
+
+    $eqLogicId = intval(init('eqlogic'));
+    $eqLogic = eqLogic::byId($eqLogicId);
+    if (!is_object($eqLogic)) {
+      ajax::error('Équipement non trouvé.');
+      return;
+    }
+
+    $filePath = realpath(dirname(__FILE__) . '/../../data') . DIRECTORY_SEPARATOR . $eqLogicId . DIRECTORY_SEPARATOR . 'profile_picture_manual.jpg';
+    if (file_exists($filePath)) {
+      unlink($filePath);
+      log::add('ProJote', 'info', 'Photo manuelle supprimée pour eqLogic ' . $eqLogicId);
+    }
+    ajax::success(true);
   } else {
     // Si le paramètre 'action' ne correspond à aucune des conditions ci-dessus,
     // c'est une erreur : le JavaScript a demandé une action inconnue.

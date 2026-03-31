@@ -228,9 +228,12 @@
 
         <div class="sidebar-section">Python</div>
         <a href="#daemon">7. ProJoted.py</a>
+        <a href="#daemon" class="sub">7.7 EDT 4 jours</a>
 
         <div class="sidebar-section">Frontend</div>
         <a href="#widget">8. Widget &amp; templates</a>
+        <a href="#widget" class="sub">8.3 Navigation EDT</a>
+        <a href="#widget" class="sub">8.4 Onglet par défaut</a>
         <a href="#frontend">9. desktop/</a>
 
         <div class="sidebar-section">Communication</div>
@@ -324,7 +327,7 @@
 <pre><code>{
     "id": "ProJote",            // Identifiant unique — doit correspondre au nom du dossier
     "name": "Plugin Pronote",   // Nom affiché dans le market
-    "pluginVersion": "0.9",     // Version du plugin (semver recommandé)
+    "pluginVersion": "0.9d",    // Version du plugin (semver recommandé)
     "description": {
         "fr_FR": "Plugin destinée à récupérer les informations de Pronote",
         "en_US": "Plugin to retrieve information from Pronote school management platform"
@@ -404,17 +407,43 @@ class ProJoteCmd extends cmd {
     <h2>4.3 $_widgetPossibility — Paramètres de widget</h2>
 
 <pre><code>public static $_widgetPossibility = array(
-    'custom' => true,
+    'custom'         => true,
     'custom::layout' => false,
-    'parameters' => array(
-        'accent_color' => array(
-            'label' => 'Couleur d\'accent',
-            'type' => 'color',
+    'parameters'     => array(
+        'accent_color' => array(          // Couleur d'accentuation (sélecteur)
+            'label'   => 'Couleur d\'accentuation',
+            'type'    => 'color',
+            'default' => '#94C904',
+        ),
+        'font_size' => array(             // Taille de police de base (select)
+            'label'   => 'Taille de police',
+            'type'    => 'select',
+            'default' => '12px',
+            'values'  => array('10px'=>'10', '12px'=>'12 (défaut)', '14px'=>'14', '16px'=>'16'),
+        ),
+        'default_tab' => array(           // Onglet ouvert à l'affichage initial
+            'label'   => 'Onglet par défaut',
+            'type'    => 'select',
+            'default' => 'dv',
+            'values'  => array('dv'=>'Devoirs', 'notes'=>'Notes', 'abs'=>'Absences',
+                               'ret'=>'Retards', 'pun'=>'Punitions'),
+        ),
+        'edt_nav_mode' => array(          // Mode navigation EDT jours suivants
+            'label'   => 'Navigation EDT jours suivants',
+            'type'    => 'select',
+            'default' => 'next_day',
+            'values'  => array('next_day'=>'Jour suivant (J+1)', 'arrows'=>'Flèches (J+1 à J+4)'),
         ),
     ),
 );</code></pre>
 
-    <p>Expose des paramètres configurables depuis l'onglet "Affichage avancé" de l'équipement dans Jeedom.</p>
+    <p>
+        Expose des paramètres configurables depuis l'onglet <strong>Affichage</strong> de l'équipement
+        (section <em>Paramètres avancés</em>). Ces valeurs sont accessibles dans <code>toHtml()</code>
+        via <code>$replace['#param_name#']</code> et injectées en tant que placeholders dans le
+        template HTML (ex. <code>#accent_color#</code>, <code>#font_size#</code>, <code>#default_tab#</code>,
+        <code>#edt_nav_mode#</code>).
+    </p>
 
     <h2>4.4 deamon_info() — État du daemon</h2>
 
@@ -519,9 +548,9 @@ class ProJoteCmd extends cmd {
         $this->setConfiguration('CmdId', jeedom::createUniqueId());
     }
 
-    // Largeur par défaut sur le dashboard
-    if ($this->getDisplay('width') === '0px' || empty($this->getDisplay('width'))) {
-        $this->setDisplay('width', '300px');
+    // Largeur par défaut sur le dashboard (360px depuis v0.9b)
+    if (empty($this->getDisplay('width'))) {
+        $this->setDisplay('width', '360px');
     }
 
     // IMPORTANT : protéger les tokens de ne pas être écrasés lors d'une sauvegarde
@@ -817,7 +846,7 @@ client.set_child(child_name)</code></pre>
             <tr><th>Fonction Python</th><th>Données collectées</th><th>Commandes Jeedom</th></tr>
         </thead>
         <tbody>
-            <tr><td><code>Emploidutemps()</code></td><td>EDT aujourd'hui, demain, prochain jour, période complète</td><td>edt_aujourd_hui, edt_demain, etc.</td></tr>
+            <tr><td><code>Emploidutemps()</code></td><td>EDT aujourd'hui + 4 prochains jours scolaires (batch sur 14 j), compteur cours annulés depuis la rentrée</td><td>edt_aujourdhui, edt_J1…edt_J4, edt_prochainjour (= J1, rétro-compat)</td></tr>
             <tr><td><code>Notes()</code></td><td>Notes de toutes les périodes + moyennes</td><td>nb_notes, moy_generale, etc.</td></tr>
             <tr><td><code>Devoirs()</code></td><td>Devoirs du jour et du lendemain + fichiers joints</td><td>nb_devoirs, devoirs_aujourdhui</td></tr>
             <tr><td><code>Absences()</code></td><td>Liste des absences</td><td>nb_absences</td></tr>
@@ -830,7 +859,106 @@ client.set_child(child_name)</code></pre>
         </tbody>
     </table>
 
-    <h2>7.7 Circuit breaker — Protection anti-boucle</h2>
+    <h2>7.7 Notes() — Structure et calcul de la moyenne</h2>
+
+    <p>La fonction <code>Notes()</code> itère sur <strong>toutes les périodes</strong> de <code>client.periods</code> et collecte :</p>
+    <ul>
+        <li>Chaque note individuelle (<code>grade.grade</code>, <code>grade.out_of</code>, <code>grade.coefficient</code>, <code>grade.average</code>, <code>grade.is_optionnal</code>, <code>grade.is_bonus</code>)</li>
+        <li>La moyenne officielle de la période (<code>period.overall_average</code>) et la moyenne de classe (<code>period.class_overall_average</code>)</li>
+    </ul>
+
+    <p>La structure renvoyée au widget via <code>widget_json.moyennes_periodes</code> est :</p>
+<pre><code>moyennes_periodes = [
+    {
+        "periode":        "Semestre 1",
+        "moyenne_eleve":  "16.5",   # str, virgule → point ; "" si non publiée
+        "moyenne_classe": "14.2",
+    },
+    ...
+]</code></pre>
+
+    <p>Seules les périodes ayant au moins une valeur non vide (<code>overall_average</code> ou <code>class_overall_average</code>) sont incluses — Pronote ne publie la moyenne officielle qu'après clôture du bilan de période.</p>
+
+    <h3>Affichage côté widget (JS)</h3>
+    <p>Le widget JS utilise en priorité <code>moyennes_periodes[dernière entrée].moyenne_eleve</code>. Si cette valeur est vide (période en cours, bilan non clôturé), il bascule sur un calcul local pondéré :</p>
+<pre><code>// Calcul local (fallback)
+tot = 0; coefs = 0;
+notes.forEach(n => {
+    r = parseFloat(n.note) / parseFloat(n.sur || '20');  // ratio /1
+    c = parseFloat(n.coeff ?? '1');
+    if (!isNaN(r) && !isNaN(c)) { tot += r * 20 * c; coefs += c; }
+});
+moyenne = coefs > 0 ? (tot / coefs).toFixed(1) : '–';</code></pre>
+
+    <p>Cas particuliers gérés :</p>
+    <table>
+        <thead><tr><th>Cas</th><th>Comportement</th></tr></thead>
+        <tbody>
+            <tr><td><code>note</code> = <em>"Abs"</em>, <em>"Disp"</em>…</td><td><code>parseFloat()</code> retourne <code>NaN</code> → note exclue du calcul</td></tr>
+            <tr><td><code>coeff = 0</code></td><td>Contribue 0 au numérateur et 0 au dénominateur → sans effet sur la moyenne</td></tr>
+            <tr><td><code>coeff</code> décimal (<em>1.5</em>, <em>0.5</em>…)</td><td>Géré nativement par <code>parseFloat()</code></td></tr>
+            <tr><td><code>sur</code> absent</td><td>Défaut <code>20</code></td></tr>
+        </tbody>
+    </table>
+
+    <div class="callout callout-warning">
+        Le calcul local donne un résultat différent de la moyenne officielle Pronote. Pronote calcule une <em>moyenne de moyennes par matière</em> (chaque matière a sa propre moyenne pondérée, puis les moyennes matières sont pondérées par le coefficient matière). Le calcul local est une moyenne pondérée directe sur toutes les notes individuelles — l'écart peut atteindre quelques dixièmes.
+    </div>
+
+    <h2>7.8 Emploidutemps() — Collecte des 4 prochains jours (v0.9b)</h2>
+
+    <p>
+        Avant la v0.9b, le daemon effectuait N appels API séquentiels pour trouver le prochain jour
+        scolaire (boucle <code>delta++</code>). Désormais <strong>un seul appel sur 14 jours</strong>
+        est effectué, les cours sont groupés par date et les 4 premières dates non vides sont conservées.
+    </p>
+
+<pre><code># 1 appel API sur 14 jours au lieu de N appels
+lessons_range = client.lessons(today + timedelta(days=1), today + timedelta(days=14))
+
+# Grouper par date (lesson.start est un datetime)
+days_by_date = {}
+for lesson in lessons_range:
+    d = lesson.start.date()
+    days_by_date.setdefault(d, []).append(lesson)
+
+# Prendre les 4 premières dates avec cours
+next_school_dates = sorted(days_by_date.keys())[:4]
+
+# Stocker dans data["edt_J1"] … data["edt_J4"]
+# + data["edt_J1_date"], data["edt_J1_debut"], data["edt_J1_fin"], data["edt_J1_cancel"]
+
+# Rétro-compatibilité obligatoire :
+data["edt_prochainjour"]        = data["edt_J1"]       # = J1
+data["edt_prochainjour_date"]   = data["edt_J1_date"]
+
+# Tableau compact pour le widget (évite la duplication dans widget_json)
+data["edt_next_days"] = [
+    {"cours": data["edt_J1"], "date": "...", "debut": "...", "fin": "...", "cancel": 0},
+    # … J2, J3, J4 si disponibles
+]</code></pre>
+
+    <p>Structure des commandes Jeedom générées :</p>
+    <table>
+        <thead><tr><th>LogicalId</th><th>Description</th><th>Type</th></tr></thead>
+        <tbody>
+            <tr><td><code>edt_J{n}</code></td><td>Liste des cours du jour J+n (JSON)</td><td>info/string</td></tr>
+            <tr><td><code>edt_J{n}_date</code></td><td>Date du jour J+n (jj/mm/aaaa)</td><td>info/string</td></tr>
+            <tr><td><code>edt_J{n}_debut</code></td><td>Heure de début (HHMM)</td><td>info/string</td></tr>
+            <tr><td><code>edt_J{n}_fin</code></td><td>Heure de fin (HHMM)</td><td>info/string</td></tr>
+            <tr><td><code>edt_J{n}_cancel</code></td><td>Nombre de cours annulés</td><td>info/numeric</td></tr>
+        </tbody>
+    </table>
+    <p>n ∈ {1, 2, 3, 4} — soit 20 nouvelles commandes. <code>edt_prochainjour</code> reste = J1.</p>
+
+    <div class="callout callout-info">
+        <strong>widget_json</strong>
+        Le callback <code>jeeProJote.php</code> stocke <code>edt_next_days</code> (tableau compact)
+        dans <code>widget_json</code>. Le widget JS lit <code>d.edt_next_days[edtDayIdx]</code>
+        pour afficher le jour courant dans la colonne droite.
+    </div>
+
+    <h2>7.8 Circuit breaker — Protection anti-boucle</h2>
 
 <pre><code>failed_attempts = {}  # Compteur d'échecs par eqLogicId
 
@@ -906,20 +1034,32 @@ logging.warning(
     <!-- ── 8. Widget ───────────────────────── -->
     <h1 id="widget">8. Widget et templates HTML</h1>
 
-    <h2>8.1 Template widget (cmd.info.string.projote.html)</h2>
+    <h2>8.1 Template widget (ProJote.html)</h2>
 
     <p>
-        Le fichier <code>core/template/dashboard/cmd.info.string.projote.html</code>
+        Le fichier <code>core/template/dashboard/ProJote.html</code>
         définit le rendu visuel complet du tableau de bord. Toutes les règles CSS sont préfixées
         par <code>.pjw-#id#</code> pour éviter tout conflit avec d'autres widgets Jeedom.
         Le JavaScript est encapsulé dans une IIFE (<code>(function(){})();</code>).
     </p>
 
+    <p>Variables JS injectées par <code>toHtml()</code> :</p>
+    <table>
+        <thead><tr><th>Variable JS</th><th>Placeholder PHP</th><th>Défaut</th><th>Rôle</th></tr></thead>
+        <tbody>
+            <tr><td><code>D</code></td><td><code>#initData#</code></td><td><code>{}</code></td><td>Données widget (JSON complet de widget_json)</td></tr>
+            <tr><td><code>VIS</code></td><td><code>#visibilityMap#</code></td><td>tout visible</td><td>Carte de visibilité des sections selon les commandes masquées</td></tr>
+            <tr><td><code>DEFAULT_TAB</code></td><td><code>#default_tab#</code></td><td><code>'dv'</code></td><td>Identifiant de l'onglet actif au chargement</td></tr>
+            <tr><td><code>EDT_NAV_MODE</code></td><td><code>#edt_nav_mode#</code></td><td><code>'next_day'</code></td><td><code>'next_day'</code> = J+1 fixe, <code>'arrows'</code> = navigation J+1→J+4</td></tr>
+            <tr><td><code>LAST_LOGIN_CMD_ID</code></td><td><code>#lastLoginCmdId#</code></td><td><code>0</code></td><td>ID de la commande LastLogin pour déclencher le refresh</td></tr>
+        </tbody>
+    </table>
+
     <p>Flux de données :</p>
     <ol>
-        <li>Au chargement, <code>jeedom.cmd.refreshValue()</code> injecte la valeur en cache — <code>render()</code> est appelé immédiatement si la valeur est non vide.</li>
-        <li>Quand le daemon pousse une nouvelle valeur, <code>jeedom.cmd.addUpdateFunction()</code> déclenche <code>render()</code>.</li>
-        <li>L'objet JSON reçu est parsé et distribué aux renderers (<code>renderHeader</code>, <code>renderStats</code>, <code>renderEDT</code>, <code>renderNotesBar</code>, <code>renderDevoirs</code>, <code>renderDernieresNotes</code>).</li>
+        <li>Au chargement, <code>D</code> (<code>#initData#</code>) est injecté directement — <code>render()</code> est appelé immédiatement si non vide.</li>
+        <li>Quand le daemon met à jour la commande <code>LastLogin</code>, <code>jeedom.cmd.addUpdateFunction()</code> déclenche un appel AJAX <code>GetWidgetData</code> qui rappelle <code>render()</code>.</li>
+        <li>L'objet JSON est distribué aux renderers : <code>renderHeader</code>, <code>renderEDT</code>, <code>renderNotesBar</code>, <code>renderDevoirs</code>, <code>renderDernieresNotes</code>, <code>renderAbsences</code>, <code>renderRetards</code>, <code>renderPunitions</code>.</li>
     </ol>
 
 <pre><code>&lt;script&gt;
@@ -1005,8 +1145,140 @@ function render(d, ts) {
         — plusieurs widgets ProJote sur le même dashboard ne se perturbent pas.
     </div>
 
+    <h2>8.3 Navigation EDT — flèches J+1 à J+4</h2>
+
+    <p>
+        Quand le paramètre <code>edt_nav_mode</code> vaut <code>'arrows'</code>, la colonne droite
+        de l'EDT affiche des boutons ‹ › permettant de naviguer entre J+1 et J+4.
+        Les données viennent de <code>d.edt_next_days</code> (tableau de 1 à 4 objets).
+    </p>
+
+<pre><code>// Variables module-level (IIFE)
+var edtDayIdx     = 0;          // index courant dans edt_next_days (0 = J+1)
+var edtCurrentData = null;      // données en cours (mises à jour à chaque render)
+
+function renderEdtDay(d) {
+    var days = (d && d.edt_next_days) || [];
+    var day  = days[edtDayIdx] || null;
+    var showNav = EDT_NAV_MODE === 'arrows';
+
+    // Afficher/masquer les flèches
+    prev.style.display = showNav ? '' : 'none';
+    next.style.display = showNav ? '' : 'none';
+
+    // Rendre le jour sélectionné
+    lbl.textContent = day ? day.date : 'Prochain jour';
+    ec.innerHTML    = day ? edtCoursesHtml(mergeAndSort(day.cours, retenues)) : '...';
+
+    // Griser les flèches aux extrémités
+    if (showNav) {
+        prev.disabled = (edtDayIdx === 0);
+        next.disabled = (edtDayIdx >= days.length - 1);
+    }
+}
+
+function initEDT() {
+    prev.addEventListener('click', function() {
+        if (edtDayIdx > 0) { edtDayIdx--; renderEdtDay(edtCurrentData); }
+    });
+    next.addEventListener('click', function() {
+        var max = (edtCurrentData.edt_next_days || []).length - 1;
+        if (edtDayIdx < max) { edtDayIdx++; renderEdtDay(edtCurrentData); }
+    });
+}</code></pre>
+
+    <div class="callout callout-info">
+        <strong>Boutons HTML</strong>
+        Les boutons <code>&#8249;</code> / <code>&#8250;</code> sont dans le DOM avec
+        <code>id="pjwnav-prev#id#"</code> et <code>id="pjwnav-next#id#"</code>.
+        En mode <code>next_day</code>, ils sont cachés (<code>display:none</code>) mais restent
+        dans le DOM — aucun changement de structure HTML entre les deux modes.
+    </div>
+
+    <h2>8.4 Onglet par défaut</h2>
+
+    <p>
+        Le HTML hardcode <code>class="tab-btn active"</code> et <code>class="tab-pane active"</code>
+        sur l'onglet Devoirs (<code>dv</code>). Si <code>DEFAULT_TAB !== 'dv'</code>,
+        <code>initTabs()</code> retire les classes <code>active</code> de tous les éléments
+        et les réapplique sur l'onglet configuré.
+    </p>
+
+<pre><code>function initTabs() {
+    if (DEFAULT_TAB && DEFAULT_TAB !== 'dv') {
+        // Retirer l'état actif du défaut HTML
+        tabsEl.querySelectorAll('.tab-btn, .tab-pane').forEach(function(el) {
+            el.classList.remove('active');
+        });
+        // Activer l'onglet configuré
+        var btn  = tabsEl.querySelector('[data-tab="' + DEFAULT_TAB + ID + '"]');
+        var pane = el(DEFAULT_TAB + ID);
+        if (btn)  btn.classList.add('active');
+        if (pane) pane.classList.add('active');
+    }
+    // Gestion des clics...
+}</code></pre>
+
     <!-- ── 9. desktop/ ────────────────────── -->
     <h1 id="frontend">9. desktop/ — Interface utilisateur</h1>
+
+    <h2>9.0 Onglet Affichage — paramètres widget &amp; photo</h2>
+
+    <p>
+        L'onglet <strong>Affichage</strong> de l'équipement présente une mise en page deux colonnes :
+        à gauche les paramètres du widget, à droite une prévisualisation live.
+    </p>
+
+    <h3>Paramètres widget</h3>
+    <p>
+        Les valeurs sont stockées sous <code>display.parameters_xxx</code> (clé plate, préfixe <code>parameters_</code>) :
+    </p>
+
+    <table>
+        <thead><tr><th>Champ HTML</th><th>Clé display</th><th>Usage dans toHtml()</th></tr></thead>
+        <tbody>
+            <tr><td><code>data-l2key="parameters_accent_color"</code></td><td><code>display.parameters_accent_color</code></td><td><code>$this->getDisplay('parameters_accent_color')</code></td></tr>
+            <tr><td><code>data-l2key="parameters_font_size"</code></td><td><code>display.parameters_font_size</code></td><td><code>$this->getDisplay('parameters_font_size')</code></td></tr>
+            <tr><td><code>data-l2key="parameters_default_tab"</code></td><td><code>display.parameters_default_tab</code></td><td><code>$this->getDisplay('parameters_default_tab')</code></td></tr>
+            <tr><td><code>data-l2key="parameters_edt_nav_mode"</code></td><td><code>display.parameters_edt_nav_mode</code></td><td><code>$this->getDisplay('parameters_edt_nav_mode')</code></td></tr>
+        </tbody>
+    </table>
+
+    <div class="callout callout-warn">
+        <strong>Piège Jeedom :</strong> <code>preToHtml()</code> expose les paramètres via <code>$replace['#key#']</code>
+        uniquement si ils sont stockés sous <code>display.parameters.key</code> (sous-tableau).
+        Nos champs utilisent <code>display.parameters_key</code> (clé plate) — il faut donc lire via
+        <code>$this->getDisplay('parameters_key')</code>, pas via <code>$replace['#parameters_key#']</code>.
+    </div>
+
+    <h3>Photo de profil</h3>
+    <p>Trois emplacements possibles :</p>
+    <ul>
+        <li><code>data/{id}/profile_picture.jpg</code> — photo téléchargée depuis Pronote (par le démon)</li>
+        <li><code>data/{id}/profile_picture_manual.jpg</code> — photo uploadée manuellement par l'utilisateur</li>
+        <li>Initiales générées en CSS (aucun fichier)</li>
+    </ul>
+    <p>
+        Le champ <code>configuration.photo_source</code> détermine laquelle utiliser (<code>none</code>, <code>pronote</code>,
+        <code>manual</code>, <code>auto</code>). La résolution est effectuée dans <strong>deux endroits</strong> :
+    </p>
+    <ul>
+        <li><code>jeeProJote.php</code> — lors du refresh Pronote, met à jour la commande <code>Picture</code>
+            et stocke <code>pronote_photo</code> + <code>photo</code> dans <code>widget_json</code>.</li>
+        <li><code>toHtml()</code> — recalcule en temps réel à chaque rendu (indépendant du démon).
+            Permet à un changement de <code>photo_source</code> ou un upload manuel d'être visible
+            immédiatement sans refresh Pronote.</li>
+    </ul>
+
+    <h3>Upload / suppression (AJAX)</h3>
+    <p>Deux actions dans <code>ProJote.ajax.php</code> :</p>
+    <table>
+        <thead><tr><th>Action</th><th>Description</th></tr></thead>
+        <tbody>
+            <tr><td><code>UploadManualPhoto</code></td><td>Valide le MIME (JPEG/PNG/WebP), max 5 Mo, déplace vers <code>data/{id}/profile_picture_manual.jpg</code></td></tr>
+            <tr><td><code>DeleteManualPhoto</code></td><td>Supprime <code>data/{id}/profile_picture_manual.jpg</code> (succès même si absent)</td></tr>
+        </tbody>
+    </table>
 
     <h2>9.1 desktop/php/ProJote.php — Vue liste</h2>
 

@@ -50,8 +50,12 @@ class ProJote extends eqLogic
   public static $_encryptConfigKey = array('Token_password');
 
   /**
-   * Options exposées dans l'éditeur de widget Jeedom (onglet Affichage avancé).
-   * Permet à l'utilisateur de personnaliser la couleur d'accentuation et la taille du widget.
+   * Options exposées dans l'onglet Affichage → Paramètres avancés de l'équipement.
+   * Injectées dans ProJote.html via str_replace() dans toHtml() :
+   *   #accent_color# — couleur CSS d'accentuation (défaut #94C904)
+   *   #font_size#    — taille de police de base (défaut 12px)
+   *   #default_tab#  — onglet ouvert au chargement : dv|notes|abs|ret|pun (défaut dv)
+   *   #edt_nav_mode# — navigation EDT : next_day (J+1 fixe) | arrows (flèches J+1→J+4)
    */
   public static $_widgetPossibility = [
     'custom'         => true,
@@ -62,6 +66,27 @@ class ProJote extends eqLogic
         'type'              => 'color',
         'label'             => 'Couleur d\'accentuation',
         'default'           => '#94C904',
+      ],
+      'font_size' => [
+        'allow_displayType' => ['dashboard', 'mobile'],
+        'type'              => 'select',
+        'label'             => 'Taille de police',
+        'default'           => '12px',
+        'values'            => ['10px' => '10', '11px' => '11', '12px' => '12 (défaut)', '13px' => '13', '14px' => '14', '15px' => '15', '16px' => '16'],
+      ],
+      'default_tab' => [
+        'allow_displayType' => ['dashboard', 'mobile'],
+        'type'              => 'select',
+        'label'             => 'Onglet par défaut',
+        'default'           => 'dv',
+        'values'            => ['dv' => 'Devoirs', 'notes' => 'Notes', 'abs' => 'Absences', 'ret' => 'Retards', 'pun' => 'Punitions'],
+      ],
+      'edt_nav_mode' => [
+        'allow_displayType' => ['dashboard', 'mobile'],
+        'type'              => 'select',
+        'label'             => 'Navigation EDT jours suivants',
+        'default'           => 'next_day',
+        'values'            => ['next_day' => 'Jour suivant (J+1)', 'arrows' => 'Flèches (J+1 à J+4)'],
       ],
     ],
   ];
@@ -290,6 +315,28 @@ class ProJote extends eqLogic
   // clés de la vie d'un équipement.
 
   /**
+   * Surcharge eqLogic::save() pour ignorer silencieusement les équipements orphelins.
+   *
+   * Contexte : lors de la sauvegarde via l'interface Jeedom, le JS peut soumettre
+   * un objet ProJote sans nom (équipement fantôme issu d'un état intermédiaire du DOM).
+   * Le core Jeedom lève une exception "Le nom de l'équipement ne peut pas être vide"
+   * AVANT que preSave() ne s'exécute. On intercepte ici pour éviter cette erreur.
+   *
+   * Note : la signature $_direct = false est obligatoire pour respecter la compatibilité
+   * avec eqLogic::save($_direct = false) sous PHP 8.x (E_COMPILE_ERROR sinon).
+   *
+   * @param bool $_direct true = pas de cycle preSave/postSave (usage interne Jeedom).
+   */
+  public function save($_direct = false)
+  {
+    if (empty(trim((string)$this->getName()))) {
+      log::add('ProJote', 'warning', 'ProJote::save() : équipement sans nom ignoré (id=' . $this->getId() . ', order=' . $this->getOrder() . ')');
+      return;
+    }
+    parent::save($_direct);
+  }
+
+  /**
    * Exécutée avant la sauvegarde d'un équipement (création ou mise à jour).
    */
   public function preSave()
@@ -298,9 +345,12 @@ class ProJote extends eqLogic
     // Cet UUID est utilisé pour identifier l'appareil de manière unique auprès de Pronote.
     if (empty($this->getConfiguration('uuid'))) {
       // Format UUID standard (RFC 4122 v4) — sans préfixe identifiant le plugin
-      $uuid = sprintf('%s-%s-%s-%s-%s',
-        bin2hex(random_bytes(4)), bin2hex(random_bytes(2)),
-        bin2hex(random_bytes(2)), bin2hex(random_bytes(2)),
+      $uuid = sprintf(
+        '%s-%s-%s-%s-%s',
+        bin2hex(random_bytes(4)),
+        bin2hex(random_bytes(2)),
+        bin2hex(random_bytes(2)),
+        bin2hex(random_bytes(2)),
         bin2hex(random_bytes(6))
       );
       $this->setConfiguration('uuid', $uuid);
@@ -309,7 +359,7 @@ class ProJote extends eqLogic
 
     // 2. Définir la largeur par défaut du tile sur le dashboard (~1/3 de page).
     if (empty($this->getDisplay('width'))) {
-      $this->setDisplay('width', '300px');
+      $this->setDisplay('width', '360px');
     }
 
     // 3. Protéger les tokens de session contre l'écrasement.
@@ -366,6 +416,17 @@ class ProJote extends eqLogic
       log::add('ProJote', 'info', 'postSave : commande Widget migrée et supprimée (remplacée par toHtml).');
     }
 
+    // 3. Supprimer les commandes orphelines sans nom ou sans logicalId.
+    // Cela peut arriver suite à un bug JS (let vs var dans addCmdToTable) qui créait
+    // des lignes vides en base. Sans ce nettoyage, la sauvegarde échoue avec
+    // "Le nom de la commande ne peut pas être vide".
+    foreach ($this->getCmd() as $cmd) {
+      if (empty(trim((string)$cmd->getName())) || empty(trim((string)$cmd->getLogicalId()))) {
+        log::add('ProJote', 'warning', 'postSave : suppression commande orpheline (order=' . $cmd->getOrder() . ', id=' . $cmd->getId() . ')');
+        $cmd->remove();
+      }
+    }
+
     // 3. La visibilité des commandes info est gérée par l'utilisateur via la case "Afficher"
     // dans l'onglet Commandes. Elle détermine quelles sections apparaissent dans le widget.
     // On ne la modifie pas ici : les valeurs par défaut viennent de getListeDefaultCommandes().
@@ -383,24 +444,28 @@ class ProJote extends eqLogic
     log::add('ProJote', 'debug', 'Début de la suppression des données pour l\'EqID : ' . $eqLogicId);
     $dataDir = self::getDataPath() . DIRECTORY_SEPARATOR . $eqLogicId;
 
-    // Fonction pour supprimer un dossier et tout son contenu.
-    function deleteDirectory($dir) {
-      if (!file_exists($dir)) return true;
-      if (!is_dir($dir)) return unlink($dir);
-      foreach (scandir($dir) as $item) {
-        if ($item == '.' || $item == '..') continue;
-        if (!deleteDirectory($dir . DIRECTORY_SEPARATOR . $item)) return false;
-      }
-      return rmdir($dir);
-    }
-
-    if (deleteDirectory($dataDir)) {
+    if (self::deleteDirectory($dataDir)) {
       log::add('ProJote', 'info', 'Le dossier de données ' . $dataDir . ' a été supprimé avec succès.');
     } else {
       log::add('ProJote', 'error', 'Erreur lors de la suppression du dossier de données ' . $dataDir);
     }
   }
 
+  /**
+   * Supprime un dossier et tout son contenu de manière récursive
+   * @param string $dir
+   * @return bool
+   */
+  private static function deleteDirectory($dir)
+  {
+    if (!file_exists($dir)) return true;
+    if (!is_dir($dir)) return unlink($dir);
+    foreach (scandir($dir) as $item) {
+      if ($item == '.' || $item == '..') continue;
+      if (!self::deleteDirectory($dir . DIRECTORY_SEPARATOR . $item)) return false;
+    }
+    return rmdir($dir);
+  }
   /**
    * Retourne la liste de toutes les commandes à créer pour un équipement.
    *
@@ -436,11 +501,32 @@ class ProJote extends eqLogic
       "edt_aujourdhui_fin"    => array("Heure de fin Aujourd'hui",                         'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
       "edt_aujourdhui_cancel" => array("Nombre de cours annulé Aujourd'hui",               'info',   'numeric', "cours", 0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
       "edt_prochainjour_date" => array("Date du Prochain Jour",                            'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
-      "edt_prochainjour_debut"=> array("Heure de début du Prochain Jour",                  'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
+      "edt_prochainjour_debut" => array("Heure de début du Prochain Jour",                  'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
       "edt_prochainjour_fin"  => array("Heure de fin du Prochain Jour",                    'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
-      "edt_prochainjour_cancel"=>array("Nombre de cours annulé du Prochain Jour",          'info',   'numeric', "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
+      "edt_prochainjour_cancel" => array("Nombre de cours annulé du Prochain Jour",          'info',   'numeric', "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
       "edt_Cours_canceled"    => array("Nombre de cours annulé",                           'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
       "edt_prochainjour"      => array("Emploi du temps du Prochain Jour",                 'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::edt',         'core::badge'),
+      // J+1 à J+4 (4 prochains jours scolaires)
+      "edt_J1"                => array("Emploi du temps J+1",                              'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::edt',         'core::badge'),
+      "edt_J1_date"           => array("Date J+1",                                         'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
+      "edt_J1_debut"          => array("Heure de début J+1",                              'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
+      "edt_J1_fin"            => array("Heure de fin J+1",                                 'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
+      "edt_J1_cancel"         => array("Cours annulés J+1",                               'info',   'numeric', "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
+      "edt_J2"                => array("Emploi du temps J+2",                              'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::edt',         'core::badge'),
+      "edt_J2_date"           => array("Date J+2",                                         'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
+      "edt_J2_debut"          => array("Heure de début J+2",                              'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
+      "edt_J2_fin"            => array("Heure de fin J+2",                                 'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
+      "edt_J2_cancel"         => array("Cours annulés J+2",                               'info',   'numeric', "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
+      "edt_J3"                => array("Emploi du temps J+3",                              'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::edt',         'core::badge'),
+      "edt_J3_date"           => array("Date J+3",                                         'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
+      "edt_J3_debut"          => array("Heure de début J+3",                              'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
+      "edt_J3_fin"            => array("Heure de fin J+3",                                 'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
+      "edt_J3_cancel"         => array("Cours annulés J+3",                               'info',   'numeric', "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
+      "edt_J4"                => array("Emploi du temps J+4",                              'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::edt',         'core::badge'),
+      "edt_J4_date"           => array("Date J+4",                                         'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
+      "edt_J4_debut"          => array("Heure de début J+4",                              'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
+      "edt_J4_fin"            => array("Heure de fin J+4",                                 'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
+      "edt_J4_cancel"         => array("Cours annulés J+4",                               'info',   'numeric', "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
       "edt_aujourdhui"        => array("Emploi du temps Aujourd'hui",                      'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::edt',         'core::badge'),
       "devoir"                => array("Liste des devoirs",                                 'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::devoir',      'core::badge'),
       "devoir_Demain"         => array("Liste des devoirs pour demain",                    'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::devoir',      'core::badge'),
@@ -452,22 +538,36 @@ class ProJote extends eqLogic
       "derniere_punition"     => array("Dernière punition",                                'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::punition',    'core::badge'),
       "note"                  => array("Liste des notes",                                  'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::note',        'core::badge'),
       "derniere_note"         => array("Dernière note",                                    'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::note',        'core::badge'),
-      "notifications"         => array("liste des notifications",                          'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::notification','core::badge'),
-      "derniere_notification" => array("Dernière notification",                            'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::notification','core::badge'),
+      "notifications"         => array("liste des notifications",                          'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::notification', 'core::badge'),
+      "derniere_notification" => array("Dernière notification",                            'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::notification', 'core::badge'),
       "competences"           => array("Liste des compétences",                            'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::competence',  'core::badge'),
     );
+  }
+
+  /**
+   * Retourne la clé de chiffrement dérivée de la clé API Jeedom.
+   * hash('sha256', apikey) produit 64 hex chars = 32 octets, format attendu par AES-256-CBC.
+   * Cohérence PHP↔Python : Python fait hashlib.sha256(_apikey.encode()).hexdigest().
+   * @return string Clé en hexadécimal (64 chars)
+   */
+  private static function _getEncryptionKey()
+  {
+    return hash('sha256', jeedom::getApiKey(__CLASS__));
   }
 
   /**
    * Chiffre une chaîne avec AES-256-CBC.
    * Un IV aléatoire est généré à chaque appel pour que le même texte
    * donne des résultats différents à chaque chiffrement.
-   * @param string $data       Texte clair à chiffrer
-   * @param string $passphrase Clé en hexadécimal (64 hex = 32 octets)
-   * @return string            JSON {iv, data} encodé en base64
+   * @param string      $data       Texte clair à chiffrer
+   * @param string|null $passphrase Clé hex 64 chars. Si null, utilise la clé API Jeedom.
+   * @return string                 JSON {iv, data} encodé en base64
    */
-  function my_encrypt($data, $passphrase)
+  function my_encrypt($data, $passphrase = null)
   {
+    if ($passphrase === null) {
+      $passphrase = self::_getEncryptionKey();
+    }
     $secret_key    = hex2bin($passphrase);
     $iv            = openssl_random_pseudo_bytes(openssl_cipher_iv_length('aes-256-cbc'));
     $encrypted_64  = openssl_encrypt($data, 'aes-256-cbc', $secret_key, 0, $iv);
@@ -480,17 +580,38 @@ class ProJote extends eqLogic
 
   /**
    * Déchiffre une chaîne produite par my_encrypt().
-   * @param string $data       Données chiffrées (base64 du JSON {iv, data})
-   * @param string $passphrase Clé identique à celle utilisée lors du chiffrement
-   * @return string            Texte clair original
+   * @param string      $data       Données chiffrées (base64 du JSON {iv, data})
+   * @param string|null $passphrase Clé hex 64 chars. Si null, utilise la clé API Jeedom.
+   * @return string                 Texte clair original
    */
-  function my_decrypt($data, $passphrase)
+  function my_decrypt($data, $passphrase = null)
   {
+    if ($passphrase === null) {
+      $passphrase = self::_getEncryptionKey();
+    }
     $secret_key     = hex2bin($passphrase);
     $json           = json_decode(base64_decode($data));
     $iv             = base64_decode($json->{'iv'});
     $data_encrypted = base64_decode($json->{'data'});
     return openssl_decrypt($data_encrypted, 'aes-256-cbc', $secret_key, OPENSSL_RAW_DATA, $iv);
+  }
+
+  /**
+   * Retourne les données Pronote décodées pour un équipement donné.
+   * Lit la configuration 'widget_json' (mise à jour par le démon) et la décode.
+   * @param int $eqLogicId ID de l'équipement Jeedom
+   * @return array|null Tableau de données, ou null si l'équipement est introuvable
+   */
+  public static function getPronoteData($eqLogicId)
+  {
+    $eqLogic = self::byId($eqLogicId);
+    if (!is_object($eqLogic)) {
+      log::add('ProJote', 'warning', 'getPronoteData() : équipement introuvable pour id=' . $eqLogicId);
+      return null;
+    }
+    $json = $eqLogic->getConfiguration('widget_json', '{}');
+    $data = json_decode($json, true);
+    return is_array($data) ? $data : null;
   }
 
   /**
@@ -541,8 +662,8 @@ class ProJote extends eqLogic
 
     // 2. Forcer la largeur par défaut si non définie par l'utilisateur.
     if ($replace['#width#'] === 'auto' || empty($this->getDisplay('width'))) {
-      $replace['#width#'] = '300px';
-      $this->setDisplay('width', '300px');
+      $replace['#width#'] = '360px';
+      $this->setDisplay('width', '360px');
       $this->save();
     }
 
@@ -552,6 +673,33 @@ class ProJote extends eqLogic
     if (!is_array($widgetData)) {
       $widgetData = [];
     }
+
+    // 3b. Recalcul de la photo en temps réel selon photo_source
+    //     (indépendant du démon — toujours à jour après upload/changement de source).
+    $dataDir         = realpath(dirname(__FILE__) . '/../../data');
+    $manualPhotoFile = $dataDir . DIRECTORY_SEPARATOR . $this->getId() . DIRECTORY_SEPARATOR . 'profile_picture_manual.jpg';
+    $manualPhotoUrl  = '/plugins/ProJote/data/' . $this->getId() . '/profile_picture_manual.jpg';
+    $pronotePhotoUrl = !empty($widgetData['photo']) ? $widgetData['photo'] : null;
+    // Si la photo stockée vient de Pronote (et non d'un précédent calcul manuel), on la garde.
+    // On utilise le champ 'pronote_photo' s'il existe, sinon on tombe sur la valeur brute.
+    if (!empty($widgetData['pronote_photo'])) {
+      $pronotePhotoUrl = $widgetData['pronote_photo'];
+    }
+    $manualExists = file_exists($manualPhotoFile);
+    switch ($this->getConfiguration('photo_source', 'none')) {
+      case 'pronote':
+        $resolvedPhoto = $pronotePhotoUrl ?? '';
+        break;
+      case 'manual':
+        $resolvedPhoto = $manualExists ? $manualPhotoUrl : '';
+        break;
+      case 'auto':
+        $resolvedPhoto = $pronotePhotoUrl ?? ($manualExists ? $manualPhotoUrl : '');
+        break;
+      default:
+        $resolvedPhoto = ''; // 'none' → initiales
+    }
+    $widgetData['photo'] = $resolvedPhoto;
 
     // 4. Carte de visibilité des sections.
     $vis = [];
@@ -587,10 +735,21 @@ class ProJote extends eqLogic
     $content = str_replace('#lastLoginCmdId#', $lastLoginCmdId,                  $content);
     $content = str_replace('#initData#',       json_encode($widgetData, $flags), $content);
     $content = str_replace('#visibilityMap#',  json_encode($visibility, $flags), $content);
-    // Couleur d'accentuation (paramètre éditeur de widget avancé)
-    $accentColor = $replace['#accent_color#'] ?? '#94C904';
-    if (empty($accentColor) || $accentColor === 'transparent') $accentColor = '#94C904';
+    // Paramètres widget — lus directement depuis display.parameters_xxx
+    // (preToHtml() expose display.parameters.* mais nos champs utilisent display.parameters_xxx,
+    //  clé plate avec préfixe → getDisplay('parameters_xxx') est la seule source fiable)
+    $accentColor = $this->getDisplay('parameters_accent_color') ?: '#94C904';
+    if ($accentColor === 'transparent') $accentColor = '#94C904';
     $content = str_replace('#accent_color#', $accentColor, $content);
+
+    $fontSize = $this->getDisplay('parameters_font_size') ?: '12px';
+    $content  = str_replace('#font_size#', $fontSize, $content);
+
+    $defaultTab = $this->getDisplay('parameters_default_tab') ?: 'dv';
+    $content    = str_replace('#default_tab#', $defaultTab, $content);
+
+    $edtNavMode = $this->getDisplay('parameters_edt_nav_mode') ?: 'next_day';
+    $content    = str_replace('#edt_nav_mode#', $edtNavMode, $content);
 
     // 7. Injecter dans le wrapper standard Jeedom (#cmd#) puis appliquer le template core.
     //    Cela donne le tile correct avec les poignées de redimensionnement/déplacement.
@@ -627,8 +786,8 @@ class ProJote extends eqLogic
       'password'    => $this->getConfiguration("password"),
       'enfant'      => $this->getConfiguration("enfant"),
       'TokenId'     => $this->getConfiguration('Token_client_identifier'),
-      'TokenUsername'=> $this->getConfiguration('Token_username'),
-      'TokenPassword'=> $this->getConfiguration('Token_password'),
+      'TokenUsername' => $this->getConfiguration('Token_username'),
+      'TokenPassword' => $this->getConfiguration('Token_password'),
       'TokenUrl'    => html_entity_decode($this->getConfiguration('Token_pronote_url', '')),
       'TokenUuid'   => $this->getConfiguration('uuid', 'ProJote'),
       'Log'         => log::convertLogLevel(log::getLogLevel(__CLASS__)),
@@ -707,6 +866,31 @@ class ProJote extends eqLogic
  */
 class ProJoteCmd extends cmd
 {
+  /**
+   * Surcharge cmd::save() pour ignorer silencieusement les commandes orphelines.
+   *
+   * Contexte : un bug JS historique (affectation `let _cmd = {}` à portée de bloc dans
+   * addCmdToTable) créait des entrées vides en base (name/logicalId vides, order=59).
+   * Le core Jeedom lève "Le nom de la commande ne peut pas être vide" au moment de les
+   * sauvegarder. Cette surcharge les supprime proprement si elles ont déjà un id en base,
+   * ou les ignore si elles sont purement en mémoire.
+   *
+   * Note : la signature $_direct = false est obligatoire (PHP 8.x E_COMPILE_ERROR sinon).
+   *
+   * @param bool $_direct Passage direct (sans cycle pre/postSave) — relayé au parent.
+   */
+  public function save($_direct = false)
+  {
+    if (empty(trim((string)$this->getName())) || empty(trim((string)$this->getLogicalId()))) {
+      if (!empty($this->getId())) {
+        log::add('ProJote', 'warning', 'save() : suppression commande orpheline id=' . $this->getId() . ' order=' . $this->getOrder());
+        parent::remove();
+      }
+      return;
+    }
+    parent::save($_direct);
+  }
+
   /**
    * Exécute une commande de type "action".
    *

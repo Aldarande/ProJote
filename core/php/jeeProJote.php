@@ -1,4 +1,5 @@
 <?php
+
 /**
  * jeeProJote.php — Point de callback HTTP du démon Python vers Jeedom.
  *
@@ -16,6 +17,8 @@
  *  - Eleve             : Infos élève (Nom_Eleve, Nom_Classe, Etablissement)
  *  - Emploi_du_temps   : Emploi du temps du jour et du prochain jour
  *  - Notes, Devoirs, Absences, Retards, Punitions... : Données scolaires
+ *  - Emploi_du_temps.edt_next_days : tableau compact [{cours,date,debut,fin,cancel}] pour J+1..J+4
+ *  - Emploi_du_temps.edt_J{1..4}[_date|_debut|_fin|_cancel] : commandes Jeedom J+1 à J+4
  *  - Token             : Token de reconnexion Pronote à sauvegarder
  *
  * Sécurité : la clé API Jeedom est vérifiée avant tout traitement.
@@ -122,9 +125,27 @@ try {
         $eqLogic->checkAndUpdateCmd('Etablissement', $result['Eleve']['Etablissement']);
     }
     // saisie unitaire des valeurs
-    // Met à jour la photo de l'élève si elle est présente
-    if (isset($result['Local_Picture']) && $eqLogic->getCmd(null, 'Picture')) {
-        $eqLogic->checkAndUpdateCmd('Picture', $result['Local_Picture']);
+    // Résolution de la photo selon la préférence photo_source de l'équipement.
+    // Valeurs : 'none' (initiales, défaut) | 'pronote' | 'manual' | 'auto' (Pronote puis manuelle)
+    $manualPhotoFile = realpath(dirname(__FILE__) . '/../../data') . DIRECTORY_SEPARATOR . $eqLogic->getId() . DIRECTORY_SEPARATOR . 'profile_picture_manual.jpg';
+    $manualPhotoUrl  = '/plugins/ProJote/data/' . $eqLogic->getId() . '/profile_picture_manual.jpg';
+    $pronotePhotoUrl = !empty($result['Local_Picture']) ? $result['Local_Picture'] : null;
+    $manualExists    = file_exists($manualPhotoFile);
+    switch ($eqLogic->getConfiguration('photo_source', 'none')) {
+        case 'pronote':
+            $resolvedPhoto = $pronotePhotoUrl ?? '';
+            break;
+        case 'manual':
+            $resolvedPhoto = $manualExists ? $manualPhotoUrl : '';
+            break;
+        case 'auto':
+            $resolvedPhoto = $pronotePhotoUrl ?? ($manualExists ? $manualPhotoUrl : '');
+            break;
+        default:
+            $resolvedPhoto = ''; // 'none' → initiales
+    }
+    if ($eqLogic->getCmd(null, 'Picture')) {
+        $eqLogic->checkAndUpdateCmd('Picture', $resolvedPhoto);
     }
     // Met à jour le nombre d'absence
     if (isset($result['Absences']['nb_absences']) && $eqLogic->getCmd(null, 'Nb_absences')) {
@@ -172,6 +193,19 @@ try {
         $eqLogic->checkAndUpdateCmd('edt_prochainjour_cancel', $result['Emploi_du_temps']['edt_prochainjour_cancel']);
     } else {
         $eqLogic->checkAndUpdateCmd('edt_prochainjour_cancel', "Pas de cours annulé pour le prochain jour");
+    }
+    // Mise à jour des commandes J+1 à J+4
+    for ($j = 1; $j <= 4; $j++) {
+        $prefix = "edt_J{$j}";
+        if (isset($result['Emploi_du_temps'][$prefix]) && $eqLogic->getCmd(null, $prefix)) {
+            $eqLogic->checkAndUpdateCmd($prefix, json_encode($result['Emploi_du_temps'][$prefix]));
+        }
+        foreach (['_date', '_debut', '_fin', '_cancel'] as $suffix) {
+            $key = $prefix . $suffix;
+            if (isset($result['Emploi_du_temps'][$key]) && $eqLogic->getCmd(null, $key)) {
+                $eqLogic->checkAndUpdateCmd($key, $result['Emploi_du_temps'][$key]);
+            }
+        }
     }
     if (isset($result['Emploi_du_temps']['edt_prochainjour_date']) && $eqLogic->getCmd(null, 'edt_prochainjour_date')) {
         $eqLogic->checkAndUpdateCmd('edt_prochainjour_date', $result['Emploi_du_temps']['edt_prochainjour_date']);
@@ -387,7 +421,9 @@ try {
         'devoirs'               => isset($result['Devoirs']['devoir'])                        ? $result['Devoirs']['devoir']                        : array(),
         'devoirs_demain'        => isset($result['Devoirs']['devoir_Demain'])                 ? $result['Devoirs']['devoir_Demain']                 : array(),
         'nb_devoirs_f'          => isset($result['Devoirs']['Nb_devoir_F'])                   ? $result['Devoirs']['Nb_devoir_F']                   : 0,
-        'photo'                 => isset($result['Local_Picture'])                            ? $result['Local_Picture']                            : '',
+        'edt_next_days'         => isset($result['Emploi_du_temps']['edt_next_days'])          ? $result['Emploi_du_temps']['edt_next_days']          : array(),
+        'photo'                 => $resolvedPhoto,
+        'pronote_photo'         => $pronotePhotoUrl ?? '',
         'last_update'           => date('c'),
     );
     $eqLogic->setConfiguration('widget_json', json_encode($widget_data));

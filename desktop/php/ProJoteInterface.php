@@ -16,18 +16,16 @@ $eqLogicId = init('id');
 
 // Vérifier si l'ID de l'équipement est valide
 if (!$eqLogicId) {
-    throw new Exception(__('ID de l'équipement non spécifié', __FILE__));
+    throw new Exception(__('ID de l\'équipement non spécifié', __FILE__));
 }
 
-// Récupérer les données de l'équipement
-$eqLogic = eqLogic::byId($eqLogicId);
+// Récupérer l'équipement et les données Pronote en un seul appel
+$eqLogic = ProJote::byId($eqLogicId);
 if (!is_object($eqLogic)) {
     throw new Exception(__('Équipement non trouvé', __FILE__));
 }
 
-// Récupérer les données Pronote
-$proJote = new ProJote();
-$pronoteData = $proJote->getPronoteData($eqLogicId);
+$pronoteData = ProJote::getPronoteData($eqLogicId);
 
 // Inclure le template de l'interface
 include_file('desktop', 'ProJoteInterface', 'php', 'ProJote');

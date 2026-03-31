@@ -79,6 +79,7 @@ sendVarToJS('eqLogicId', $eqLogic);
 		<ul class="nav nav-tabs" role="tablist">
 			<li role="presentation"><a href="#" class="eqLogicAction" aria-controls="home" role="tab" data-toggle="tab" data-action="returnToThumbnailDisplay"><i class="fas fa-arrow-circle-left"></i></a></li>
 			<li role="presentation" class="active"><a href="#eqlogictab" aria-controls="home" role="tab" data-toggle="tab"><i class="fas fa-tachometer-alt"></i> {{Equipement}}</a></li>
+			<li role="presentation"><a href="#eqlogicDisplaytab" aria-controls="profile" role="tab" data-toggle="tab"><i class="fas fa-desktop"></i> {{Affichage}}</a></li>
 			<li role="presentation"><a href="#commandtab" aria-controls="home" role="tab" data-toggle="tab"><i class="fas fa-list"></i> {{Commandes}}</a></li>
 		</ul>
 		<div class="tab-content">
@@ -206,15 +207,15 @@ sendVarToJS('eqLogicId', $eqLogic);
 								</div>
 								<div class="form-group">
 									<label class="col-sm-4 control-label">{{Login du compte}}<i class="fas fa-question-circle tooltips" title="{{Renseignez le login pour vous connecter à Pronote}}"></i></label>
-									<input type="text" class="col-sm-6 eqLogicAttr form-control" data-l1key="configuration" data-l2key="login">
+									<input type="text" class="col-sm-6 eqLogicAttr form-control" data-l1key="configuration" data-l2key="login" autocomplete="username">
 								</div>
 								<div class="form-group">
 									<label class="col-sm-4 control-label">{{Mot de passe}}<i class="fas fa-question-circle tooltips" title="{{Renseignez le mot de passe}}"></i></label>
-									<input type="password" class=" col-sm-6 eqLogicAttr form-control inputPassword" data-l1key="configuration" data-l2key="password">
+									<input type="password" class=" col-sm-6 eqLogicAttr form-control inputPassword" data-l1key="configuration" data-l2key="password" autocomplete="current-password">
 								</div>
 								<div class="form-group">
 									<label class="col-sm-4 control-label">{{Url}}<i class="fas fa-question-circle tooltips" title="{{Renseignez l'adresse web pour vous connecter à Pronote}}"></i></label>
-									<input type="text" class="col-sm-6 eqLogicAttr form-control" data-l1key="configuration" data-l2key="url">
+									<input type="text" class="col-sm-6 eqLogicAttr form-control" data-l1key="configuration" data-l2key="url" autocomplete="off">
 								</div>
 
 								<div class="form-group Validate">
@@ -358,6 +359,131 @@ sendVarToJS('eqLogicId', $eqLogic);
 					</table>
 				</div>
 			</div><!-- /.tabpanel #commandtab-->
+		<div role="tabpanel" class="tab-pane" id="eqlogicDisplaytab">
+			<div class="row" style="margin-top:12px;">
+
+				<!-- ── Colonne gauche : paramètres du widget + photo manuelle ── -->
+				<div class="col-sm-5">
+					<form class="form-horizontal">
+						<fieldset>
+							<legend><i class="fas fa-paint-brush"></i> {{Personnalisation du widget}}</legend>
+
+							<div class="form-group">
+								<label class="col-sm-6 control-label">{{Couleur d'accentuation}}</label>
+								<div class="col-sm-5">
+									<input type="color" class="eqLogicAttr form-control" data-l1key="display" data-l2key="parameters_accent_color" value="#94C904">
+								</div>
+							</div>
+
+							<div class="form-group">
+								<label class="col-sm-6 control-label">{{Taille de police}}</label>
+								<div class="col-sm-5">
+									<select class="eqLogicAttr form-control" data-l1key="display" data-l2key="parameters_font_size">
+										<option value="10px">10</option>
+										<option value="11px">11</option>
+										<option value="12px" selected>12 ({{défaut}})</option>
+										<option value="13px">13</option>
+										<option value="14px">14</option>
+										<option value="15px">15</option>
+										<option value="16px">16</option>
+									</select>
+								</div>
+							</div>
+
+							<div class="form-group">
+								<label class="col-sm-6 control-label">{{Onglet par défaut}}</label>
+								<div class="col-sm-5">
+									<select class="eqLogicAttr form-control" data-l1key="display" data-l2key="parameters_default_tab">
+										<option value="dv" selected>{{Devoirs}}</option>
+										<option value="notes">{{Notes}}</option>
+										<option value="abs">{{Absences}}</option>
+										<option value="ret">{{Retards}}</option>
+										<option value="pun">{{Punitions}}</option>
+									</select>
+								</div>
+							</div>
+
+							<div class="form-group">
+								<label class="col-sm-6 control-label">{{Navigation EDT}}</label>
+								<div class="col-sm-5">
+									<select class="eqLogicAttr form-control" data-l1key="display" data-l2key="parameters_edt_nav_mode">
+										<option value="next_day" selected>{{Seulement J+1}}</option>
+										<option value="arrows">{{Jusqu'à J+4}}</option>
+									</select>
+								</div>
+							</div>
+
+						</fieldset>
+
+						<fieldset style="margin-top:15px;">
+							<legend><i class="fas fa-user-circle"></i> {{Photo de profil}}</legend>
+
+							<!-- Miniatures Pronote | Manuelle -->
+							<div style="display:flex;gap:20px;padding:0 15px 12px;flex-wrap:wrap;">
+
+								<!-- Photo Pronote (lecture seule) -->
+								<div style="text-align:center;">
+									<div style="font-size:10px;color:#888;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;">Pronote</div>
+									<div id="pjw-pronote-photo-wrap" style="display:none;width:70px;height:70px;">
+										<img id="pjw-pronote-photo-img" src="" alt="" style="width:70px;height:70px;border-radius:50%;border:2px solid #ccc;object-fit:cover;">
+									</div>
+									<div id="pjw-no-pronote-photo" class="text-muted" style="font-size:11px;line-height:70px;">{{Aucune}}</div>
+								</div>
+
+								<!-- Photo manuelle (upload utilisateur) -->
+								<div style="text-align:center;">
+									<div style="font-size:10px;color:#888;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;">{{Manuelle}}</div>
+									<div id="pjw-manual-photo-wrap" style="display:none;position:relative;width:70px;height:70px;">
+										<img id="pjw-manual-photo-img" src="" alt="" style="width:70px;height:70px;border-radius:50%;border:2px solid #ccc;object-fit:cover;">
+										<button type="button" id="pjw-manual-photo-delete"
+											style="position:absolute;top:-5px;right:-5px;width:20px;height:20px;border-radius:50%;padding:0;line-height:18px;font-size:10px;"
+											class="btn btn-xs btn-danger" title="{{Supprimer la photo manuelle}}">
+											<i class="fas fa-times"></i>
+										</button>
+									</div>
+									<div id="pjw-no-manual-photo" class="text-muted" style="font-size:11px;line-height:70px;">{{Aucune}}</div>
+									<label class="btn btn-xs btn-default" style="margin-top:4px;cursor:pointer;display:block;width:70px;">
+										<i class="fas fa-plus"></i>
+										<input type="file" id="pjw-manual-photo-input" accept="image/jpeg,image/png,image/webp" style="display:none;">
+									</label>
+								</div>
+
+							</div>
+
+							<!-- Selecteur source photo -->
+							<div class="form-group" style="margin-bottom:4px;">
+								<label class="col-sm-6 control-label" style="font-size:12px;">{{Photo a utiliser}}</label>
+								<div class="col-sm-6">
+									<select class="eqLogicAttr form-control input-sm" data-l1key="configuration" data-l2key="photo_source">
+										<option value="none" selected>{{Aucune (initiales)}}</option>
+										<option value="pronote">{{Photo Pronote}}</option>
+										<option value="manual">{{Photo manuelle}}</option>
+										<option value="auto">{{Automatique (Pronote en priorite)}}</option>
+									</select>
+								</div>
+							</div>
+
+							<div id="pjw-manual-photo-status" style="font-size:11px;margin-top:8px;padding:0 15px;clear:both;"></div>
+						</fieldset>
+					</form>
+				</div>
+
+				<!-- ── Colonne droite : prévisualisation du widget ── -->
+				<div class="col-sm-7">
+					<fieldset>
+						<legend><i class="fas fa-eye"></i> {{Prévisualisation du widget}}</legend>
+						<p class="text-muted" style="font-size:11px;margin-bottom:8px;">{{Sauvegardez l'équipement puis cliquez sur Rafraîchir pour voir vos modifications.}}</p>
+						<div id="pjw-preview-zone" style="min-height:150px;border:1px dashed #ccc;border-radius:6px;padding:10px;background:#f9f9f9;overflow:auto;display:flex;align-items:center;justify-content:center;">
+							<span class="text-muted" style="font-size:12px;">{{Cliquez sur Rafraîchir pour charger la prévisualisation}}</span>
+						</div>
+						<button type="button" id="pjw-preview-refresh" class="btn btn-sm btn-default" style="margin-top:8px;">
+							<i class="fas fa-sync"></i> {{Rafraîchir}}
+						</button>
+					</fieldset>
+				</div>
+
+			</div><!-- /.row -->
+		</div><!-- /.tabpanel #eqlogicDisplaytab -->
 		</div><!-- /.tab-content -->
 	</div><!-- /.eqLogic -->
 </div><!-- /.row row-overflow -->
