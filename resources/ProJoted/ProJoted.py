@@ -26,6 +26,12 @@ import contextlib
 try:
     import logging
     import sys
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format="[%(asctime)-15s][%(levelname)s] : %(filename)s:%(lineno)d - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        stream=sys.stdout,
+    )
     import os
     import time
     import datetime
@@ -692,16 +698,38 @@ def notes(client):
 
             # Moyennes générales par période (élève + classe)
             try:
-                moy_eleve = getattr(period, "overall_average", "") or ""
-                moy_classe = getattr(period, "class_overall_average", "") or ""
+                period_name = getattr(period, "name", "?")
+                moy_eleve_raw = getattr(period, "overall_average", "") or ""
+                moy_classe_raw = getattr(period, "class_overall_average", "") or ""
+                logging.debug(
+                    "Moyenne brute Pronote — période=%s  élève=%r  classe=%r",
+                    period_name, moy_eleve_raw, moy_classe_raw,
+                )
+                moy_eleve = moy_eleve_raw
+                moy_classe = moy_classe_raw
+                # Pronote retourne "-1" comme sentinelle quand la moyenne n'est pas disponible
+                if str(moy_eleve).strip() == "-1":
+                    logging.debug("Moyenne élève ignorée (sentinelle -1) — période=%s", period_name)
+                    moy_eleve = ""
+                if str(moy_classe).strip() == "-1":
+                    logging.debug("Moyenne classe ignorée (sentinelle -1) — période=%s", period_name)
+                    moy_classe = ""
                 if moy_eleve or moy_classe:
+                    logging.debug(
+                        "Moyenne retenue — période=%s  élève=%s  classe=%s",
+                        period_name,
+                        str(moy_eleve).replace(",", "."),
+                        str(moy_classe).replace(",", "."),
+                    )
                     data["moyennes_periodes"].append(
                         {
-                            "periode": getattr(period, "name", ""),
+                            "periode": period_name,
                             "moyenne_eleve": str(moy_eleve).replace(",", "."),
                             "moyenne_classe": str(moy_classe).replace(",", "."),
                         }
                     )
+                else:
+                    logging.debug("Aucune moyenne disponible pour la période=%s", period_name)
             except Exception:
                 pass
 

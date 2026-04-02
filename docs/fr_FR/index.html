@@ -478,6 +478,29 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
     <!-- ── Historique ─────────────────────── -->
     <h1 id="version">Historique des versions</h1>
 
+    <h2>0.9c — Avril 2026</h2>
+    <table>
+        <thead><tr><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><span class="badge badge-fix">Correction</span></td>
+                <td><strong>Démon — module Python introuvable sur box Luna</strong> — le démon était lancé avec le Python système (<code>/usr/bin/python3</code>) au lieu du venv du plugin. Pronotepy étant installé uniquement dans le venv, le démon échouait avec <code>No module named 'pronotepy'</code>. Le démon utilise désormais systématiquement l'interpréteur du venv (<code>resources/python_venv/bin/python3</code>).</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correction</span></td>
+                <td><strong>Moyenne générale — affichage « -1/20 »</strong> — Pronote retourne <code>-1</code> comme valeur sentinelle quand la moyenne n'est pas encore calculée (début de période, trop peu de notes). Cette valeur est désormais filtrée côté démon Python et côté widget ; le widget affiche alors la moyenne calculée localement à partir des notes individuelles, ou <code>–</code> s'il n'y en a aucune.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-perf">Amélioration</span></td>
+                <td><strong>Logs Python — horodatage, fichier et numéro de ligne</strong> — tous les messages de log Python (démon, LoginConnect, QRConnect) incluent désormais l'horodatage, le fichier source et la ligne dès le premier message, y compris les erreurs d'import précoces survenant avant l'initialisation complète du logger. Format : <code>[YYYY-MM-DD HH:MM:SS][LEVEL] : fichier.py:N - message</code>.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-perf">Amélioration</span></td>
+                <td><strong>Logs — traçabilité de la moyenne Pronote</strong> — en mode Debug, le démon trace pour chaque période la valeur brute reçue de Pronote (<code>overall_average</code>), indique si elle est ignorée (sentinelle <code>-1</code>) et confirme la valeur finalement retenue.</td>
+            </tr>
+        </tbody>
+    </table>
+
     <h2>0.9b — Mars 2026</h2>
     <table>
         <thead><tr><th>Type</th><th>Description</th></tr></thead>
