@@ -781,6 +781,53 @@ def notes(client):
 
             if data["note"]:
                 data["derniere_note"].append(data["note"][0])
+
+            # ── Calcul debug de la moyenne (même logique que le widget JS) ──────
+            if logging.getLogger().isEnabledFor(logging.DEBUG):
+                tot = 0.0
+                coefs = 0.0
+                skipped = 0
+                logging.debug("── Détail calcul moyenne générale (%d notes) ──", len(data["note"]))
+                for n in data["note"]:
+                    note_str = str(n.get("note", "")).replace(",", ".")
+                    sur_str  = str(n.get("sur",  "20")).replace(",", ".") or "20"
+                    coeff_str = str(n.get("coeff", "1")).replace(",", ".")
+                    try:
+                        note_f  = float(note_str)
+                        sur_f   = float(sur_str) if sur_str else 20.0
+                        coeff_f = float(coeff_str) if coeff_str else 1.0
+                    except ValueError:
+                        logging.debug(
+                            "  IGNORÉE  %-30s  %s — valeur non numérique (note=%r sur=%r coeff=%r)",
+                            n.get("cours", "?"), n.get("date", "?"),
+                            n.get("note"), n.get("sur"), n.get("coeff"),
+                        )
+                        skipped += 1
+                        continue
+                    if sur_f <= 0:
+                        logging.debug(
+                            "  IGNORÉE  %-30s  %s — dénominateur nul ou négatif (sur=%s)",
+                            n.get("cours", "?"), n.get("date", "?"), sur_str,
+                        )
+                        skipped += 1
+                        continue
+                    contribution = (note_f / sur_f) * 20.0 * coeff_f
+                    tot   += contribution
+                    coefs += coeff_f
+                    logging.debug(
+                        "  INCLUSE  %-30s  %s  note=%s/%s  coeff=%s  contrib=%.4f  (tot=%.4f coefs=%.2f)",
+                        n.get("cours", "?"), n.get("date", "?"),
+                        note_str, sur_str, coeff_str,
+                        contribution, tot, coefs,
+                    )
+                if coefs > 0:
+                    moy_calc = tot / coefs
+                    logging.debug(
+                        "── Résultat calcul : %.2f/20  (%d notes incluses, %d ignorées) ──",
+                        moy_calc, len(data["note"]) - skipped, skipped,
+                    )
+                else:
+                    logging.debug("── Résultat calcul : aucune note valide ──")
         else:
             logging.info("Aucune note trouvée pour l'année scolaire.")
 
