@@ -1169,9 +1169,11 @@
             var trendEl = el('pjwtrend' + ID);
 
             // Utilisation de la moyenne officielle Pronote si disponible
+            // Pronote retourne "-1" comme sentinelle quand la moyenne n'est pas calculée
             var officialAvg = (d.moyennes_periodes && d.moyennes_periodes.length > 0)
                 ? d.moyennes_periodes[d.moyennes_periodes.length - 1].moyenne_eleve
                 : null;
+            if (officialAvg !== null && (parseFloat(String(officialAvg).replace(',', '.')) < 0 || String(officialAvg).trim() === '')) officialAvg = null;
 
             if (!officialAvg && (!notes || !Array.isArray(notes) || !notes.length)) {
                 if (moyEl) moyEl.textContent = '–';

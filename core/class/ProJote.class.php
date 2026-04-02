@@ -210,7 +210,8 @@ class ProJote extends eqLogic
 
     // Construction de la commande shell
     $data_dir = dirname(dirname(dirname(__FILE__))) . '/data';
-    $cmd = system::getCmdPython3(__CLASS__) . " {$path}/ProJoted.py";
+    $venvPython = realpath(dirname(__FILE__) . '/../../resources') . '/python_venv/bin/python3';
+    $cmd = escapeshellarg($venvPython) . " {$path}/ProJoted.py";
     $cmd .= ' --loglevel ' . $loglevel;
     $cmd .= ' --socketport ' . $socketport;
     $cmd .= ' --datadir ' . escapeshellarg($data_dir);

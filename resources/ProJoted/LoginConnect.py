@@ -28,6 +28,12 @@ try:
     import sys
     import json
     import logging
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format="[%(asctime)-15s][%(levelname)s] : %(filename)s:%(lineno)d - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        stream=sys.stdout,
+    )
     import importlib
     import os
     import datetime

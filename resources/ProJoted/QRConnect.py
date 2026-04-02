@@ -33,7 +33,8 @@ try:
     # Activation du logging dès le départ pour que les erreurs précoces soient visibles
     logging.basicConfig(
         level=logging.DEBUG,
-        format="%(levelname)s  : QRConnect.py:%(lineno)d - %(message)s",
+        format="[%(asctime)-15s][%(levelname)s] : %(filename)s:%(lineno)d - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
         stream=sys.stdout,
     )
 
