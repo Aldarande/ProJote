@@ -25,8 +25,18 @@ if (!isConnect()) {
 <!--
 /* The code you provided is a PHP code snippet that generates an HTML form. */
 -->
+<?php
+$_pluginInfo = json_decode(file_get_contents(dirname(__FILE__) . '/info.json'), true);
+$_pluginVersion = $_pluginInfo['pluginVersion'] ?? '?';
+?>
 <form class="form-horizontal">
   <fieldset>
+    <div class="form-group">
+      <label class="col-md-4 control-label">{{Version}}</label>
+      <div class="col-md-4">
+        <span class="form-control" style="background:transparent;border:none;font-weight:bold;"><?php echo htmlspecialchars($_pluginVersion); ?></span>
+      </div>
+    </div>
     <div class="form-group">
       <label class="col-md-4 control-label">{{Port du Démon}}
         <sup><i class="fas fa-question-circle tooltips" title="{{Le port proposé est celui par défault, vous pouvez le modifier en cas de conflit}}"></i></sup>

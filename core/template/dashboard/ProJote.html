@@ -16,6 +16,7 @@
         width: 100%;
         box-sizing: border-box;
         padding: 6px 4px;
+        overflow: hidden;
     }
 
     /* ── En-tête : flex horizontal ──────────────────────── */
@@ -128,7 +129,7 @@
     /* ── EDT : deux colonnes côte à côte ─────────────────── */
     .pjw-#id# .edt-cols {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
         gap: 10px;
         margin-bottom: 14px;
     }
