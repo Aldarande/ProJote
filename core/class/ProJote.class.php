@@ -679,7 +679,8 @@ class ProJote extends eqLogic
     //     (indépendant du démon — toujours à jour après upload/changement de source).
     $dataDir         = realpath(dirname(__FILE__) . '/../../data');
     $manualPhotoFile = $dataDir . DIRECTORY_SEPARATOR . $this->getId() . DIRECTORY_SEPARATOR . 'profile_picture_manual.jpg';
-    $manualPhotoUrl  = '/plugins/ProJote/data/' . $this->getId() . '/profile_picture_manual.jpg';
+    $manualPhotoUrl  = '/plugins/ProJote/data/' . $this->getId() . '/profile_picture_manual.jpg'
+      . '?v=' . (file_exists($manualPhotoFile) ? filemtime($manualPhotoFile) : '0');
     $pronotePhotoUrl = !empty($widgetData['photo']) ? $widgetData['photo'] : null;
     // Si la photo stockée vient de Pronote (et non d'un précédent calcul manuel), on la garde.
     // On utilise le champ 'pronote_photo' s'il existe, sinon on tombe sur la valeur brute.
