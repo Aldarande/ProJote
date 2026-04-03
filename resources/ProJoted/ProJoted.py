@@ -755,6 +755,14 @@ def notes(client):
                 )
                 grade_date = getattr(grade, "date", None) or datetime.date.today()
 
+                # Pronote renvoie parfois des objets {"V": valeur} au lieu de scalaires
+                coeff_raw = getattr(grade, "coefficient", "1")
+                if isinstance(coeff_raw, dict):
+                    coeff_raw = coeff_raw.get("V", "1")
+                comment_raw = getattr(grade, "comment", "")
+                if isinstance(comment_raw, dict):
+                    comment_raw = comment_raw.get("V", "")
+
                 data["note"].append(
                     {
                         "id": getattr(grade, "id", ""),
@@ -765,15 +773,13 @@ def notes(client):
                         "note": str(note_value).replace(",", "."),
                         "sur": str(out_of_value).replace(",", "."),
                         "note_sur": note_sur,
-                        "coeff": str(getattr(grade, "coefficient", "1")).replace(
-                            ",", "."
-                        ),
+                        "coeff": str(coeff_raw).replace(",", "."),
                         "moyenne_classe": str(getattr(grade, "average", "")).replace(
                             ",", "."
                         ),
                         "max": str(getattr(grade, "max", "")).replace(",", "."),
                         "min": str(getattr(grade, "min", "")).replace(",", "."),
-                        "commentaire": getattr(grade, "comment", ""),
+                        "commentaire": str(comment_raw),
                         "optionnel": getattr(grade, "is_optionnal", False),
                         "bonus": getattr(grade, "is_bonus", False),
                     }
