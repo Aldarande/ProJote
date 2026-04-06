@@ -78,6 +78,7 @@ try:
         parser.add_argument("--Loglevel", help="Niveau de log", type=str)
         parser.add_argument("--Uuid", help="UUID unique de l'équipement", type=str)
         parser.add_argument("--datadir", help="Chemin du dossier data du plugin", type=str)
+        parser.add_argument("--apikey", help="Clé API Jeedom (ignorée, réservée au callback)", type=str)
         args = parser.parse_args()
 
         QRUrl   = args.QRUrl   or ''
