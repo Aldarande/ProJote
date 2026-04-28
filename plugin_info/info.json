@@ -1,6 +1,6 @@
 {
 	"id": "ProJote",
-	"name": "Plugin Pronote",
+	"name": "ProJote",
 	"pluginVersion": "1.0",
 	"description": {
 		"fr_FR": "Plugin destinée à récupérer les informations de Pronote",
@@ -14,7 +14,9 @@
 	"hasOwnDeamon": true,
 	"maxDependancyInstallTime": 60,
 	"changelog": "https://aldarande.github.io/ProJote/#language#/index.html#Version",
-	"documentation": "/plugins/ProJote/docs/#language#/index.html",
+	"documentation": "https://aldarande.github.io/ProJote/#language#/index.html",
+	"documentation_beta": "https://aldarande.github.io/ProJote/#language#/beta.html",
+	"changelog_beta": "https://aldarande.github.io/ProJote/#language#/beta.html#beta-nouveautes",
 	"language": [
 		"fr_FR"
 	],
