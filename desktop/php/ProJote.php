@@ -31,6 +31,30 @@ sendVarToJS('eqLogicId', $eqLogic);
 				<br>
 				<span>{{Configuration}}</span>
 			</div>
+			<div class="cursor logoSecondary" id="bt_donProJote" title="{{Faire un don}}">
+				<i class="fas fa-mug-hot"></i>
+				<br>
+				<span>{{Don}}</span>
+			</div>
+		</div>
+
+		<!-- Modal Don -->
+		<div class="modal fade" id="modal_donProJote" tabindex="-1" role="dialog">
+			<div class="modal-dialog" role="document">
+				<div class="modal-content">
+					<div class="modal-header" style="background-color:#8DC63F;border-radius:5px 5px 0 0;">
+						<button type="button" class="close" data-dismiss="modal" style="color:#fff;opacity:1;"><span>&times;</span></button>
+						<h4 class="modal-title" style="color:#fff;"><i class="fas fa-mug-hot"></i> {{Soutenir ProJote}}</h4>
+					</div>
+					<div class="modal-body" style="text-align:center;">
+						<p style="font-size:1.1em;">{{Ce plugin est gratuit et open-source.}}<br>{{Si vous l'appréciez, et que vous voulez me remercier, offrez moi un café !}}<br><small>{{Ces dons participent au maintien et au développement du plugin.}}</small></p>
+						<hr>
+						<a href="https://ko-fi.com/aldarande" target="_blank" class="btn btn-warning btn-lg" style="margin:8px;">
+							<i class="fas fa-coffee"></i> Ko-fi
+						</a>
+					</div>
+				</div>
+			</div>
 		</div>
 		<legend><i class="fas fa-table"></i> {{Mes équipements}}</legend>
 		<?php
