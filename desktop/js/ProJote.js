@@ -260,6 +260,10 @@ $(document).ready(function () {
   // Masquer la liste des élèves par défaut
   $('.form-group.listenfant').hide();
 
+  $('#bt_donProJote').on('click', function () {
+    $('#modal_donProJote').modal('show');
+  });
+
   // Ajouter un gestionnaire d'événements click pour les cartes d'équipement
   $('.eqLogicDisplayCard').on('click', function () {
     let eqLogicId = $(this).attr('data-eqlogic_id'); // Récupérer l'ID de l'équipement depuis l'attribut data

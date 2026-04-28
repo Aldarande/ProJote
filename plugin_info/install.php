@@ -17,11 +17,26 @@
 
 require_once dirname(__FILE__) . '/../../../core/php/core.inc.php';
 
+function _ProJote_setVersion() {
+  $info = json_decode(file_get_contents(dirname(__FILE__) . '/info.json'), true);
+  $version = $info['pluginVersion'] ?? null;
+  if (!$version) return;
+  $update = update::byLogicalId('ProJote', 'plugin');
+  if (is_object($update)) {
+    $update->setLocalVersion($version);
+    $update->save();
+  }
+}
+
 // Fonction exécutée automatiquement après l'installation du plugin
-function ProJote_install() {}
+function ProJote_install() {
+  _ProJote_setVersion();
+}
 
 // Fonction exécutée automatiquement après la mise à jour du plugin
-function ProJote_update() {}
+function ProJote_update() {
+  _ProJote_setVersion();
+}
 
 // Fonction exécutée automatiquement après la suppression du plugin
 function ProJote_remove() {}
