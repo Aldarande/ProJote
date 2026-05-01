@@ -52,6 +52,9 @@ sendVarToJS('eqLogicId', $eqLogic);
 						<a href="https://ko-fi.com/aldarande" target="_blank" class="btn btn-warning btn-lg" style="margin:8px;">
 							<i class="fas fa-coffee"></i> Ko-fi
 						</a>
+						<a href="https://github.com/sponsors/Aldarande" target="_blank" class="btn btn-dark btn-lg" style="margin:8px;">
+							<i class="fab fa-github"></i> GitHub Sponsors
+						</a>
 					</div>
 				</div>
 			</div>
