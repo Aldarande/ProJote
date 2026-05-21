@@ -642,24 +642,24 @@ def evaluations(client):
             else:
                 acquisitions = evaluation.acquisitions
 
-                try:
-                    sujet_name = getattr(evaluation.subject, "name", "Inconnu")
-                except Exception:
-                    sujet_name = "Inconnu"
-                data["evaluations"].append(
-                    {
-                        "id": evaluation.id,
-                        "nom": evaluation.name,
-                        "domaine": evaluation.domain,
-                        "professeur": evaluation.teacher,
-                        "Sujet": sujet_name,
-                        "date": evaluation.date.strftime("%d/%m/%Y"),
-                        "acquisitions": acquisitions,
-                        "description": evaluation.description,
-                        "Paliers": evaluation.paliers,
-                        "coeff": evaluation.coefficient,
-                    }
-                )
+            try:
+                sujet_name = getattr(evaluation.subject, "name", "Inconnu")
+            except Exception:
+                sujet_name = "Inconnu"
+            data["evaluations"].append(
+                {
+                    "id": evaluation.id,
+                    "nom": evaluation.name,
+                    "domaine": evaluation.domain,
+                    "professeur": evaluation.teacher,
+                    "Sujet": sujet_name,
+                    "date": evaluation.date.strftime("%d/%m/%Y"),
+                    "acquisitions": acquisitions,
+                    "description": evaluation.description,
+                    "Paliers": evaluation.paliers,
+                    "coeff": evaluation.coefficient,
+                }
+            )
         return data["evaluations"]
     except Exception as e:
         line_number = e.__traceback__.tb_lineno
