@@ -1,7 +1,7 @@
 {
 	"id": "ProJote",
 	"name": "ProJote",
-	"pluginVersion": "1.0",
+	"pluginVersion": "1.0.a",
 	"description": {
 		"fr_FR": "Plugin destinée à récupérer les informations de Pronote",
 		"en_US": "Plugin to retrieve information from Pronote school management platform"
