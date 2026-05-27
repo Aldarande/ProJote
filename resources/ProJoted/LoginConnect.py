@@ -1,3 +1,8 @@
+# ProJote — plugin Jeedom pour Pronote
+# Copyright (C) 2024-2026 Aldarande
+# Licensed under the GNU Affero General Public License v3 or later.
+# See <https://www.gnu.org/licenses/agpl-3.0.html> for full license text.
+
 """
 LoginConnect.py — Connexion à Pronote via identifiants login/mot de passe.
 

@@ -1,7 +1,7 @@
 # 📚 ProJote - Plugin JEEDOM Pronote
 
 ![Version](https://img.shields.io/badge/version-1.0-blue)
-![License](https://img.shields.io/badge/license-AGPL-green)
+![License](https://img.shields.io/badge/license-AGPL%20v3-green)
 ![Jeedom](https://img.shields.io/badge/Jeedom-4.3+-orange)
 
 **ProJote** est un plugin JEEDOM qui vous permet de **récupérer automatiquement les informations de votre compte Pronote** directement dans Jeedom. Consultez vos notes, emplois du temps, devoirs, absences et bien plus encore!
