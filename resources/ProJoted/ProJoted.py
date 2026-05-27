@@ -1,16 +1,20 @@
-# This file is part of Jeedom
-# Jeedom is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+# ProJote — plugin Jeedom pour Pronote
+# Copyright (C) 2024-2026 Aldarande
 #
-# Jeedom is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-# GNU General Public License for more details.
+# This file is part of ProJote.
 #
-# You should have received a copy of the GNU General Public License
-# along with Jeedom. If not, see <http://www.gnu.org/licenses/>.
+# ProJote is free software: you can redistribute it and/or modify it under
+# the terms of the GNU Affero General Public License as published by the
+# Free Software Foundation, either version 3 of the License, or (at your
+# option) any later version.
+#
+# ProJote is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+# FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public
+# License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 ### Sources ###
 # API WRAPPER PronotePy :  https://github.com/bain3/pronotepy
@@ -642,24 +646,24 @@ def evaluations(client):
             else:
                 acquisitions = evaluation.acquisitions
 
-                try:
-                    sujet_name = getattr(evaluation.subject, "name", "Inconnu")
-                except Exception:
-                    sujet_name = "Inconnu"
-                data["evaluations"].append(
-                    {
-                        "id": evaluation.id,
-                        "nom": evaluation.name,
-                        "domaine": evaluation.domain,
-                        "professeur": evaluation.teacher,
-                        "Sujet": sujet_name,
-                        "date": evaluation.date.strftime("%d/%m/%Y"),
-                        "acquisitions": acquisitions,
-                        "description": evaluation.description,
-                        "Paliers": evaluation.paliers,
-                        "coeff": evaluation.coefficient,
-                    }
-                )
+            try:
+                sujet_name = getattr(evaluation.subject, "name", "Inconnu")
+            except Exception:
+                sujet_name = "Inconnu"
+            data["evaluations"].append(
+                {
+                    "id": evaluation.id,
+                    "nom": evaluation.name,
+                    "domaine": evaluation.domain,
+                    "professeur": evaluation.teacher,
+                    "Sujet": sujet_name,
+                    "date": evaluation.date.strftime("%d/%m/%Y"),
+                    "acquisitions": acquisitions,
+                    "description": evaluation.description,
+                    "Paliers": evaluation.paliers,
+                    "coeff": evaluation.coefficient,
+                }
+            )
         return data["evaluations"]
     except Exception as e:
         line_number = e.__traceback__.tb_lineno
