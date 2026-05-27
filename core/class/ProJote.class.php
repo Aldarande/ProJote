@@ -1,19 +1,22 @@
 <?php
-/* This file is part of Jeedom.
-*
-* Jeedom is free software: you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation, either version 3 of the License, or
-* (at your option) any later version.
-*
-* Jeedom is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-* GNU General Public License for more details.
-*
-* You should have received a copy of the GNU General Public License
-* along with Jeedom. If not, see <http://www.gnu.org/licenses/>.
-*/
+/* ProJote — plugin Jeedom pour Pronote
+ * Copyright (C) 2024-2026 Aldarande
+ *
+ * This file is part of ProJote.
+ *
+ * ProJote is free software: you can redistribute it and/or modify it under
+ * the terms of the GNU Affero General Public License as published by the
+ * Free Software Foundation, either version 3 of the License, or (at your
+ * option) any later version.
+ *
+ * ProJote is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public
+ * License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
 
 /**
  * Ce fichier contient la définition des classes principales du plugin ProJote.
@@ -484,6 +487,7 @@ class ProJote extends eqLogic
       // L'utilisateur peut décocher "Afficher" dans l'onglet Commandes pour masquer une section.
       "refresh"               => array('Rafraichir',                                       'action', 'other',   "",      0, 1, "GENERIC_ACTION",  'core::badge',          'core::badge'),
       "LastLogin"             => array('Derniére Mise à Jour',                             'info',   'string',  "",      0, 0, "GENERIC_INFO",    'core::badge',          'core::badge'),
+      "Statut_Connexion"      => array('Statut connexion',                                  'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
       "Nom_Eleve"             => array("Nom de l'éleve",                                   'info',   'string',  "",      0, 1, "GENERIC_NAME ",   'core::badge',          'core::badge'),
       "Nom_Classe"            => array('Nom de la classe',                                 'info',   'string',  "",      0, 1, "GENERIC_NAME ",   'core::badge',          'core::badge'),
       "Etablissement"         => array('Etablissement',                                    'info',   'string',  "",      0, 1, "GENERIC_NAME ",   'core::badge',          'core::badge'),

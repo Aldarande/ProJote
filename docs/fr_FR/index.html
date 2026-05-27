@@ -251,6 +251,7 @@
         <a href="#qrcode" class="sub">Par QR Code</a>
 
         <div class="sidebar-section">Référence</div>
+        <a href="#prerequis">Prérequis</a>
         <a href="#utilisation">Commandes disponibles</a>
         <a href="#widget">Widget</a>
         <a href="#version">Historique des versions</a>
@@ -289,8 +290,22 @@
     </div>
     <div class="callout callout-info">
         <strong>Compatibilité</strong>
-        Jeedom 4.4+ · Python 3.9+ · Debian 11/12 · Comptes élèves et parents.
+        Jeedom 4.4+ · Python 3.8+ · Debian 11/12 · Comptes élèves et parents.
     </div>
+
+    <!-- ── Prérequis ──────────────────────── -->
+    <h1 id="prerequis">Prérequis</h1>
+    <table>
+        <thead><tr><th>Élément</th><th>Version / Détail</th></tr></thead>
+        <tbody>
+            <tr><td>Jeedom</td><td>4.4 ou supérieur</td></tr>
+            <tr><td>Python</td><td>3.8 minimum (vérifié à l'installation des dépendances)</td></tr>
+            <tr><td>Système</td><td>Debian 11, Debian 12 (Smart, Luna, Atlas, RPi, Docker, DIY)</td></tr>
+            <tr><td>Paquet système</td><td><code>python3-venv</code> (installé automatiquement par Jeedom dans la plupart des cas)</td></tr>
+            <tr><td>Compte Pronote</td><td>Compte élève ou parent actif sur le portail Pronote de l'établissement</td></tr>
+            <tr><td>Réseau</td><td>Accès sortant HTTPS vers le serveur Pronote de l'établissement (et l'ENT si utilisé)</td></tr>
+        </tbody>
+    </table>
 
     <!-- ── Installation ───────────────────── -->
     <h1 id="installation">Installation</h1>
@@ -376,25 +391,31 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
     Vous pouvez forcer une actualisation avec la commande <em>Rafraîchir</em>.</p>
 
     <table>
-        <thead><tr><th>Commande</th><th>Description</th></tr></thead>
+        <thead><tr><th>Commande</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-            <tr><td>Nom de l'élève</td><td>Prénom et nom</td></tr>
-            <tr><td>Classe</td><td>Intitulé de la classe</td></tr>
-            <tr><td>Établissement</td><td>Nom de l'établissement scolaire</td></tr>
-            <tr><td>Photo</td><td>Chemin local de la photo de profil</td></tr>
-            <tr><td>URL iCal</td><td>Lien d'abonnement au calendrier Pronote</td></tr>
-            <tr><td>Nb absences</td><td>Nombre d'absences sur la période en cours</td></tr>
-            <tr><td>Nb retards</td><td>Nombre de retards sur la période</td></tr>
-            <tr><td>Nb punitions</td><td>Nombre de punitions sur la période</td></tr>
-            <tr><td>Nb devoirs (fait / non fait)</td><td>Devoirs de la semaine, ventilés par statut</td></tr>
-            <tr><td>Nb devoirs demain (fait / non fait)</td><td>Devoirs pour le prochain jour de cours</td></tr>
-            <tr><td>EDT aujourd'hui — début / fin</td><td>Première et dernière heure de cours du jour</td></tr>
-            <tr><td>EDT aujourd'hui — cours annulés</td><td>Nombre de cours annulés aujourd'hui</td></tr>
-            <tr><td>EDT prochain jour — date / début / fin</td><td>Informations sur le prochain jour de cours</td></tr>
-            <tr><td>EDT prochain jour — cours annulés</td><td>Cours annulés du prochain jour</td></tr>
-            <tr><td>Cours annulés (total période)</td><td>Nombre total de cours annulés depuis la rentrée</td></tr>
+            <tr><td>Rafraîchir</td><td>action</td><td>Force une synchronisation immédiate avec Pronote (utilisable à toute heure, y compris durant la fenêtre nocturne).</td></tr>
+            <tr><td>Statut connexion</td><td>info</td><td>État courant : <code>Connecté</code>, <code>Déconnecté : &lt;raison&gt;</code> ou <code>Erreur : &lt;raison&gt;</code>. Utile pour scénarios d'alerte.</td></tr>
+            <tr><td>Dernière mise à jour</td><td>info</td><td>Horodatage de la dernière collecte réussie (commande <code>LastLogin</code>).</td></tr>
+            <tr><td>Nom de l'élève</td><td>info</td><td>Prénom et nom</td></tr>
+            <tr><td>Classe</td><td>info</td><td>Intitulé de la classe</td></tr>
+            <tr><td>Établissement</td><td>info</td><td>Nom de l'établissement scolaire</td></tr>
+            <tr><td>Photo</td><td>info</td><td>Chemin local de la photo de profil</td></tr>
+            <tr><td>URL iCal</td><td>info</td><td>Lien d'abonnement au calendrier Pronote</td></tr>
+            <tr><td>Nb absences / retards / punitions</td><td>info</td><td>Compteurs sur la période en cours</td></tr>
+            <tr><td>Nb devoirs (fait / non fait)</td><td>info</td><td>Devoirs de la semaine, ventilés par statut</td></tr>
+            <tr><td>Nb devoirs demain (fait / non fait)</td><td>info</td><td>Devoirs pour le prochain jour de cours</td></tr>
+            <tr><td>EDT aujourd'hui — début / fin / cours annulés</td><td>info</td><td>Repères horaires de la journée</td></tr>
+            <tr><td>EDT prochain jour — date / début / fin / cours annulés</td><td>info</td><td>Informations sur le prochain jour de cours</td></tr>
+            <tr><td>EDT J+1 à J+4</td><td>info</td><td>Emploi du temps détaillé sur les 4 prochains jours scolaires</td></tr>
+            <tr><td>Cours annulés (total période)</td><td>info</td><td>Nombre total de cours annulés depuis la rentrée</td></tr>
+            <tr><td>Liste des devoirs / absences / retards / punitions</td><td>info</td><td>Détails formatés HTML pour le widget</td></tr>
         </tbody>
     </table>
+    <div class="callout callout-info">
+        <strong>Fenêtre de synchronisation</strong>
+        Le cron Jeedom déclenche une collecte automatique toutes les heures, <strong>désactivé entre 22h et 4h</strong>
+        pour ne pas solliciter Pronote la nuit. La commande <em>Rafraîchir</em> reste utilisable à toute heure.
+    </div>
 
     <div class="callout callout-warning">
         <strong>Données manquantes ?</strong>
@@ -478,10 +499,26 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
     <!-- ── Historique ─────────────────────── -->
     <h1 id="version">Historique des versions</h1>
 
-    <h2>1.0 — Avril 2026</h2>
+    <h2>1.0.0 — Mai 2026 (stable)</h2>
     <table>
         <thead><tr><th>Type</th><th>Description</th></tr></thead>
         <tbody>
+            <tr>
+                <td><span class="badge badge-new">Nouveau</span></td>
+                <td><strong>Commande info <code>Statut_Connexion</code></strong> — expose en temps réel l'état de la connexion à Pronote (<code>Connecté</code>, <code>Déconnecté : …</code>, <code>Erreur : …</code>) pour bâtir des scénarios d'alerte sans parser les logs.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-perf">Amélioration</span></td>
+                <td><strong>Script d'installation des dépendances robuste et idempotent</strong> — vérification stricte de Python ≥ 3.8, détection des paquets déjà présents pour éviter les ré-installations inutiles, capture explicite des erreurs pip dans le log Jeedom. Le script peut être relancé sans risque.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sec">Sécurité</span></td>
+                <td><strong>Licence AGPL v3</strong> — migration officielle de la licence du plugin vers la GNU Affero General Public License v3 ; en-têtes de licence harmonisés sur les sources Python et PHP principales.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-perf">Amélioration</span></td>
+                <td><strong>Icône au gabarit Jeedom</strong> — l'icône respecte désormais le format 309×348 attendu par le Market Jeedom.</td>
+            </tr>
             <tr>
                 <td><span class="badge badge-fix">Correction</span></td>
                 <td><strong>Démon — module Python introuvable sur box Luna</strong> — le démon était lancé avec le Python système (<code>/usr/bin/python3</code>) au lieu du venv du plugin. Pronotepy étant installé uniquement dans le venv, le démon échouait avec <code>No module named 'pronotepy'</code>. Le démon utilise désormais systématiquement l'interpréteur du venv (<code>resources/python_venv/bin/python3</code>).</td>
@@ -732,7 +769,7 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
             <tr>
                 <td>Le démon ne démarre pas</td>
                 <td>
-                    Vérifiez que Python 3.9+ est installé : <code>python3 --version</code><br>
+                    Vérifiez que Python 3.8+ est installé : <code>python3 --version</code><br>
                     Vérifiez l'environnement virtuel : <code>ls /var/www/html/plugins/ProJote/resources/python_venv</code><br>
                     Relancez les dépendances depuis la page du plugin.
                 </td>

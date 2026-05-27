@@ -1,4 +1,9 @@
 <?php
+/* ProJote — plugin Jeedom pour Pronote
+ * Copyright (C) 2024-2026 Aldarande
+ * Licensed under the GNU Affero General Public License v3 or later.
+ * See <https://www.gnu.org/licenses/agpl-3.0.html> for full license text.
+ */
 
 /**
  * jeeProJote.php — Point de callback HTTP du démon Python vers Jeedom.
@@ -68,6 +73,14 @@ try {
     if ($connection_status === 'disconnected' || $connection_status === 'error') {
         $error_message = isset($result['error']) ? $result['error'] : 'Raison non spécifiée';
 
+        // Expose le statut dans la cmd info "Statut_Connexion" pour le widget et les scénarios.
+        if ($eqLogic->getCmd(null, 'Statut_Connexion')) {
+            $label = ($connection_status === 'disconnected')
+                ? 'Déconnecté : ' . $error_message
+                : 'Erreur : ' . $error_message;
+            $eqLogic->checkAndUpdateCmd('Statut_Connexion', $label);
+        }
+
         // Log le statut avec différenciation claire
         if ($connection_status === 'disconnected') {
             log::add('ProJote', 'warning', '[SESSION EXPIRÉE] ' . $eqLogic->getHumanName() . ' - ' . $error_message);
@@ -98,6 +111,11 @@ try {
     if (isset($result['ConnectionDate']) && $eqLogic->getCmd(null, 'LastLogin')) {
         log::add('ProJote', 'debug', 'Champ reçu : LastLogin - Valeur reçue : ' . $result['ConnectionDate']);
         $eqLogic->checkAndUpdateCmd('LastLogin', $result['ConnectionDate']);
+    }
+
+    // Cycle connecté : on rafraîchit la cmd "Statut_Connexion" en positif.
+    if ($connection_status === 'connected' && $eqLogic->getCmd(null, 'Statut_Connexion')) {
+        $eqLogic->checkAndUpdateCmd('Statut_Connexion', 'Connecté');
     }
 
     // Vérifie si des informations d'élève sont présentes
