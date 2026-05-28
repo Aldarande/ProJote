@@ -770,11 +770,17 @@ def messages(client):
             # Date du dernier message — selon pronotepy, attribut date ou date_last_message
             raw_date = _safe_attr(disc, "date", "date_last_message", default=None)
             date_str = ""
+            date_sort = ""  # Clé de tri chronologique (ISO ou epoch string)
             if raw_date:
                 try:
                     date_str = raw_date.strftime("%d/%m/%Y %H:%M")
                 except Exception:
                     date_str = str(raw_date)
+                try:
+                    # ISO 8601 trie lexicographiquement = chronologiquement
+                    date_sort = raw_date.strftime("%Y-%m-%dT%H:%M:%S")
+                except Exception:
+                    date_sort = str(raw_date)
 
             unread = bool(_safe_attr(disc, "unread", default=0))
             participants_count = 0
@@ -799,6 +805,7 @@ def messages(client):
                     "subject": str(subject),
                     "creator": str(creator),
                     "date": date_str,
+                    "_date_sort": date_sort,  # interne, retiré avant retour
                     "unread": unread,
                     "participants_count": participants_count,
                     "extrait": _truncate(last_content, 200),
@@ -807,17 +814,55 @@ def messages(client):
         except Exception as e:
             logging.error("Erreur sérialisation discussion : %s", e)
 
-    # Tri : non-lus d'abord, puis par date décroissante si possible
+    # « dernier message » = le plus récent chronologiquement, indépendamment du statut lu.
+    # Calcul avant tri d'affichage pour ne pas dépendre de l'ordre final.
+    dernier = {}
+    if messages_brut:
+        try:
+            dernier = max(messages_brut, key=lambda m: m.get("_date_sort") or "")
+        except Exception:
+            dernier = messages_brut[0]
+
+    # Tri d'affichage : non-lus d'abord, puis du plus récent au plus ancien.
+    # On utilise _date_sort (ISO 8601) qui se trie correctement lexicographiquement.
     try:
-        messages_brut.sort(key=lambda m: (0 if m["unread"] else 1, m["date"]), reverse=False)
-    except Exception:
-        pass
+        messages_brut.sort(
+            key=lambda m: (0 if m["unread"] else 1, m.get("_date_sort") or ""),
+            reverse=False,
+        )
+        # Si deux messages ont le même statut lu/non-lu, on veut le plus récent en premier ;
+        # le tri ci-dessus met le plus ancien en premier dans un groupe. On inverse par groupe.
+        messages_brut = sorted(
+            messages_brut,
+            key=lambda m: (0 if m["unread"] else 1, -1),
+        )
+        # Re-trier finalement avec un comparateur composite : groupes par unread, puis date desc.
+        from functools import cmp_to_key
+
+        def _msg_cmp(a, b):
+            # Non-lus avant lus
+            ua, ub = (0 if a["unread"] else 1), (0 if b["unread"] else 1)
+            if ua != ub:
+                return ua - ub
+            # Date décroissante (plus récent en premier)
+            da, db = a.get("_date_sort") or "", b.get("_date_sort") or ""
+            if da > db:
+                return -1
+            if da < db:
+                return 1
+            return 0
+
+        messages_brut.sort(key=cmp_to_key(_msg_cmp))
+    except Exception as e:
+        logging.debug("Tri messages : %s", e)
+
+    # Nettoyage : retirer la clé interne _date_sort avant exposition
+    for m in messages_brut:
+        m.pop("_date_sort", None)
+    dernier.pop("_date_sort", None) if isinstance(dernier, dict) else None
 
     nb_total = len(messages_brut)
     nb_non_lus = sum(1 for m in messages_brut if m["unread"])
-
-    # Le « dernier message » = le plus récent par date string si on sait trier, sinon le premier
-    dernier = messages_brut[0] if messages_brut else {}
 
     # HTML compact pour le widget — pattern aligné sur les autres listes
     html_parts = []
