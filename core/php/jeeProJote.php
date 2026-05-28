@@ -320,6 +320,10 @@ try {
     if (is_array($result["Menus"])) {
         // Parcourt toutes les clés possibles
         foreach ($result["Menus"] as $key => $value) {
+            // Saute les structures complexes destinées aux scénarios avancés
+            if ($key === 'menus_brut' || $key === 'error') {
+                continue;
+            }
             // Vérifie si la clé existe et met à jour la commande correspondante
             if (isset($value) && $eqLogic->getCmd(null, $key)) {
                 log::add('ProJote', 'debug', 'Champ reçu : ' . $key . ' - Valeur reçue : ' . print_r($value, true));
@@ -328,6 +332,23 @@ try {
         }
     } else {
         log::add('ProJote', 'debug', 'Menus non reçu');
+    }
+
+    // ── Messagerie Pronote (v1.0.1) ─────────────────────────────────────────
+    // Le démon envoie un dict avec sous-clés Nb_messages_non_lus,
+    // dernier_message_*, messages_html, etc. On itère comme pour Menus.
+    if (isset($result["Messages"]) && is_array($result["Messages"])) {
+        foreach ($result["Messages"] as $key => $value) {
+            if ($key === 'messages_brut' || $key === 'error') {
+                continue;
+            }
+            if (isset($value) && $eqLogic->getCmd(null, $key)) {
+                log::add('ProJote', 'debug', 'Champ reçu : ' . $key . ' - Valeur reçue : ' . print_r($value, true));
+                $eqLogic->checkAndUpdateCmd($key, $value);
+            }
+        }
+    } else {
+        log::add('ProJote', 'debug', 'Messages non reçu');
     }
     // Vérifie les entrées des compétences
     if (isset($result["Competences"]) && $eqLogic->getCmd(null, 'competences')) {

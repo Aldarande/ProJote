@@ -722,6 +722,63 @@
         /* 10px */
         letter-spacing: .3px;
     }
+
+    /* ── v1.0.1 — Badge "Prochain DS" en-tête ───────────────── */
+    .pjw-#id# .ph-badge-ds {
+        display: inline-block;
+        margin-top: 6px;
+        padding: 3px 9px;
+        background: linear-gradient(135deg, #e67e22, #d35400);
+        color: #fff;
+        font-size: 0.78em;
+        font-weight: 700;
+        border-radius: 12px;
+        letter-spacing: .3px;
+        user-select: none;
+    }
+
+    /* ── v1.0.1 — Onglet Menu cantine ───────────────────────── */
+    .pjw-#id# .pj-menu-today {
+        padding: 6px 10px;
+        margin-bottom: 8px;
+        background: rgba(39, 174, 96, .08);
+        border-left: 3px solid #27ae60;
+        font-size: 0.92em;
+    }
+    .pjw-#id# .pj-menu-row {
+        display: flex;
+        gap: 8px;
+        align-items: baseline;
+        padding: 4px 6px;
+        border-bottom: 1px solid rgba(0,0,0,.06);
+        font-size: 0.85em;
+    }
+    .pjw-#id# .pj-menu-row:last-child { border-bottom: none; }
+    .pjw-#id# .pj-menu-date { color: var(--pjw-a, #94C904); font-weight: 600; min-width: 78px; }
+    .pjw-#id# .pj-menu-type { color: inherit; opacity: .65; min-width: 56px; }
+    .pjw-#id# .pj-menu-text { flex: 1; }
+
+    /* ── v1.0.1 — Onglet Messagerie ─────────────────────────── */
+    .pjw-#id# .pj-msg-row {
+        padding: 6px 8px;
+        border-bottom: 1px solid rgba(0,0,0,.06);
+        font-size: 0.88em;
+    }
+    .pjw-#id# .pj-msg-row.pj-msg-unread {
+        background: rgba(231, 126, 34, .07);
+        border-left: 3px solid #e67e22;
+        padding-left: 6px;
+    }
+    .pjw-#id# .pj-msg-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        font-size: 0.85em;
+        opacity: .75;
+    }
+    .pjw-#id# .pj-msg-sender { font-weight: 600; }
+    .pjw-#id# .pj-msg-subject { font-weight: 600; margin-top: 2px; }
+    .pjw-#id# .pj-msg-extract { opacity: .8; margin-top: 2px; }
 </style>
 
 <div class="pjw-#id#">
@@ -738,6 +795,8 @@
                 <div class="ph-ts" id="pjwts#id#"></div>
             </div>
             <div class="ph-class" id="pjwcl#id#"></div>
+            <!-- v1.0.1 : badge prochain DS / évaluation -->
+            <div class="ph-badge-ds" id="pjwds#id#" style="display:none"></div>
         </div>
     </div>
 
@@ -796,6 +855,11 @@
                     id="pjwbret#id#"></span></button>
             <button class="tab-btn" data-tab="pun#id#"><i class="fas fa-exclamation-triangle"></i> Pun.<span
                     class="tab-badge" id="pjwbpun#id#"></span></button>
+            <!-- v1.0.1 -->
+            <button class="tab-btn" data-tab="menu#id#"><i class="fas fa-utensils"></i> Menu<span class="tab-badge"
+                    id="pjwbmenu#id#"></span></button>
+            <button class="tab-btn" data-tab="msg#id#"><i class="fas fa-envelope"></i> Msg<span class="tab-badge"
+                    id="pjwbmsg#id#"></span></button>
         </div>
 
         <!-- Devoirs (défaut) -->
@@ -830,6 +894,20 @@
         <div class="tab-pane" id="pun#id#">
             <div id="pjwpun#id#">
                 <div class="p-empty">–</div>
+            </div>
+        </div>
+
+        <!-- v1.0.1 — Menu cantine -->
+        <div class="tab-pane" id="menu#id#">
+            <div id="pjwmenu#id#">
+                <div class="p-empty">Aucun menu</div>
+            </div>
+        </div>
+
+        <!-- v1.0.1 — Messagerie -->
+        <div class="tab-pane" id="msg#id#">
+            <div id="pjwmsg#id#">
+                <div class="p-empty">Aucun message</div>
             </div>
         </div>
     </div>
@@ -1001,12 +1079,14 @@
                 }
 
                 if (canceled) {
+                    // v1.0.1 : enrichissement avec prof (matière · prof · salle — Annulé)
+                    var prof = c.Professeur ? ' · ' + c.Professeur : '';
                     result.push(
-                        '<div class="edt-pill edt-pill-annule">' +
+                        '<div class="edt-pill edt-pill-annule" title="' + escAttr(name + prof + room) + ' — Annulé">' +
                         '<div class="edt-pill-bar" style="background:' + esc(color) + '"></div>' +
                         '<div class="edt-pill-text">' +
                         '<span class="edt-t-start">' + esc(time) + '</span>' +
-                        '<span class="edt-t-annule">❌ ' + esc(name + room) + ' — Annulé</span>' +
+                        '<span class="edt-t-annule">❌ ' + esc(name + prof + room) + ' — Annulé</span>' +
                         '<span class="edt-t-end">' + esc(timeEnd) + '</span>' +
                         '</div>' +
                         '</div>'
@@ -1426,6 +1506,74 @@
             dvEl.innerHTML = html || '<div class="p-empty">Aucun devoir</div>';
         }
 
+        /* ─── MENU CANTINE (v1.0.1) ───────────────────────── */
+        function renderMenu(d) {
+            var elM = el('pjwmenu' + ID);
+            if (!elM) return;
+            if (VIS && VIS.menu === false) {
+                var pane = el('menu' + ID); if (pane) pane.style.display = 'none'; return;
+            }
+            var html = '';
+            var hasToday = d.menu_midi_aujourdhui && d.menu_midi_aujourdhui.length;
+            var hasTomorrow = d.menu_midi_demain && d.menu_midi_demain.length;
+            if (hasToday) {
+                html += '<div class="dv-section-title">Aujourd\'hui — midi</div>' +
+                    '<div class="pj-menu-today">' + esc(d.menu_midi_aujourdhui) + '</div>';
+            }
+            if (hasTomorrow) {
+                html += '<div class="dv-section-title">Demain — midi</div>' +
+                    '<div class="pj-menu-today">' + esc(d.menu_midi_demain) + '</div>';
+            }
+            if (d.menu_semaine && d.menu_semaine.length) {
+                html += '<div class="dv-section-title">Semaine</div>' + d.menu_semaine;
+            }
+            elM.innerHTML = html || '<div class="p-empty">Aucun menu cantine disponible</div>';
+        }
+
+        /* ─── MESSAGERIE (v1.0.1) ─────────────────────────── */
+        function renderMessages(d) {
+            var elM = el('pjwmsg' + ID);
+            if (!elM) return;
+            if (VIS && VIS.messages === false) {
+                var pane = el('msg' + ID); if (pane) pane.style.display = 'none'; return;
+            }
+            if (d.messages_html && d.messages_html.length) {
+                elM.innerHTML = d.messages_html;
+            } else {
+                elM.innerHTML = '<div class="p-empty">Aucun message</div>';
+            }
+        }
+
+        /* ─── BADGE PROCHAIN DS (v1.0.1) ──────────────────── */
+        function renderProchainDS(d) {
+            var elDS = el('pjwds' + ID);
+            if (!elDS) return;
+            if (VIS && VIS.prochain_ds === false) {
+                elDS.style.display = 'none'; return;
+            }
+            var matiere = d.prochain_DS_matiere || '';
+            var date = d.prochain_DS_date || '';
+            var jours = (typeof d.prochain_DS_dans_jours === 'number') ? d.prochain_DS_dans_jours : -1;
+            if (!matiere || jours < 0) {
+                elDS.style.display = 'none';
+                elDS.textContent = '';
+                return;
+            }
+            var label = '📝 DS ' + matiere;
+            if (jours === 0) label += ' · aujourd\'hui';
+            else if (jours === 1) label += ' · demain';
+            else label += ' · J-' + jours;
+            elDS.textContent = label;
+            elDS.title = matiere + ' — ' + date;
+            elDS.style.display = '';
+            elDS.style.cursor = 'pointer';
+            elDS.onclick = function () {
+                // Ouvre l'onglet Devoirs
+                var btn = document.querySelector('[data-tab="dv' + ID + '"]');
+                if (btn) btn.click();
+            };
+        }
+
         /* ─── ONGLETS : gestion des clics + onglet par défaut ─ */
         function initTabs() {
             var tabsEl = el('pjwtabs' + ID);
@@ -1490,12 +1638,17 @@
             renderRetards(d);
             renderPunitions(d);
             renderDevoirs(d);
+            // v1.0.1
+            renderMenu(d);
+            renderMessages(d);
+            renderProchainDS(d);
             // Masquer les boutons d'onglets des sections non visibles
             var tabsEl = el('pjwtabs' + ID);
             if (tabsEl) {
                 var btnMap = {
                     'abs': VIS.absences, 'ret': VIS.retards, 'pun': VIS.punitions,
-                    'notes': VIS.notes, 'dv': VIS.devoirs
+                    'notes': VIS.notes, 'dv': VIS.devoirs,
+                    'menu': VIS.menu !== false, 'msg': VIS.messages !== false
                 };
                 tabsEl.querySelectorAll('.tab-btn').forEach(function (btn) {
                     var tab = (btn.getAttribute('data-tab') || '').replace(ID, '');
@@ -1510,6 +1663,9 @@
             setBadge('pjwbpun' + ID, d.nb_punitions);
             var dvCount = ((d.devoirs || []).concat(d.devoirs_demain || [])).filter(function (dv) { return !dv.done; }).length;
             setBadge('pjwbdv' + ID, dvCount);
+            // v1.0.1 : badges menus et messages non lus
+            setBadge('pjwbmenu' + ID, d.Nb_menus_semaine);
+            setBadge('pjwbmsg' + ID, d.Nb_messages_non_lus);
         }
 
         /* ─── INITIALISATION ──────────────────────────────── */
