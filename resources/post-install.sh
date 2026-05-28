@@ -66,7 +66,7 @@ fi
 # ── Installation idempotente des paquets ───────────────────────────────────
 # Format : "nom_pip:contrainte_version" — contrainte vide = dernière version.
 PACKAGES=(
-    "pronotepy:"
+    "pronotepy:>=2.14,<3.0"
     "autoslot:"
     "cryptography:"
     "pycryptodome:==3.20.0"
