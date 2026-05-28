@@ -304,6 +304,7 @@
             <tr><td>Paquet système</td><td><code>python3-venv</code> (installé automatiquement par Jeedom dans la plupart des cas)</td></tr>
             <tr><td>Compte Pronote</td><td>Compte élève ou parent actif sur le portail Pronote de l'établissement</td></tr>
             <tr><td>Réseau</td><td>Accès sortant HTTPS vers le serveur Pronote de l'établissement (et l'ENT si utilisé)</td></tr>
+            <tr><td>pronotepy</td><td>Branche 2.x (installation contrainte à <code>&gt;=2.14,&lt;3.0</code> depuis la v1.0.1)</td></tr>
         </tbody>
     </table>
 
@@ -409,6 +410,24 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
             <tr><td>EDT J+1 à J+4</td><td>info</td><td>Emploi du temps détaillé sur les 4 prochains jours scolaires</td></tr>
             <tr><td>Cours annulés (total période)</td><td>info</td><td>Nombre total de cours annulés depuis la rentrée</td></tr>
             <tr><td>Liste des devoirs / absences / retards / punitions</td><td>info</td><td>Détails formatés HTML pour le widget</td></tr>
+            <tr><td colspan="3" style="background:rgba(39,174,96,.08);font-weight:600;">— Menu cantine (v1.0.1) —</td></tr>
+            <tr><td>menu_midi_aujourdhui</td><td>info</td><td>Texte lisible du menu de midi du jour ("Entrée · Plat · Dessert…"). Vide si pas de menu.</td></tr>
+            <tr><td>menu_midi_demain</td><td>info</td><td>Idem pour le lendemain.</td></tr>
+            <tr><td>menu_semaine</td><td>info</td><td>HTML compact des menus sur 7 jours (consommé par le widget).</td></tr>
+            <tr><td>Nb_menus_semaine</td><td>info</td><td>Nombre de menus disponibles dans la fenêtre.</td></tr>
+            <tr><td colspan="3" style="background:rgba(231,126,34,.08);font-weight:600;">— Messagerie (v1.0.1) —</td></tr>
+            <tr><td>Nb_messages</td><td>info</td><td>Nombre total de discussions visibles.</td></tr>
+            <tr><td>Nb_messages_non_lus</td><td>info</td><td>Compteur des messages non lus. Idéal pour scénarios d'alerte (TTS, push…).</td></tr>
+            <tr><td>dernier_message_expediteur</td><td>info</td><td>Créateur (souvent un prof ou le CPE).</td></tr>
+            <tr><td>dernier_message_sujet</td><td>info</td><td>Objet du dernier message.</td></tr>
+            <tr><td>dernier_message_date</td><td>info</td><td>Date du dernier message <code>dd/mm/yyyy HH:MM</code>.</td></tr>
+            <tr><td>dernier_message_extrait</td><td>info</td><td>Contenu tronqué à 200 caractères.</td></tr>
+            <tr><td>messages_html</td><td>info</td><td>Liste HTML compacte de toutes les discussions (consommée par l'onglet Msg).</td></tr>
+            <tr><td colspan="3" style="background:rgba(192,57,43,.08);font-weight:600;">— Prochain DS / évaluation (v1.0.1) —</td></tr>
+            <tr><td>prochain_DS_matiere</td><td>info</td><td>Matière du prochain devoir surveillé détecté. Vide si aucun DS à venir.</td></tr>
+            <tr><td>prochain_DS_date</td><td>info</td><td>Date au format <code>dd/mm/yyyy</code>.</td></tr>
+            <tr><td>prochain_DS_dans_jours</td><td>info</td><td>Nombre de jours avant le DS (entier). Pratique pour scénarios <em>mode révision</em>.</td></tr>
+            <tr><td>prochains_DS_html</td><td>info</td><td>Liste HTML des 5 prochains DS détectés.</td></tr>
         </tbody>
     </table>
     <div class="callout callout-info">
@@ -431,7 +450,9 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
         <li><strong>Vie scolaire</strong> — badges circulaires pour absences, retards, punitions, devoirs non faits</li>
         <li><strong>Emploi du temps</strong> — cours d'aujourd'hui + navigation vers les 4 prochains jours scolaires, nombre de cours annulés depuis la rentrée</li>
         <li><strong>Moyenne générale</strong> — barre dégradée rouge→vert avec tendance (hausse/baisse)</li>
-        <li><strong>Onglets</strong> — Devoirs · Notes · Absences · Retards · Punitions</li>
+        <li><strong>Onglets</strong> — Devoirs · Notes · Absences · Retards · Punitions · <strong>Menu cantine</strong> (v1.0.1) · <strong>Messagerie</strong> (v1.0.1)</li>
+        <li><strong>Badge "Prochain DS"</strong> <em>(v1.0.1)</em> — en-tête, libellé adaptatif <em>aujourd'hui</em> / <em>demain</em> / <em>J-X</em>. Visible uniquement si un DS est à venir. Un clic ouvre l'onglet Devoirs.</li>
+        <li><strong>Détail cours annulés</strong> <em>(v1.0.1)</em> — affichage <code>Matière · Professeur · Salle — Annulé</code> dans l'EDT.</li>
         <li><strong>Spinner de chargement</strong> — le logo ProJote tourne dans la zone avatar pendant la collecte ; un clic déclenche un rafraîchissement manuel</li>
     </ul>
 
@@ -454,7 +475,7 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
             </tr>
             <tr>
                 <td><strong>Onglet par défaut</strong></td>
-                <td>Devoirs · Notes · Absences · Retards · Punitions</td>
+                <td>Devoirs · Notes · Absences · Retards · Punitions · Menu cantine · Messagerie</td>
                 <td>Devoirs</td>
                 <td>Onglet ouvert à l'affichage initial du widget.</td>
             </tr>
@@ -498,6 +519,41 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
 
     <!-- ── Historique ─────────────────────── -->
     <h1 id="version">Historique des versions</h1>
+
+    <h2>1.0.1 — Mai 2026</h2>
+    <table>
+        <thead><tr><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><span class="badge badge-new">Nouveau</span></td>
+                <td><strong>Menu cantine — onglet dédié</strong> — la collecte des menus Pronote (déjà câblée côté démon) est désormais exposée en commandes Jeedom et rendue dans un onglet <em>Menu</em> du widget. Nouvelles commandes : <code>menu_midi_aujourdhui</code>, <code>menu_midi_demain</code>, <code>menu_semaine</code> (HTML), <code>Nb_menus_semaine</code>. Fenêtre de collecte étendue à 7 jours.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-new">Nouveau</span></td>
+                <td><strong>Messagerie Pronote (lecture)</strong> — nouvel onglet <em>Msg</em> dans le widget listant les discussions Pronote (sujet, expéditeur, date, extrait). Messages non lus mis en évidence et badge sur l'onglet. Nouvelles commandes : <code>Nb_messages</code>, <code>Nb_messages_non_lus</code>, <code>dernier_message_expediteur</code>, <code>dernier_message_sujet</code>, <code>dernier_message_date</code>, <code>dernier_message_extrait</code>, <code>messages_html</code>.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-new">Nouveau</span></td>
+                <td><strong>Badge "Prochain DS"</strong> — détection heuristique (mots-clés <code>contrôle</code>, <code>DS</code>, <code>évaluation</code>, <code>interro</code>, <code>test</code>, <code>examen</code>) sur la description et la matière des devoirs. Badge orange dans l'en-tête du widget (affiché uniquement si un DS est à venir), libellé adaptatif <em>aujourd'hui</em> / <em>demain</em> / <em>J-X</em>. Un clic ouvre l'onglet Devoirs. Nouvelles commandes : <code>prochain_DS_matiere</code>, <code>prochain_DS_date</code>, <code>prochain_DS_dans_jours</code>, <code>prochains_DS_html</code>.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-perf">Amélioration</span></td>
+                <td><strong>EDT — détail des cours annulés</strong> — les créneaux annulés affichent désormais <code>Matière · Professeur · Salle — Annulé</code> au lieu de <code>Matière · Salle — Annulé</code>. Un tooltip reprend l'info complète au survol.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-perf">Amélioration</span></td>
+                <td><strong>Onglet par défaut configurable étendu</strong> — les nouveaux onglets <em>Menu cantine</em> et <em>Messagerie</em> sont sélectionnables dans le paramètre <em>Onglet par défaut</em> (Affichage → Paramètres avancés).</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sec">Sécurité</span></td>
+                <td><strong>pronotepy pinné</strong> — contrainte de version <code>pronotepy&gt;=2.14,&lt;3.0</code> dans <code>post-install.sh</code> pour éviter qu'une future 3.x publiée en breaking change ne casse les démons en production.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correction</span></td>
+                <td><strong>Sortie de la collecte des menus</strong> — l'ancienne version retournait une liste plate inexploitable par le PHP. Refactorisée pour produire un dictionnaire structuré directement consommable par la boucle de callback Jeedom.</td>
+            </tr>
+        </tbody>
+    </table>
 
     <h2>1.0.0 — Mai 2026 (stable)</h2>
     <table>
@@ -711,6 +767,26 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
 
     <h2>Le démon refuse de démarrer, que faire ?</h2>
     <p>Consultez la section <a href="#depannage">Dépannage</a> ci-dessous.</p>
+
+    <h2>L'onglet Menu cantine est vide, pourquoi ? <span class="badge badge-new">v1.0.1</span></h2>
+    <p>Tous les établissements ne publient pas les menus dans Pronote. Si la cantine est gérée par un prestataire externe
+    sans intégration Pronote, le démon n'aura simplement rien à collecter. Vérifiez dans Pronote (espace Communication →
+    Menu) si les menus sont visibles côté navigateur — si oui mais que l'onglet reste vide dans Jeedom, ouvrez une issue
+    GitHub avec les logs en mode <em>Debug</em>.</p>
+
+    <h2>La messagerie n'affiche rien ou affiche une erreur <span class="badge badge-new">v1.0.1</span></h2>
+    <p>La messagerie utilise <code>client.discussions()</code> de pronotepy. Quelques cas connus :</p>
+    <ul>
+        <li><strong>pronotepy &lt; 2.14</strong> : méthode indisponible — relancez l'installation des dépendances (la contrainte de version a été ajoutée en v1.0.1).</li>
+        <li><strong>Compte parent multi-enfants</strong> : la collecte porte sur l'enfant actuellement sélectionné. Vérifiez que c'est bien le bon.</li>
+        <li><strong>Établissement bloquant la messagerie côté API</strong> : certains établissements désactivent les discussions hors de l'interface web officielle. Aucun contournement possible.</li>
+    </ul>
+
+    <h2>Pourquoi le badge "Prochain DS" ne s'affiche pas ? <span class="badge badge-new">v1.0.1</span></h2>
+    <p>La détection est <strong>heuristique</strong> : elle parcourt la description et le nom de matière des devoirs pour
+    repérer les mots-clés <code>contrôle</code>, <code>DS</code>, <code>évaluation</code>, <code>interro</code>,
+    <code>test</code>, <code>examen</code>. Si vos profs n'utilisent jamais ces termes (ex : "Préparer le chapitre 5"),
+    rien ne sera détecté. Le badge reste également masqué s'il n'y a aucun DS dans les 120 prochains jours.</p>
 
     <!-- ── Sécurité ───────────────────────── -->
     <h1 id="securite">Sécurité</h1>
