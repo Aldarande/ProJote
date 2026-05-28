@@ -579,23 +579,410 @@ def Emploidutemps(client):
         return {"error": error_msg}
 
 
+def _menu_to_text(menu_data):
+    """Convertit un menu sérialisé (build_menu_data) en chaîne lisible.
+
+    Format : "Entrée · Plat · Accompagnement · Fromage · Dessert"
+    Les sections vides sont omises. Renvoie "" si aucun aliment.
+    """
+    sections = []
+    for key in ("first_meal", "main_meal", "side_meal", "cheese", "dessert", "other_meal"):
+        items = menu_data.get(key) or []
+        names = [str(item.get("name", "")).strip() for item in items if item.get("name")]
+        names = [n for n in names if n]
+        if names:
+            sections.append(", ".join(names))
+    return " · ".join(sections)
+
+
+def _menu_to_html_row(menu_data):
+    """Une ligne HTML compacte représentant un menu pour le widget."""
+    import html as _html_mod
+
+    date_iso = menu_data.get("date", "")
+    is_lunch = menu_data.get("is_lunch", False)
+    is_dinner = menu_data.get("is_dinner", False)
+    repas_label = "🍽️ Midi" if is_lunch else ("🌙 Soir" if is_dinner else "🍴 Repas")
+    text = _menu_to_text(menu_data) or "—"
+    return (
+        f'<div class="pj-menu-row">'
+        f'<span class="pj-menu-date">{_html_mod.escape(date_iso)}</span>'
+        f'<span class="pj-menu-type">{_html_mod.escape(repas_label)}</span>'
+        f'<span class="pj-menu-text">{_html_mod.escape(text)}</span>'
+        f"</div>"
+    )
+
+
 def menus(client):
+    """Collecte les menus cantine sur 7 jours et construit les agrégats widget.
+
+    Retourne un dict avec :
+      - menu_midi_aujourdhui : texte lisible du menu de midi du jour (ou "")
+      - menu_midi_demain     : idem pour le lendemain
+      - menu_semaine         : HTML compact des 7 prochains jours
+      - Nb_menus_semaine     : nombre de menus dans la fenêtre
+      - menus_brut           : liste complète des menus sérialisés (build_menu_data)
+
+    pronotepy v2.14+ : client.menus(date_from, date_to=None) → List[Menu]
+    En cas d'erreur, retourne un dict avec clé 'error' et valeurs neutres
+    (pattern d'isolation des erreurs par feature, cf. notes, devoirs…).
+    """
+    today = datetime.date.today()
+    week_end = today + datetime.timedelta(days=7)
+    empty = {
+        "menu_midi_aujourdhui": "",
+        "menu_midi_demain": "",
+        "menu_semaine": "",
+        "Nb_menus_semaine": 0,
+        "menus_brut": [],
+    }
     try:
-        data = {"Menu": []}
-        # Récupération des menus
-        menu_today = client.menus(datetime.date.today())
-        if not menu_today == []:
-            # On trie les menus par date
-            menu_today = sorted(menu_today, key=lambda m: m.date)
-            # Transformation des menu en json
-            for menu in menu_today:
-                data["Menu"].append(build_menu_data(menu))
-        else:
-            logging.info("Aucun menu trouvé pour la date du jour.")
-            time.sleep(5)
-        return data["Menu"]
+        menu_list = client.menus(today, week_end)
+    except TypeError:
+        # Compat ancienne signature : un seul argument
+        try:
+            menu_list = client.menus(today)
+        except Exception as e:
+            logging.error("Erreur lors de l'appel client.menus : %s", e)
+            empty["error"] = f"Erreur d'accès aux menus : {e}"
+            return empty
     except Exception as e:
-        logging.error("Un erreur est retourné sur le traitement des Menus: %s", e)
+        logging.error("Erreur lors de l'appel client.menus : %s", e)
+        empty["error"] = f"Erreur d'accès aux menus : {e}"
+        return empty
+
+    if not menu_list:
+        logging.info("Aucun menu cantine trouvé pour la fenêtre %s → %s.", today, week_end)
+        return empty
+
+    try:
+        menu_list = sorted(menu_list, key=lambda m: m.date)
+    except Exception:
+        pass
+
+    menus_brut = []
+    for menu in menu_list:
+        try:
+            menus_brut.append(build_menu_data(menu))
+        except Exception as e:
+            logging.error("Erreur sérialisation menu : %s", e)
+
+    tomorrow = today + datetime.timedelta(days=1)
+    today_iso = today.strftime("%Y-%m-%d")
+    tomorrow_iso = tomorrow.strftime("%Y-%m-%d")
+
+    menu_midi_today = ""
+    menu_midi_tomorrow = ""
+    for m in menus_brut:
+        if not m.get("is_lunch"):
+            continue
+        if m.get("date") == today_iso and not menu_midi_today:
+            menu_midi_today = _menu_to_text(m)
+        elif m.get("date") == tomorrow_iso and not menu_midi_tomorrow:
+            menu_midi_tomorrow = _menu_to_text(m)
+
+    menu_semaine_html = "".join(_menu_to_html_row(m) for m in menus_brut)
+
+    return {
+        "menu_midi_aujourdhui": menu_midi_today,
+        "menu_midi_demain": menu_midi_tomorrow,
+        "menu_semaine": menu_semaine_html,
+        "Nb_menus_semaine": len(menus_brut),
+        "menus_brut": menus_brut,
+    }
+
+
+def _truncate(text, max_len=200):
+    """Tronque proprement un texte avec ellipse."""
+    if not text:
+        return ""
+    text = str(text).strip()
+    if len(text) <= max_len:
+        return text
+    return text[: max_len - 1].rstrip() + "…"
+
+
+def _safe_attr(obj, *names, default=""):
+    """Renvoie le premier attribut existant et non-vide parmi `names`.
+
+    Utile pour pronotepy qui peut renommer/déplacer des attributs entre versions.
+    """
+    for name in names:
+        try:
+            val = getattr(obj, name, None)
+            if val not in (None, ""):
+                return val
+        except Exception:
+            continue
+    return default
+
+
+def messages(client):
+    """Collecte les discussions Pronote (messagerie) et construit les agrégats widget.
+
+    Retourne un dict avec :
+      - Nb_messages_non_lus       : compteur entier
+      - dernier_message_expediteur: nom du créateur du dernier message
+      - dernier_message_sujet     : objet (sujet) du dernier message
+      - dernier_message_date      : date formatée dd/mm/yyyy HH:MM
+      - dernier_message_extrait   : contenu tronqué (200 caractères)
+      - messages_html             : liste HTML compacte des discussions pour widget
+      - Nb_messages               : compteur total des discussions visibles
+      - messages_brut             : liste structurée des discussions
+
+    pronotepy : Client.discussions() → List[Discussion]
+    Pattern d'isolation des erreurs (cf. menus, notes…).
+    """
+    import html as _html_mod
+
+    empty = {
+        "Nb_messages": 0,
+        "Nb_messages_non_lus": 0,
+        "dernier_message_expediteur": "",
+        "dernier_message_sujet": "",
+        "dernier_message_date": "",
+        "dernier_message_extrait": "",
+        "messages_html": "",
+        "messages_brut": [],
+    }
+
+    try:
+        # ParentClient peut nécessiter de cibler l'enfant sélectionné. Le client.discussions()
+        # fonctionne sur le client courant (élève direct ou child sélectionné via _selected_child).
+        discussions = client.discussions()
+    except AttributeError:
+        logging.info("pronotepy : client.discussions() indisponible — messagerie ignorée.")
+        return empty
+    except Exception as e:
+        logging.error("Erreur lors de l'accès aux discussions Pronote : %s", e)
+        empty["error"] = f"Erreur d'accès à la messagerie : {e}"
+        return empty
+
+    if not discussions:
+        logging.info("Aucune discussion Pronote retournée.")
+        return empty
+
+    messages_brut = []
+    for disc in discussions:
+        try:
+            subject = _safe_attr(disc, "subject", default="(sans objet)")
+            creator = _safe_attr(disc, "creator", "sender", default="")
+            # Date du dernier message — selon pronotepy, attribut date ou date_last_message
+            raw_date = _safe_attr(disc, "date", "date_last_message", default=None)
+            date_str = ""
+            date_sort = ""  # Clé de tri chronologique (ISO ou epoch string)
+            if raw_date:
+                try:
+                    date_str = raw_date.strftime("%d/%m/%Y %H:%M")
+                except Exception:
+                    date_str = str(raw_date)
+                try:
+                    # ISO 8601 trie lexicographiquement = chronologiquement
+                    date_sort = raw_date.strftime("%Y-%m-%dT%H:%M:%S")
+                except Exception:
+                    date_sort = str(raw_date)
+
+            unread = bool(_safe_attr(disc, "unread", default=0))
+            participants_count = 0
+            try:
+                participants = _safe_attr(disc, "participants", default=[]) or []
+                participants_count = len(participants)
+            except Exception:
+                participants_count = 0
+
+            # Contenu : Discussion.messages est généralement une List[Message]
+            last_content = ""
+            try:
+                msg_list = _safe_attr(disc, "messages", default=[]) or []
+                if msg_list:
+                    last_msg = msg_list[-1]
+                    last_content = _safe_attr(last_msg, "content", "body", default="")
+            except Exception:
+                last_content = ""
+
+            messages_brut.append(
+                {
+                    "subject": str(subject),
+                    "creator": str(creator),
+                    "date": date_str,
+                    "_date_sort": date_sort,  # interne, retiré avant retour
+                    "unread": unread,
+                    "participants_count": participants_count,
+                    "extrait": _truncate(last_content, 200),
+                }
+            )
+        except Exception as e:
+            logging.error("Erreur sérialisation discussion : %s", e)
+
+    # « dernier message » = le plus récent chronologiquement, indépendamment du statut lu.
+    # Calcul avant tri d'affichage pour ne pas dépendre de l'ordre final.
+    dernier = {}
+    if messages_brut:
+        try:
+            dernier = max(messages_brut, key=lambda m: m.get("_date_sort") or "")
+        except Exception:
+            dernier = messages_brut[0]
+
+    # Tri d'affichage : non-lus d'abord, puis du plus récent au plus ancien.
+    # On utilise _date_sort (ISO 8601) qui se trie correctement lexicographiquement.
+    try:
+        messages_brut.sort(
+            key=lambda m: (0 if m["unread"] else 1, m.get("_date_sort") or ""),
+            reverse=False,
+        )
+        # Si deux messages ont le même statut lu/non-lu, on veut le plus récent en premier ;
+        # le tri ci-dessus met le plus ancien en premier dans un groupe. On inverse par groupe.
+        messages_brut = sorted(
+            messages_brut,
+            key=lambda m: (0 if m["unread"] else 1, -1),
+        )
+        # Re-trier finalement avec un comparateur composite : groupes par unread, puis date desc.
+        from functools import cmp_to_key
+
+        def _msg_cmp(a, b):
+            # Non-lus avant lus
+            ua, ub = (0 if a["unread"] else 1), (0 if b["unread"] else 1)
+            if ua != ub:
+                return ua - ub
+            # Date décroissante (plus récent en premier)
+            da, db = a.get("_date_sort") or "", b.get("_date_sort") or ""
+            if da > db:
+                return -1
+            if da < db:
+                return 1
+            return 0
+
+        messages_brut.sort(key=cmp_to_key(_msg_cmp))
+    except Exception as e:
+        logging.debug("Tri messages : %s", e)
+
+    # Nettoyage : retirer la clé interne _date_sort avant exposition
+    for m in messages_brut:
+        m.pop("_date_sort", None)
+    dernier.pop("_date_sort", None) if isinstance(dernier, dict) else None
+
+    nb_total = len(messages_brut)
+    nb_non_lus = sum(1 for m in messages_brut if m["unread"])
+
+    # HTML compact pour le widget — pattern aligné sur les autres listes
+    html_parts = []
+    for m in messages_brut:
+        unread_cls = " pj-msg-unread" if m["unread"] else ""
+        html_parts.append(
+            f'<div class="pj-msg-row{unread_cls}">'
+            f'<div class="pj-msg-head">'
+            f'<span class="pj-msg-sender">{_html_mod.escape(m["creator"]) or "—"}</span>'
+            f'<span class="pj-msg-date">{_html_mod.escape(m["date"])}</span>'
+            f"</div>"
+            f'<div class="pj-msg-subject">{_html_mod.escape(m["subject"])}</div>'
+            f'<div class="pj-msg-extract">{_html_mod.escape(m["extrait"])}</div>'
+            f"</div>"
+        )
+
+    return {
+        "Nb_messages": nb_total,
+        "Nb_messages_non_lus": nb_non_lus,
+        "dernier_message_expediteur": dernier.get("creator", ""),
+        "dernier_message_sujet": dernier.get("subject", ""),
+        "dernier_message_date": dernier.get("date", ""),
+        "dernier_message_extrait": dernier.get("extrait", ""),
+        "messages_html": "".join(html_parts),
+        "messages_brut": messages_brut,
+    }
+
+
+# ── Détection des évaluations / DS dans les devoirs ─────────────────────────
+# Pronote ne fournit pas de flag « contrôle » sur Homework. On infère via une
+# regex sur la description et le titre.
+import re as _re_eval
+
+_EVAL_PATTERN = _re_eval.compile(
+    r"\b(contr[ôo]le|DS|[ée]valuation|interro(?:gation)?|test|examen|devoir surveill[ée])\b",
+    _re_eval.IGNORECASE,
+)
+
+
+def detect_next_evaluations(all_homework, max_keep=5):
+    """Repère les devoirs qui ressemblent à un contrôle/DS et renvoie les prochains.
+
+    Retourne un dict avec :
+      - prochain_DS_matiere      : matière du prochain DS (ou "")
+      - prochain_DS_date         : date dd/mm/yyyy
+      - prochain_DS_dans_jours   : nb jours entre aujourd'hui et le DS (int)
+      - prochains_DS_html        : HTML compact des `max_keep` prochains DS
+      - prochains_DS_brut        : liste structurée
+
+    Robustesse : si all_homework est vide ou si toutes les entrées échouent
+    au parsing, on retourne des valeurs neutres.
+    """
+    import html as _html_mod
+
+    empty = {
+        "prochain_DS_matiere": "",
+        "prochain_DS_date": "",
+        "prochain_DS_dans_jours": -1,
+        "prochains_DS_html": "",
+        "prochains_DS_brut": [],
+    }
+    if not all_homework:
+        return empty
+
+    today = datetime.date.today()
+    candidats = []
+
+    for hw in all_homework:
+        try:
+            description = (hw.description or "") if hasattr(hw, "description") else ""
+            subject_name = ""
+            try:
+                subject_name = getattr(hw.subject, "name", "") if hw.subject else ""
+            except Exception:
+                subject_name = ""
+
+            haystack = f"{subject_name} {description}"
+            if not _EVAL_PATTERN.search(haystack):
+                continue
+
+            hw_date = getattr(hw, "date", None)
+            if hw_date is None or hw_date < today:
+                continue
+
+            candidats.append(
+                {
+                    "matiere": subject_name or "—",
+                    "date": hw_date.strftime("%d/%m/%Y"),
+                    "date_iso": hw_date.isoformat(),
+                    "dans_jours": (hw_date - today).days,
+                    "extrait": _truncate(description, 120),
+                }
+            )
+        except Exception as e:
+            logging.debug("Detection DS : entrée ignorée (%s)", e)
+
+    if not candidats:
+        return empty
+
+    candidats.sort(key=lambda c: c["date_iso"])
+    prochain = candidats[0]
+
+    top = candidats[:max_keep]
+    html_parts = []
+    for c in top:
+        html_parts.append(
+            f'<div class="pj-ds-row">'
+            f'<span class="pj-ds-date">{_html_mod.escape(c["date"])}</span>'
+            f'<span class="pj-ds-matiere">{_html_mod.escape(c["matiere"])}</span>'
+            f'<span class="pj-ds-extrait">{_html_mod.escape(c["extrait"])}</span>'
+            f"</div>"
+        )
+
+    return {
+        "prochain_DS_matiere": prochain["matiere"],
+        "prochain_DS_date": prochain["date"],
+        "prochain_DS_dans_jours": prochain["dans_jours"],
+        "prochains_DS_html": "".join(html_parts),
+        "prochains_DS_brut": top,
+    }
 
 
 def evaluations(client):
@@ -932,6 +1319,8 @@ def devoirs(client):
                 data[f"Nb_{key}_F"] = 0
                 data[f"Nb_{key}_NF"] = 0
                 data[key] = []
+            # Fusionne agrégats DS vides pour cohérence des cmd Jeedom
+            data.update(detect_next_evaluations([]))
             time.sleep(5)
             return data
 
@@ -956,6 +1345,15 @@ def devoirs(client):
             process_homework(next_school_day, data, "devoir_Demain")
         else:
             logging.info("Aucun devoir trouvé pour le prochain jour d'école.")
+
+        # ── Détection des évaluations / DS à venir ─────────────────────────
+        # Pattern heuristique sur l'ensemble des devoirs collectés.
+        try:
+            data.update(detect_next_evaluations(all_homework))
+        except Exception as e:
+            logging.error("Erreur detect_next_evaluations : %s", e)
+            data.update(detect_next_evaluations([]))
+
         return data
     except Exception as e:
         line_number = e.__traceback__.tb_lineno
@@ -2068,6 +2466,9 @@ def process_message(message):
             # j'ajoute les menus
             logging.info("Je récupére les menus")
             jsondata["Menus"] = menus(client)
+            # j'ajoute la messagerie (discussions Pronote)
+            logging.info("Je récupére la messagerie")
+            jsondata["Messages"] = messages(client)
             # J'ajoute les Notifications
             logging.info("Je récupére les notifications")
             jsondata["Notifications"] = notifications(client)

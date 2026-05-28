@@ -82,7 +82,7 @@ class ProJote extends eqLogic
         'type'              => 'select',
         'label'             => 'Onglet par défaut',
         'default'           => 'dv',
-        'values'            => ['dv' => 'Devoirs', 'notes' => 'Notes', 'abs' => 'Absences', 'ret' => 'Retards', 'pun' => 'Punitions'],
+        'values'            => ['dv' => 'Devoirs', 'notes' => 'Notes', 'abs' => 'Absences', 'ret' => 'Retards', 'pun' => 'Punitions', 'menu' => 'Menu cantine', 'msg' => 'Messagerie'],
       ],
       'edt_nav_mode' => [
         'allow_displayType' => ['dashboard', 'mobile'],
@@ -546,6 +546,24 @@ class ProJote extends eqLogic
       "notifications"         => array("liste des notifications",                          'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::notification', 'core::badge'),
       "derniere_notification" => array("Dernière notification",                            'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::notification', 'core::badge'),
       "competences"           => array("Liste des compétences",                            'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::competence',  'core::badge'),
+      // ── Menu cantine (v1.0.1) ──────────────────────────────────────────────
+      "menu_midi_aujourdhui"  => array("Menu cantine - midi aujourd'hui",                  'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
+      "menu_midi_demain"      => array("Menu cantine - midi demain",                       'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
+      "menu_semaine"          => array("Menu cantine - semaine",                           'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
+      "Nb_menus_semaine"      => array("Nombre de menus sur la semaine",                   'info',   'numeric', "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
+      // ── Messagerie Pronote (v1.0.1) ────────────────────────────────────────
+      "Nb_messages"           => array("Nombre de discussions",                            'info',   'numeric', "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
+      "Nb_messages_non_lus"   => array("Nombre de messages non lus",                       'info',   'numeric', "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
+      "dernier_message_expediteur" => array("Dernier message - expéditeur",                'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
+      "dernier_message_sujet" => array("Dernier message - sujet",                          'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
+      "dernier_message_date"  => array("Dernier message - date",                           'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
+      "dernier_message_extrait" => array("Dernier message - extrait",                      'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
+      "messages_html"         => array("Liste HTML des discussions",                       'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
+      // ── Prochain DS / évaluation (v1.0.1) ─────────────────────────────────
+      "prochain_DS_matiere"   => array("Prochain DS - matière",                            'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
+      "prochain_DS_date"      => array("Prochain DS - date",                               'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
+      "prochain_DS_dans_jours" => array("Prochain DS - jours restants",                    'info',   'numeric', "j",     0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
+      "prochains_DS_html"     => array("Liste HTML des prochains DS",                      'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
     );
   }
 
@@ -723,6 +741,10 @@ class ProJote extends eqLogic
       'absences'         => $vis['Nb_absences']      ?? true,
       'retards'          => $vis['Nb_retard']        ?? true,
       'punitions'        => $vis['Nb_punitions']     ?? true,
+      // v1.0.1 — nouveaux onglets et badge
+      'menu'             => $vis['menu_midi_aujourdhui'] ?? true,
+      'messages'         => $vis['Nb_messages']      ?? true,
+      'prochain_ds'      => $vis['prochain_DS_matiere'] ?? true,
     ];
 
     // 5. ID de la commande LastLogin pour le rafraîchissement JS.
