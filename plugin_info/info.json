@@ -3,8 +3,7 @@
 	"name": "ProJote",
 	"pluginVersion": "1.0.1",
 	"description": {
-		"fr_FR": "Plugin destinée à récupérer les informations de Pronote",
-		"en_US": "Plugin to retrieve information from Pronote school management platform"
+		"fr_FR": "Plugin destiné à récupérer les informations de Pronote"
 	},
 	"licence": "AGPL v3",
 	"author": "Aldarande",
