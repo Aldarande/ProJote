@@ -552,6 +552,14 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
                 <td><span class="badge badge-fix">Correction</span></td>
                 <td><strong>Sortie de la collecte des menus</strong> — l'ancienne version retournait une liste plate inexploitable par le PHP. Refactorisée pour produire un dictionnaire structuré directement consommable par la boucle de callback Jeedom.</td>
             </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correction</span></td>
+                <td><strong>Tri chronologique des messages</strong> — le tri utilisait la string de date <code>dd/mm/yyyy HH:MM</code> ce qui produisait un ordre incorrect (15/01 passait avant 02/02). Refait sur clé ISO 8601 + extraction du « dernier message » via <code>max()</code> indépendamment du statut lu/non-lu.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correction</span></td>
+                <td><strong>Manifest plugin nettoyé</strong> — suppression de la description en_US (le plugin reste monolingue fr_FR) et correction de l'accord « destiné ». Aligné avec <code>language: ["fr_FR"]</code>.</td>
+            </tr>
         </tbody>
     </table>
 
