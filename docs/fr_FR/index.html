@@ -254,6 +254,7 @@
         <a href="#prerequis">Prérequis</a>
         <a href="#utilisation">Commandes disponibles</a>
         <a href="#widget">Widget</a>
+        <a href="#scenarios">Exemples de scénarios</a>
         <a href="#version">Historique des versions</a>
 
         <div class="sidebar-section">Aide</div>
@@ -442,6 +443,21 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
         Si une information n'est pas disponible sur le portail Pronote de l'établissement, elle ne remontera pas.
     </div>
 
+    <div class="callout callout-info">
+        <strong>Notes chiffrées vs compétences</strong>
+        Depuis 2021, Pronote distingue deux systèmes d'évaluation, exposés par <strong>deux commandes
+        distinctes</strong> dans ProJote :
+        <ul style="margin:6px 0 0 18px;">
+            <li><code>note</code> / <code>derniere_note</code> — les <strong>notes chiffrées</strong>
+            (sur 20, avec coefficients) utilisées pour le calcul de la moyenne.</li>
+            <li><code>competences</code> — les <strong>évaluations par compétences</strong>
+            (acquis / non acquis, niveaux de maîtrise), sans valeur numérique et donc
+            <strong>jamais intégrées à la moyenne</strong>.</li>
+        </ul>
+        Selon l'établissement et la matière, l'un, l'autre, ou les deux peuvent être renseignés.
+        Une matière évaluée uniquement par compétences n'apparaîtra pas dans la liste des notes.
+    </div>
+
     <!-- ── Widget ─────────────────────────── -->
     <h1 id="widget">Widget</h1>
     <p>Le widget principal (<em>projote</em>) regroupe toutes les informations sur un seul tuile de tableau de bord :</p>
@@ -451,6 +467,7 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
         <li><strong>Emploi du temps</strong> — cours d'aujourd'hui + navigation vers les 4 prochains jours scolaires, nombre de cours annulés depuis la rentrée</li>
         <li><strong>Moyenne générale</strong> — barre dégradée rouge→vert avec tendance (hausse/baisse)</li>
         <li><strong>Onglets</strong> — Devoirs · Notes · Absences · Retards · Punitions · <strong>Menu cantine</strong> (v1.0.1) · <strong>Messagerie</strong> (v1.0.1)</li>
+        <li><strong>Allergènes / labels du menu</strong> <em>(v1.1.0)</em> — l'onglet Menu cantine affiche les labels Pronote (Bio, Local, Porc, allergènes…) sous forme de puces discrètes, lorsqu'ils sont renseignés par l'établissement.</li>
         <li><strong>Badge "Prochain DS"</strong> <em>(v1.0.1)</em> — en-tête, libellé adaptatif <em>aujourd'hui</em> / <em>demain</em> / <em>J-X</em>. Visible uniquement si un DS est à venir. Un clic ouvre l'onglet Devoirs.</li>
         <li><strong>Détail cours annulés</strong> <em>(v1.0.1)</em> — affichage <code>Matière · Professeur · Salle — Annulé</code> dans l'EDT.</li>
         <li><strong>Spinner de chargement</strong> — le logo ProJote tourne dans la zone avatar pendant la collecte ; un clic déclenche un rafraîchissement manuel</li>
@@ -515,6 +532,84 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
     </table>
     <div class="callout callout-info">
         <strong>Tendance</strong> — L'indicateur ↗/↘ est calculé en comparant la moyenne des 3 dernières notes saisies avec la moyenne des 3 premières notes de l'année (tri chronologique). Il n'apparaît que si au moins 4 notes sont disponibles.
+    </div>
+
+    <!-- ── Exemples de scénarios ──────────── -->
+    <h1 id="scenarios">Exemples de scénarios</h1>
+    <p>
+        ProJote n'embarque <strong>aucun scénario prédéfini</strong> : il expose des commandes que
+        vous combinez librement dans vos propres scénarios Jeedom. Voici cinq recettes prêtes à
+        recopier. Chaque recette décrit le <em>déclencheur</em>, la <em>condition</em> et
+        l'<em>action</em> — adaptez les seuils, équipements et messages à votre installation.
+    </p>
+    <div class="callout callout-info">
+        <strong>Comment lire ces recettes</strong>
+        Les commandes citées (<code>#[…]#</code>) sont à remplacer par la référence de la commande
+        de <em>votre</em> équipement ProJote, via le sélecteur de commande de l'éditeur de scénario
+        Jeedom. Les noms entre crochets correspondent aux <em>logicalId</em> listés dans la section
+        <a href="#utilisation">Commandes disponibles</a>.
+    </div>
+
+    <h3>1 — Réveil adaptatif selon l'heure du premier cours</h3>
+    <p>Décale le réveil (ou l'annonce vocale) en fonction de l'heure réelle de début des cours du jour.</p>
+    <table>
+        <thead><tr><th>Élément</th><th>Configuration</th></tr></thead>
+        <tbody>
+            <tr><td><strong>Déclencheur</strong></td><td>Programmation (cron) chaque matin, ex. <code>30 6 * * 1-5</code> (6h30, du lundi au vendredi)</td></tr>
+            <tr><td><strong>Condition</strong></td><td><code>#[…][ProJote][edt_aujourdhui_debut]#</code> n'est pas vide (sinon journée sans cours)</td></tr>
+            <tr><td><strong>Action</strong></td><td>Annonce vocale / notification : « Premier cours à <code>#[…][ProJote][edt_aujourdhui_debut]#</code> ». Optionnel : déclencher la lumière ou le réveil X minutes avant cette heure.</td></tr>
+        </tbody>
+    </table>
+
+    <h3>2 — Anti-oubli des devoirs du lendemain</h3>
+    <p>Rappelle en soirée s'il reste des devoirs non faits pour le jour scolaire suivant.</p>
+    <table>
+        <thead><tr><th>Élément</th><th>Configuration</th></tr></thead>
+        <tbody>
+            <tr><td><strong>Déclencheur</strong></td><td>Programmation (cron) en soirée, ex. <code>0 19 * * 0-4</code> (19h, veille de jour scolaire)</td></tr>
+            <tr><td><strong>Condition</strong></td><td><code>#[…][ProJote][Nb_devoir_Demain_NF]#</code> &gt; 0</td></tr>
+            <tr><td><strong>Action</strong></td><td>Notification listant les devoirs : « <code>#[…][ProJote][Nb_devoir_Demain_NF]#</code> devoir(s) à faire pour demain » + contenu de <code>#[…][ProJote][devoir_Demain]#</code>.</td></tr>
+        </tbody>
+    </table>
+
+    <h3>3 — Alerte parent en cas de nouvelle absence</h3>
+    <p>Prévient dès que le compteur d'absences augmente.</p>
+    <table>
+        <thead><tr><th>Élément</th><th>Configuration</th></tr></thead>
+        <tbody>
+            <tr><td><strong>Déclencheur</strong></td><td>Sur changement de la commande <code>#[…][ProJote][Nb_absences]#</code></td></tr>
+            <tr><td><strong>Condition</strong></td><td>La nouvelle valeur est supérieure à la précédente (utiliser une variable mémorisant l'ancien total, ou le déclencheur « valeur augmente »)</td></tr>
+            <tr><td><strong>Action</strong></td><td>Notification push aux parents avec le détail de <code>#[…][ProJote][derniere_absence]#</code>.</td></tr>
+        </tbody>
+    </table>
+
+    <h3>4 — Mode révision avant un contrôle</h3>
+    <p>Active une ambiance « révision » quand un DS approche (J-2 ou moins).</p>
+    <table>
+        <thead><tr><th>Élément</th><th>Configuration</th></tr></thead>
+        <tbody>
+            <tr><td><strong>Déclencheur</strong></td><td>Sur changement de <code>#[…][ProJote][prochain_DS_dans_jours]#</code>, ou cron quotidien le soir</td></tr>
+            <tr><td><strong>Condition</strong></td><td><code>#[…][ProJote][prochain_DS_dans_jours]#</code> ≥ 0 ET ≤ 2</td></tr>
+            <tr><td><strong>Action</strong></td><td>Rappel vocal / notification : « Contrôle de <code>#[…][ProJote][prochain_DS_matiere]#</code> le <code>#[…][ProJote][prochain_DS_date]#</code> ». Optionnel : tamiser l'éclairage du bureau, couper les notifications de loisir.</td></tr>
+        </tbody>
+    </table>
+
+    <h3>5 — Annonce du menu de la cantine</h3>
+    <p>Annonce le menu du midi au moment du départ pour l'école ou avant le repas.</p>
+    <table>
+        <thead><tr><th>Élément</th><th>Configuration</th></tr></thead>
+        <tbody>
+            <tr><td><strong>Déclencheur</strong></td><td>Programmation (cron), ex. <code>30 7 * * 1-5</code> (7h30) ou <code>0 11 * * 1-5</code> (11h)</td></tr>
+            <tr><td><strong>Condition</strong></td><td><code>#[…][ProJote][menu_midi_aujourdhui]#</code> n'est pas vide</td></tr>
+            <tr><td><strong>Action</strong></td><td>Annonce vocale (TTS) : « Au menu ce midi : <code>#[…][ProJote][menu_midi_aujourdhui]#</code> ».</td></tr>
+        </tbody>
+    </table>
+
+    <div class="callout callout-tip">
+        <strong>Astuce</strong>
+        Pour limiter le bruit, conditionnez vos scénarios à la présence d'une personne à la maison
+        ou à un mode « semaine scolaire ». La commande <code>Statut connexion</code> permet aussi de
+        n'agir que lorsque la dernière synchronisation Pronote a réussi.
     </div>
 
     <!-- ── Historique ─────────────────────── -->

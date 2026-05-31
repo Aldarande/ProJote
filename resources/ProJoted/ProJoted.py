@@ -607,6 +607,23 @@ def _menu_to_text(menu_data):
     return " · ".join(sections)
 
 
+def _menu_labels(menu_data):
+    """Liste dédupliquée des labels/allergènes d'un menu (dans l'ordre d'apparition).
+
+    Les labels Pronote (Bio, Local, Porc, Allergènes…) sont déjà sérialisés par
+    build_menu_data sous chaque aliment. On les agrège au niveau du menu pour
+    un affichage compact dans le widget.
+    """
+    seen = []
+    for key in ("first_meal", "main_meal", "side_meal", "cheese", "dessert", "other_meal"):
+        for item in menu_data.get(key) or []:
+            for label in item.get("labels") or []:
+                name = str(label.get("name", "")).strip()
+                if name and name not in seen:
+                    seen.append(name)
+    return seen
+
+
 def _menu_to_html_row(menu_data):
     """Une ligne HTML compacte représentant un menu pour le widget."""
     import html as _html_mod
@@ -616,11 +633,22 @@ def _menu_to_html_row(menu_data):
     is_dinner = menu_data.get("is_dinner", False)
     repas_label = "🍽️ Midi" if is_lunch else ("🌙 Soir" if is_dinner else "🍴 Repas")
     text = _menu_to_text(menu_data) or "—"
+
+    # Labels / allergènes (Bio, Local, Porc…) en puces discrètes.
+    labels = _menu_labels(menu_data)
+    labels_html = ""
+    if labels:
+        chips = "".join(
+            f'<span class="pj-menu-label">{_html_mod.escape(name)}</span>' for name in labels
+        )
+        labels_html = f'<span class="pj-menu-labels">{chips}</span>'
+
     return (
         f'<div class="pj-menu-row">'
         f'<span class="pj-menu-date">{_html_mod.escape(date_iso)}</span>'
         f'<span class="pj-menu-type">{_html_mod.escape(repas_label)}</span>'
         f'<span class="pj-menu-text">{_html_mod.escape(text)}</span>'
+        f"{labels_html}"
         f"</div>"
     )
 

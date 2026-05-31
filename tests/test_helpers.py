@@ -105,6 +105,40 @@ class TestMenuToHtmlRow:
         assert "—" in html
         assert "Soir" in html
 
+    def test_labels_rendered(self, daemon):
+        menu = {
+            "date": "2026-05-31",
+            "is_lunch": True,
+            "main_meal": [{"name": "Poulet", "labels": [{"name": "Bio"}, {"name": "Local"}]}],
+        }
+        html = daemon._menu_to_html_row(menu)
+        assert "pj-menu-label" in html
+        assert "Bio" in html
+        assert "Local" in html
+
+    def test_no_labels_no_chip(self, daemon):
+        menu = {"date": "2026-05-31", "is_lunch": True, "main_meal": [{"name": "Poulet"}]}
+        html = daemon._menu_to_html_row(menu)
+        assert "pj-menu-label" not in html
+
+
+# ── _menu_labels ──────────────────────────────────────────────────────────────
+class TestMenuLabels:
+    def test_empty(self, daemon):
+        assert daemon._menu_labels({}) == []
+
+    def test_dedup_and_order(self, daemon):
+        menu = {
+            "first_meal": [{"name": "Salade", "labels": [{"name": "Bio"}]}],
+            "main_meal": [{"name": "Poulet", "labels": [{"name": "Local"}, {"name": "Bio"}]}],
+        }
+        # Bio puis Local (ordre d'apparition), sans doublon.
+        assert daemon._menu_labels(menu) == ["Bio", "Local"]
+
+    def test_ignores_blank_labels(self, daemon):
+        menu = {"main_meal": [{"name": "X", "labels": [{"name": ""}, {"name": "  "}]}]}
+        assert daemon._menu_labels(menu) == []
+
 
 # ── build_menu_data ───────────────────────────────────────────────────────────
 class _Label:
