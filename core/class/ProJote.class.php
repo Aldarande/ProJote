@@ -82,7 +82,7 @@ class ProJote extends eqLogic
         'type'              => 'select',
         'label'             => 'Onglet par défaut',
         'default'           => 'dv',
-        'values'            => ['dv' => 'Devoirs', 'notes' => 'Notes', 'abs' => 'Absences', 'ret' => 'Retards', 'pun' => 'Punitions', 'menu' => 'Menu cantine', 'msg' => 'Messagerie'],
+        'values'            => ['dv' => 'Devoirs', 'notes' => 'Notes', 'abs' => 'Absences', 'ret' => 'Retards', 'pun' => 'Punitions', 'menu' => 'Menu cantine', 'msg' => 'Messagerie', 'stats' => 'Statistiques'],
       ],
       'edt_nav_mode' => [
         'allow_displayType' => ['dashboard', 'mobile'],
@@ -765,6 +765,48 @@ class ProJote extends eqLogic
       'menu'             => $vis['menu_midi_aujourdhui'] ?? true,
       'messages'         => $vis['Nb_messages']      ?? true,
       'prochain_ds'      => $vis['prochain_DS_matiere'] ?? true,
+      // v1.1.0 — onglet Statistiques
+      'stats'            => $vis['moyenne_generale']  ?? true,
+    ];
+
+    // 4b. Séries d'historique pour l'onglet Statistiques (v1.1.0).
+    //     On lit l'historique Jeedom des commandes historisées, sous-échantillonné
+    //     pour garder un payload léger injecté dans le widget.
+    $buildSeries = function ($logicalId, $maxPoints = 40) {
+      $cmd = $this->getCmd(null, $logicalId);
+      if (!is_object($cmd) || $cmd->getIsHistorized() != 1) {
+        return [];
+      }
+      try {
+        $history = $cmd->getHistory(date('Y-m-d H:i:s', strtotime('-120 days')));
+      } catch (Throwable $e) {
+        log::add('ProJote', 'debug', 'toHtml : getHistory(' . $logicalId . ') a échoué : ' . $e->getMessage());
+        return [];
+      }
+      if (!is_array($history) || count($history) === 0) {
+        return [];
+      }
+      $n    = count($history);
+      $step = $n > $maxPoints ? (int)ceil($n / $maxPoints) : 1;
+      $series = [];
+      for ($i = 0; $i < $n; $i += $step) {
+        $h = $history[$i];
+        $v = $h->getValue();
+        if ($v === '' || $v === null || !is_numeric($v)) {
+          continue;
+        }
+        $series[] = ['t' => $h->getDatetime(), 'v' => (float)$v];
+      }
+      return $series;
+    };
+
+    $mebCmd  = $this->getCmd(null, 'matiere_en_baisse');
+    $statsData = [
+      'moyenne'           => $buildSeries('moyenne_generale'),
+      'absences'          => $buildSeries('Nb_absences'),
+      'retards'           => $buildSeries('Nb_retard'),
+      'devoirs_nf'        => $buildSeries('Nb_devoir_NF'),
+      'matiere_en_baisse' => is_object($mebCmd) ? (string)$mebCmd->execCmd() : '',
     ];
 
     // 5. ID de la commande LastLogin pour le rafraîchissement JS.
@@ -783,6 +825,7 @@ class ProJote extends eqLogic
     $content = str_replace('#lastLoginCmdId#', $lastLoginCmdId,                  $content);
     $content = str_replace('#initData#',       json_encode($widgetData, $flags), $content);
     $content = str_replace('#visibilityMap#',  json_encode($visibility, $flags), $content);
+    $content = str_replace('#statsData#',      json_encode($statsData, $flags),  $content);
     // Paramètres widget — lus directement depuis display.parameters_xxx
     // (preToHtml() expose display.parameters.* mais nos champs utilisent display.parameters_xxx,
     //  clé plate avec préfixe → getDisplay('parameters_xxx') est la seule source fiable)

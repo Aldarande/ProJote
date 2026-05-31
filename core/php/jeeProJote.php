@@ -475,6 +475,9 @@ try {
         'edt_next_days'         => isset($result['Emploi_du_temps']['edt_next_days'])          ? $result['Emploi_du_temps']['edt_next_days']          : array(),
         'photo'                 => $resolvedPhoto,
         'pronote_photo'         => $pronotePhotoUrl ?? '',
+        'moyenne_generale'         => isset($result['Notes']['moyenne_generale'])         ? $result['Notes']['moyenne_generale']         : '',
+        'matiere_en_baisse'        => isset($result['Notes']['matiere_en_baisse'])        ? $result['Notes']['matiere_en_baisse']        : '',
+        'matiere_en_baisse_detail' => isset($result['Notes']['matiere_en_baisse_detail']) ? $result['Notes']['matiere_en_baisse_detail'] : array(),
         'last_update'           => date('c'),
     );
     $eqLogic->setConfiguration('widget_json', json_encode($widget_data));
