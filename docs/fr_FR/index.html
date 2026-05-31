@@ -254,6 +254,7 @@
         <a href="#prerequis">Prérequis</a>
         <a href="#utilisation">Commandes disponibles</a>
         <a href="#widget">Widget</a>
+        <a href="#ical">Export iCalendar</a>
         <a href="#scenarios">Exemples de scénarios</a>
         <a href="#version">Historique des versions</a>
 
@@ -547,6 +548,39 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
     </table>
     <div class="callout callout-info">
         <strong>Tendance</strong> — L'indicateur ↗/↘ est calculé en comparant la moyenne des 3 dernières notes saisies avec la moyenne des 3 premières notes de l'année (tri chronologique). Il n'apparaît que si au moins 4 notes sont disponibles.
+    </div>
+
+    <!-- ── Export iCalendar ───────────────── -->
+    <h1 id="ical">Export iCalendar (.ics) <span class="badge badge-new">v1.1.0</span></h1>
+    <p>
+        ProJote expose un calendrier <strong>iCalendar natif</strong> généré à partir des données
+        déjà collectées (emploi du temps et devoirs), abonnable depuis n'importe quelle application
+        de calendrier (Google Agenda, Apple Calendrier, Thunderbird, Nextcloud…).
+    </p>
+    <table>
+        <thead><tr><th>Contenu</th><th>Détail</th></tr></thead>
+        <tbody>
+            <tr><td><strong>Cours</strong> (VEVENT)</td><td>Emploi du temps du jour, du prochain jour et des 4 jours suivants (J+1 à J+4), avec horaires, salle et professeur. Les cours annulés sont marqués <code>STATUS:CANCELLED</code>.</td></tr>
+            <tr><td><strong>Devoirs</strong> (VTODO)</td><td>Devoirs à faire, avec échéance et statut (fait / à faire).</td></tr>
+        </tbody>
+    </table>
+    <p>URL d'abonnement :</p>
+    <pre><code>https://&lt;votre-jeedom&gt;/plugins/ProJote/core/php/calendar.php?apikey=&lt;clé_API&gt;&amp;id=&lt;id_équipement&gt;</code></pre>
+    <ul>
+        <li><strong>clé_API</strong> : la clé API du plugin ProJote (Réglages → Système → Configuration → API).</li>
+        <li><strong>id_équipement</strong> : l'identifiant de l'équipement ProJote (visible dans l'URL de sa page de configuration).</li>
+    </ul>
+    <div class="callout callout-info">
+        <strong>Différence avec la commande <code>URL iCal</code></strong>
+        La commande <code>URL_Ical</code> pointe vers le calendrier <em>fourni par Pronote</em> (si
+        l'établissement l'active). L'export ci-dessus est <em>généré localement par ProJote</em> : il
+        fonctionne indépendamment de Pronote et inclut les devoirs en tâches (VTODO).
+    </div>
+    <div class="callout callout-warning">
+        <strong>Échéance des devoirs approximative</strong>
+        Pronote ne transmet que le jour et le mois des devoirs (sans l'année) ; ProJote infère
+        l'année (année scolaire en cours). L'échéance peut être décalée d'un an dans de rares cas
+        en fin d'année civile.
     </div>
 
     <!-- ── Exemples de scénarios ──────────── -->
