@@ -138,6 +138,18 @@ _worker_state_lock = threading.Lock()
 _callback_url = None
 _apikey_global = None
 
+# Valeurs par défaut des paramètres du démon. Elles sont surchargées par les
+# arguments de la ligne de commande dans le bloc de démarrage (if __name__ == "__main__").
+# Les définir ici rend le module importable (tests unitaires) sans démarrer le démon.
+_socket_host = "localhost"
+_log_level = "error"
+_callback = ""
+_apikey = ""
+_pidfile = "/tmp/ProJoted.pid"
+_cycle = 0.3
+_socket_port = 55369
+_data_dir = "/var/www/html/plugins/ProJote/data"
+
 
 def send_jeedom_message(message, message_type="error"):
     """
@@ -2673,73 +2685,78 @@ def shutdown():
     os._exit(0)
 
 
-# Ici est le script qui va écouter le socket. Mais la premiére chose qu'il va faire est de renvoyer sont PiD pour validation.
-_socket_host = "localhost"
-parser = argparse.ArgumentParser(description="Projoted Daemon for Jeedom plugin")
-parser.add_argument("--loglevel", help="Log Level for the daemon", type=str)
-parser.add_argument("--callback", help="Callback", type=str)
-parser.add_argument("--apikey", help="Apikey", type=str)
-parser.add_argument("--cycle", help="Cycle to send event", type=str)
-parser.add_argument("--pid", help="Pid file", type=str)
-parser.add_argument("--socketport", help="Port for Projote Deamon", type=str)
-parser.add_argument("--datadir", help="Path to plugin data directory", type=str)
-args = parser.parse_args()
+# ── Démarrage du démon ──────────────────────────────────────────────────────
+# Bloc exécuté uniquement quand le fichier est lancé comme script (python ProJoted.py …).
+# Le guard __main__ permet d'importer ce module dans les tests unitaires sans
+# démarrer le démon (pas de parsing d'arguments, pas de socket, pas de signaux).
+def _run_daemon():
+    """Point d'entrée du démon : parse les arguments, ouvre le socket et écoute."""
+    global _socket_host, _log_level, _callback, _apikey, _pidfile, _cycle
+    global _socket_port, _data_dir, _callback_url, _apikey_global
+    global jeedom_com, jeedom_socket
 
-_log_level = args.loglevel or "error"
-_callback = args.callback or ""
-_apikey = args.apikey or ""
-_pidfile = args.pid or "/tmp/ProJoted.pid"
-_cycle = float(args.cycle) if args.cycle else 0.3
-_socket_port = args.socketport or 55369
-_data_dir = args.datadir or "/var/www/html/plugins/ProJote/data"
-_socket_port = int(_socket_port)
-_cycle = int(_cycle)
+    # Ici est le script qui va écouter le socket. Mais la premiére chose qu'il va faire est de renvoyer sont PiD pour validation.
+    _socket_host = "localhost"
+    parser = argparse.ArgumentParser(description="Projoted Daemon for Jeedom plugin")
+    parser.add_argument("--loglevel", help="Log Level for the daemon", type=str)
+    parser.add_argument("--callback", help="Callback", type=str)
+    parser.add_argument("--apikey", help="Apikey", type=str)
+    parser.add_argument("--cycle", help="Cycle to send event", type=str)
+    parser.add_argument("--pid", help="Pid file", type=str)
+    parser.add_argument("--socketport", help="Port for Projote Deamon", type=str)
+    parser.add_argument("--datadir", help="Path to plugin data directory", type=str)
+    args = parser.parse_args()
 
-jeedom_utils.set_log_level(_log_level)
+    _log_level = args.loglevel or "error"
+    _callback = args.callback or ""
+    _apikey = args.apikey or ""
+    _pidfile = args.pid or "/tmp/ProJoted.pid"
+    _cycle = float(args.cycle) if args.cycle else 0.3
+    _socket_port = args.socketport or 55369
+    _data_dir = args.datadir or "/var/www/html/plugins/ProJote/data"
+    _socket_port = int(_socket_port)
+    _cycle = int(_cycle)
 
+    jeedom_utils.set_log_level(_log_level)
 
-# Filtre les messages DEBUG verbeux de PronotePy (champs optionnels absents)
-class _PronotepyNoiseFilter(logging.Filter):
-    def filter(self, record):
-        msg = record.getMessage()
-        return "setting to default" not in msg and "Could not get value for" not in msg
+    # Filtre les messages DEBUG verbeux de PronotePy (champs optionnels absents)
+    class _PronotepyNoiseFilter(logging.Filter):
+        def filter(self, record):
+            msg = record.getMessage()
+            return "setting to default" not in msg and "Could not get value for" not in msg
 
+    for _log_handler in logging.root.handlers:
+        _log_handler.addFilter(_PronotepyNoiseFilter())
 
-for _log_handler in logging.root.handlers:
-    _log_handler.addFilter(_PronotepyNoiseFilter())
+    logging.info("Start demond")
+    logging.info("Log level: %s", _log_level)
+    logging.info("Socket port: %s", _socket_port)
+    logging.info("Socket host: %s", _socket_host)
+    logging.info("PID file: %s", _pidfile)
+    logging.info("Apikey: %s", _apikey)
 
-logging.info("Start demond")
-logging.info("Log level: %s", _log_level)
-logging.info("Socket port: %s", _socket_port)
-logging.info("Socket host: %s", _socket_host)
-logging.info("PID file: %s", _pidfile)
-logging.info("Apikey: %s", _apikey)
+    # Initialiser les variables globales pour les messages Jeedom
+    _callback_url = _callback
+    _apikey_global = _apikey
 
-# Initialiser les variables globales pour les messages Jeedom
-_callback_url = _callback
-_apikey_global = _apikey
+    signal.signal(signal.SIGINT, handler)
+    signal.signal(signal.SIGTERM, handler)
 
-
-signal.signal(signal.SIGINT, handler)
-signal.signal(signal.SIGTERM, handler)
-
-try:
-    jeedom_utils.write_pid(str(_pidfile))
-    jeedom_com = jeedom_com(apikey=_apikey, url=_callback, cycle=_cycle)
-    if not jeedom_com.test():
-        logging.error(
-            "Network communication issues. Please fixe your Jeedom network configuration."
-        )
+    try:
+        jeedom_utils.write_pid(str(_pidfile))
+        jeedom_com = jeedom_com(apikey=_apikey, url=_callback, cycle=_cycle)
+        if not jeedom_com.test():
+            logging.error(
+                "Network communication issues. Please fixe your Jeedom network configuration."
+            )
+            shutdown()
+        jeedom_socket = jeedom_socket(port=_socket_port, address=_socket_host)
+        listen()
+    except Exception as e:
+        logging.error("Fatal error: %s", e)
+        logging.info(traceback.format_exc())
         shutdown()
-    jeedom_socket = jeedom_socket(port=_socket_port, address=_socket_host)
-    listen()
-except Exception as e:
-    logging.error("Fatal error: %s", e)
-    logging.info(traceback.format_exc())
-    shutdown()
-    jeedom_socket = jeedom_socket(port=_socket_port, address=_socket_host)
-    listen()
-except Exception as e:
-    logging.error("Fatal error: %s", e)
-    logging.info(traceback.format_exc())
-    shutdown()
+
+
+if __name__ == "__main__":
+    _run_daemon()
