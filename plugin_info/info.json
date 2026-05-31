@@ -1,7 +1,7 @@
 {
 	"id": "ProJote",
 	"name": "ProJote",
-	"pluginVersion": "1.0.1",
+	"pluginVersion": "1.1.0",
 	"description": {
 		"fr_FR": "Plugin destiné à récupérer les informations de Pronote"
 	},

@@ -82,7 +82,7 @@ class ProJote extends eqLogic
         'type'              => 'select',
         'label'             => 'Onglet par défaut',
         'default'           => 'dv',
-        'values'            => ['dv' => 'Devoirs', 'notes' => 'Notes', 'abs' => 'Absences', 'ret' => 'Retards', 'pun' => 'Punitions', 'menu' => 'Menu cantine', 'msg' => 'Messagerie'],
+        'values'            => ['dv' => 'Devoirs', 'notes' => 'Notes', 'abs' => 'Absences', 'ret' => 'Retards', 'pun' => 'Punitions', 'menu' => 'Menu cantine', 'msg' => 'Messagerie', 'stats' => 'Statistiques', 'alertes' => 'Alertes'],
       ],
       'edt_nav_mode' => [
         'allow_displayType' => ['dashboard', 'mobile'],
@@ -412,6 +412,23 @@ class ProJote extends eqLogic
       }
     }
 
+    // 1bis. Migration v1.1.0 : aligner l'historisation des commandes existantes sur le modèle.
+    // Les versions < 1.1.0 créaient Nb_absences / Nb_retard / Nb_devoir_NF sans historisation.
+    // On (ré)active l'historisation pour les commandes que le modèle marque historisées (hist=1),
+    // sans jamais la désactiver. Idempotent : ne fait rien si déjà historisée.
+    // $cmd->save() ne déclenche pas eqLogic::postSave → pas de récursion.
+    foreach ($this->getListeDefaultCommandes() as $id => $data) {
+      if (empty($data[4])) { // index 4 = historiser
+        continue;
+      }
+      $cmd = $this->getCmd(null, $id);
+      if (is_object($cmd) && $cmd->getIsHistorized() != 1) {
+        $cmd->setIsHistorized(1);
+        $cmd->save();
+        log::add('ProJote', 'info', 'postSave : historisation activée sur ' . $id . ' (alignement modèle v1.1.0).');
+      }
+    }
+
     // 2. Supprimer la commande Widget si elle existe encore (migration depuis l'ancienne architecture).
     // Le widget est maintenant affiché via toHtml() sur l'eqLogic, plus via une commande dédiée.
     $widgetCmd = $this->getCmd(null, 'Widget');
@@ -493,11 +510,11 @@ class ProJote extends eqLogic
       "Etablissement"         => array('Etablissement',                                    'info',   'string',  "",      0, 1, "GENERIC_NAME ",   'core::badge',          'core::badge'),
       "Picture"               => array('Photo de profil',                                  'info',   'string',  "",      0, 1, "GENERIC_PICTURE", 'ProJote::picture',     'picture'),
       "URL_Ical"              => array('URL Ical',                                         'info',   'string',  "",      0, 1, "GENERIC_URL",     'core::badge',          'core::badge'),
-      "Nb_absences"           => array("Nombre d'absence",                                 'info',   'numeric', "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
+      "Nb_absences"           => array("Nombre d'absence",                                 'info',   'numeric', "",      1, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
       "Nb_punitions"          => array("Nombre de punitions",                              'info',   'numeric', "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
-      "Nb_retard"             => array("Nombre de retard",                                 'info',   'numeric', "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
+      "Nb_retard"             => array("Nombre de retard",                                 'info',   'numeric', "",      1, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
       "Nb_devoir"             => array("Nombre de devoir",                                 'info',   'numeric', "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
-      "Nb_devoir_NF"          => array("Nombre de devoir non fait",                        'info',   'numeric', "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
+      "Nb_devoir_NF"          => array("Nombre de devoir non fait",                        'info',   'numeric', "",      1, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
       "Nb_devoir_F"           => array("Nombre de devoir fait",                            'info',   'numeric', "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
       "Nb_devoir_Demain"      => array("Nombre de devoir pour le prochain jour",           'info',   'numeric', "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
       "Nb_devoir_Demain_NF"   => array("Nombre de devoir non fait pour le prochain jour",  'info',   'numeric', "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
@@ -543,6 +560,9 @@ class ProJote extends eqLogic
       "derniere_punition"     => array("Dernière punition",                                'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::punition',    'core::badge'),
       "note"                  => array("Liste des notes",                                  'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::note',        'core::badge'),
       "derniere_note"         => array("Dernière note",                                    'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::note',        'core::badge'),
+      // ── Statistiques (v1.1.0) ──────────────────────────────────────────────
+      "moyenne_generale"      => array("Moyenne générale",                                 'info',   'numeric', "/20",   1, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
+      "matiere_en_baisse"     => array("Matière(s) en baisse",                             'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
       "notifications"         => array("liste des notifications",                          'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::notification', 'core::badge'),
       "derniere_notification" => array("Dernière notification",                            'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::notification', 'core::badge'),
       "competences"           => array("Liste des compétences",                            'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::competence',  'core::badge'),
@@ -564,6 +584,8 @@ class ProJote extends eqLogic
       "prochain_DS_date"      => array("Prochain DS - date",                               'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
       "prochain_DS_dans_jours" => array("Prochain DS - jours restants",                    'info',   'numeric', "j",     0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
       "prochains_DS_html"     => array("Liste HTML des prochains DS",                      'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
+      // ── Centre d'alertes (v1.1.0) ──────────────────────────────────────────
+      "event"                 => array("Dernier événement",                               'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
     );
   }
 
@@ -745,6 +767,50 @@ class ProJote extends eqLogic
       'menu'             => $vis['menu_midi_aujourdhui'] ?? true,
       'messages'         => $vis['Nb_messages']      ?? true,
       'prochain_ds'      => $vis['prochain_DS_matiere'] ?? true,
+      // v1.1.0 — onglet Statistiques
+      'stats'            => $vis['moyenne_generale']  ?? true,
+      // v1.1.0 — onglet Alertes (événements ProJote + notifications Pronote)
+      'alertes'          => ($vis['event'] ?? true) || ($vis['notifications'] ?? true),
+    ];
+
+    // 4b. Séries d'historique pour l'onglet Statistiques (v1.1.0).
+    //     On lit l'historique Jeedom des commandes historisées, sous-échantillonné
+    //     pour garder un payload léger injecté dans le widget.
+    $buildSeries = function ($logicalId, $maxPoints = 40) {
+      $cmd = $this->getCmd(null, $logicalId);
+      if (!is_object($cmd) || $cmd->getIsHistorized() != 1) {
+        return [];
+      }
+      try {
+        $history = $cmd->getHistory(date('Y-m-d H:i:s', strtotime('-120 days')));
+      } catch (Throwable $e) {
+        log::add('ProJote', 'debug', 'toHtml : getHistory(' . $logicalId . ') a échoué : ' . $e->getMessage());
+        return [];
+      }
+      if (!is_array($history) || count($history) === 0) {
+        return [];
+      }
+      $n    = count($history);
+      $step = $n > $maxPoints ? (int)ceil($n / $maxPoints) : 1;
+      $series = [];
+      for ($i = 0; $i < $n; $i += $step) {
+        $h = $history[$i];
+        $v = $h->getValue();
+        if ($v === '' || $v === null || !is_numeric($v)) {
+          continue;
+        }
+        $series[] = ['t' => $h->getDatetime(), 'v' => (float)$v];
+      }
+      return $series;
+    };
+
+    $mebCmd  = $this->getCmd(null, 'matiere_en_baisse');
+    $statsData = [
+      'moyenne'           => $buildSeries('moyenne_generale'),
+      'absences'          => $buildSeries('Nb_absences'),
+      'retards'           => $buildSeries('Nb_retard'),
+      'devoirs_nf'        => $buildSeries('Nb_devoir_NF'),
+      'matiere_en_baisse' => is_object($mebCmd) ? (string)$mebCmd->execCmd() : '',
     ];
 
     // 5. ID de la commande LastLogin pour le rafraîchissement JS.
@@ -763,6 +829,7 @@ class ProJote extends eqLogic
     $content = str_replace('#lastLoginCmdId#', $lastLoginCmdId,                  $content);
     $content = str_replace('#initData#',       json_encode($widgetData, $flags), $content);
     $content = str_replace('#visibilityMap#',  json_encode($visibility, $flags), $content);
+    $content = str_replace('#statsData#',      json_encode($statsData, $flags),  $content);
     // Paramètres widget — lus directement depuis display.parameters_xxx
     // (preToHtml() expose display.parameters.* mais nos champs utilisent display.parameters_xxx,
     //  clé plate avec préfixe → getDisplay('parameters_xxx') est la seule source fiable)
