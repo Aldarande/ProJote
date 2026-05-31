@@ -429,8 +429,19 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
             <tr><td>prochain_DS_date</td><td>info</td><td>Date au format <code>dd/mm/yyyy</code>.</td></tr>
             <tr><td>prochain_DS_dans_jours</td><td>info</td><td>Nombre de jours avant le DS (entier). Pratique pour scénarios <em>mode révision</em>.</td></tr>
             <tr><td>prochains_DS_html</td><td>info</td><td>Liste HTML des 5 prochains DS détectés.</td></tr>
+            <tr><td colspan="3" style="background:rgba(41,128,185,.08);font-weight:600;">— Statistiques (v1.1.0) —</td></tr>
+            <tr><td>moyenne_generale</td><td>info</td><td>Moyenne générale pondérée sur 20, calculée par le démon à partir de toutes les notes (même formule que le widget). <strong>Historisée</strong> — exploitable dans un graphique d'historique Jeedom. Vide si aucune note exploitable.</td></tr>
+            <tr><td>matiere_en_baisse</td><td>info</td><td>Matière(s) dont la moyenne récente chute d'au moins 2 points sur 20 par rapport au début (matières ayant ≥ 4 notes). Plusieurs matières séparées par « · ». Vide si aucune baisse détectée.</td></tr>
         </tbody>
     </table>
+    <div class="callout callout-info">
+        <strong>Historisation (v1.1.0)</strong>
+        Les commandes <code>Nb_absences</code>, <code>Nb_retard</code>, <code>Nb_devoir_NF</code> et
+        <code>moyenne_generale</code> sont <strong>historisées par défaut</strong> : Jeedom conserve
+        leur évolution dans le temps, consultable via un graphique d'historique (widget « historique »
+        ou page de la commande). L'historisation est activée automatiquement, y compris sur les
+        équipements créés avant la 1.1.0.
+    </div>
     <div class="callout callout-info">
         <strong>Fenêtre de synchronisation</strong>
         Le cron Jeedom déclenche une collecte automatique toutes les heures, <strong>désactivé entre 22h et 4h</strong>
