@@ -1,0 +1,4 @@
+# Dépendances de développement / CI pour ProJote.
+# Les dépendances runtime du démon sont installées par resources/post-install.sh.
+pytest>=7.0
+ruff>=0.4
