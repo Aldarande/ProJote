@@ -791,6 +791,40 @@
     .pjw-#id# .pj-msg-sender { font-weight: 600; }
     .pjw-#id# .pj-msg-subject { font-weight: 600; margin-top: 2px; }
     .pjw-#id# .pj-msg-extract { opacity: .8; margin-top: 2px; }
+
+    /* ── v1.1.0 — Onglet Statistiques ───────────────────────── */
+    .pjw-#id# .pj-stat-hint { font-size: 0.78em; opacity: .6; margin: 2px 0 8px; }
+    .pjw-#id# .pj-stat-row {
+        padding: 6px 4px;
+        border-bottom: 1px solid rgba(0,0,0,.06);
+    }
+    .pjw-#id# .pj-stat-row:last-child { border-bottom: none; }
+    .pjw-#id# .pj-stat-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 8px;
+        font-size: 0.85em;
+    }
+    .pjw-#id# .pj-stat-label { opacity: .8; }
+    .pjw-#id# .pj-stat-val { font-weight: 600; white-space: nowrap; }
+    .pjw-#id# .pj-stat-arrow { opacity: .7; }
+    .pjw-#id# .pj-spark {
+        display: block;
+        width: 100%;
+        height: 38px;
+        margin-top: 3px;
+        opacity: .85;
+        overflow: visible;
+    }
+    .pjw-#id# .pj-stat-warn {
+        margin-top: 8px;
+        padding: 6px 8px;
+        font-size: 0.84em;
+        border-radius: 6px;
+        background: rgba(192, 57, 43, .08);
+        border-left: 3px solid #c0392b;
+    }
 </style>
 
 <div class="pjw-#id#">
@@ -872,6 +906,9 @@
                     id="pjwbmenu#id#"></span></button>
             <button class="tab-btn" data-tab="msg#id#"><i class="fas fa-envelope"></i> Msg<span class="tab-badge"
                     id="pjwbmsg#id#"></span></button>
+            <!-- v1.1.0 -->
+            <button class="tab-btn" data-tab="stats#id#"><i class="fas fa-chart-line"></i> Stats<span class="tab-badge"
+                    id="pjwbstats#id#"></span></button>
         </div>
 
         <!-- Devoirs (défaut) -->
@@ -922,6 +959,13 @@
                 <div class="p-empty">Aucun message</div>
             </div>
         </div>
+
+        <!-- v1.1.0 — Statistiques -->
+        <div class="tab-pane" id="stats#id#">
+            <div id="pjwstats#id#">
+                <div class="p-empty">Aucune donnée d'historique pour l'instant</div>
+            </div>
+        </div>
     </div>
 
 </div><!-- .pjw-#id# -->
@@ -935,6 +979,7 @@
 
         var D = #initData#;
         var VIS = #visibilityMap#;
+        var STATS = #statsData#;
         var DEFAULT_TAB = '#default_tab#';
         var EDT_NAV_MODE = '#edt_nav_mode#';
         var edtDayIdx = 0;
@@ -1556,6 +1601,66 @@
             }
         }
 
+        /* ─── STATISTIQUES (v1.1.0) ───────────────────────── */
+        function sparkline(series, opts) {
+            opts = opts || {};
+            if (!series || series.length < 2) return '';
+            var w = 240, h = 38, pad = 3;
+            var vals = series.map(function (p) { return p.v; });
+            var min = Math.min.apply(null, vals), max = Math.max.apply(null, vals);
+            if (opts.min != null) min = Math.min(min, opts.min);
+            if (opts.max != null) max = Math.max(max, opts.max);
+            var range = (max - min) || 1;
+            var n = series.length;
+            var pts = series.map(function (p, i) {
+                var x = pad + (i * (w - 2 * pad) / (n - 1));
+                var y = h - pad - ((p.v - min) / range) * (h - 2 * pad);
+                return x.toFixed(1) + ',' + y.toFixed(1);
+            }).join(' ');
+            var stroke = opts.accent ? 'var(--pjw-a, #94C904)' : 'currentColor';
+            return '<svg class="pj-spark" viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none">' +
+                '<polyline points="' + pts + '" fill="none" stroke="' + stroke +
+                '" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>';
+        }
+
+        function statRow(label, series, opts) {
+            opts = opts || {};
+            if (!series || !series.length) return '';
+            var last = series[series.length - 1].v;
+            var delta = last - series[0].v;
+            var arrow = series.length > 1 ? (delta > 0.05 ? '↗' : (delta < -0.05 ? '↘' : '→')) : '';
+            var val = (opts.decimals != null) ? last.toFixed(opts.decimals) : String(last);
+            return '<div class="pj-stat-row">' +
+                '<div class="pj-stat-head"><span class="pj-stat-label">' + esc(label) + '</span>' +
+                '<span class="pj-stat-val">' + esc(val) + (opts.unit || '') +
+                ' <span class="pj-stat-arrow">' + arrow + '</span></span></div>' +
+                sparkline(series, opts) + '</div>';
+        }
+
+        function renderStats() {
+            var elS = el('pjwstats' + ID);
+            if (!elS) return;
+            if (VIS && VIS.stats === false) {
+                var pane = el('stats' + ID); if (pane) pane.style.display = 'none';
+                return;
+            }
+            var S = STATS || {};
+            var rows = '';
+            rows += statRow('Moyenne générale', S.moyenne, { accent: true, decimals: 2, unit: '/20', min: 0, max: 20 });
+            rows += statRow('Absences', S.absences, { decimals: 0 });
+            rows += statRow('Retards', S.retards, { decimals: 0 });
+            rows += statRow('Devoirs non faits', S.devoirs_nf, { decimals: 0 });
+
+            var html = '';
+            if (rows) {
+                html += '<div class="pj-stat-hint">Évolution sur les ~120 derniers jours (données historisées par Jeedom).</div>' + rows;
+            }
+            if (S.matiere_en_baisse && S.matiere_en_baisse.length) {
+                html += '<div class="pj-stat-warn">⚠ Matière(s) en baisse : ' + esc(S.matiere_en_baisse) + '</div>';
+            }
+            elS.innerHTML = html || '<div class="p-empty">Aucune donnée d\'historique pour l\'instant</div>';
+        }
+
         /* ─── BADGE PROCHAIN DS (v1.0.1) ──────────────────── */
         function renderProchainDS(d) {
             var elDS = el('pjwds' + ID);
@@ -1654,13 +1759,16 @@
             renderMenu(d);
             renderMessages(d);
             renderProchainDS(d);
+            // v1.1.0
+            renderStats();
             // Masquer les boutons d'onglets des sections non visibles
             var tabsEl = el('pjwtabs' + ID);
             if (tabsEl) {
                 var btnMap = {
                     'abs': VIS.absences, 'ret': VIS.retards, 'pun': VIS.punitions,
                     'notes': VIS.notes, 'dv': VIS.devoirs,
-                    'menu': VIS.menu !== false, 'msg': VIS.messages !== false
+                    'menu': VIS.menu !== false, 'msg': VIS.messages !== false,
+                    'stats': VIS.stats !== false
                 };
                 tabsEl.querySelectorAll('.tab-btn').forEach(function (btn) {
                     var tab = (btn.getAttribute('data-tab') || '').replace(ID, '');
