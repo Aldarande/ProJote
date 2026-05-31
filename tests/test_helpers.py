@@ -358,3 +358,100 @@ class TestMessages:
         discs = [_Discussion("X", "P", d(2026, 1, 1, 8, 0), False, long_content)]
         out = daemon.messages(_Client(discs))
         assert len(out["messages_brut"][0]["extrait"]) <= 200
+
+
+# ── compute_moyenne_generale (F3) ─────────────────────────────────────────────
+def _note(note, sur="20", coeff="1", cours="Maths"):
+    return {"note": note, "sur": sur, "coeff": coeff, "cours": cours}
+
+
+class TestComputeMoyenneGenerale:
+    def test_empty_returns_none(self, daemon):
+        assert daemon.compute_moyenne_generale([]) is None
+        assert daemon.compute_moyenne_generale(None) is None
+
+    def test_single_note(self, daemon):
+        assert daemon.compute_moyenne_generale([_note("10", "20", "1")]) == 10.0
+
+    def test_normalized_to_20(self, daemon):
+        # 5/10 = 10/20
+        assert daemon.compute_moyenne_generale([_note("5", "10", "1")]) == 10.0
+
+    def test_coefficient_weighting(self, daemon):
+        # (10*1 + 20*3) / (1+3) = 70/4 = 17.5
+        notes = [_note("10", "20", "1"), _note("20", "20", "3")]
+        assert daemon.compute_moyenne_generale(notes) == 17.5
+
+    def test_comma_decimal(self, daemon):
+        assert daemon.compute_moyenne_generale([_note("12,5", "20", "1")]) == 12.5
+
+    def test_excludes_non_numeric(self, daemon):
+        notes = [_note("Absent", "20", "1"), _note("15", "20", "1")]
+        assert daemon.compute_moyenne_generale(notes) == 15.0
+
+    def test_excludes_zero_denominator(self, daemon):
+        notes = [_note("10", "0", "1"), _note("12", "20", "1")]
+        assert daemon.compute_moyenne_generale(notes) == 12.0
+
+    def test_excludes_zero_coefficient(self, daemon):
+        # coeff 0 = bonus/optionnel → exclu
+        notes = [_note("20", "20", "0"), _note("10", "20", "1")]
+        assert daemon.compute_moyenne_generale(notes) == 10.0
+
+
+# ── detect_subject_trends (F3) ────────────────────────────────────────────────
+class TestDetectSubjectTrends:
+    def test_empty(self, daemon):
+        out = daemon.detect_subject_trends([])
+        assert out["matiere_en_baisse"] == ""
+        assert out["matiere_en_baisse_detail"] == []
+
+    def test_below_min_notes_not_flagged(self, daemon):
+        # 3 notes seulement (< min_notes=4)
+        notes = [_note("8"), _note("8"), _note("16")]
+        out = daemon.detect_subject_trends(notes)
+        assert out["matiere_en_baisse"] == ""
+
+    def test_falling_subject_flagged(self, daemon):
+        # note_list = plus récent en premier : récentes basses (8,8), anciennes hautes (16,16)
+        notes = [
+            _note("8", cours="Maths"),
+            _note("8", cours="Maths"),
+            _note("16", cours="Maths"),
+            _note("16", cours="Maths"),
+        ]
+        out = daemon.detect_subject_trends(notes)
+        assert out["matiere_en_baisse"] == "Maths"
+        d = out["matiere_en_baisse_detail"][0]
+        assert d["ancienne_moyenne"] == 16.0
+        assert d["recente_moyenne"] == 8.0
+        assert d["delta"] == -8.0
+
+    def test_improving_subject_not_flagged(self, daemon):
+        # récentes hautes, anciennes basses → progression, pas de flag
+        notes = [
+            _note("17", cours="Physique"),
+            _note("18", cours="Physique"),
+            _note("9", cours="Physique"),
+            _note("8", cours="Physique"),
+        ]
+        out = daemon.detect_subject_trends(notes)
+        assert out["matiere_en_baisse"] == ""
+
+    def test_stable_subject_not_flagged(self, daemon):
+        notes = [_note("14"), _note("14"), _note("15"), _note("15")]
+        out = daemon.detect_subject_trends(notes)
+        assert out["matiere_en_baisse"] == ""
+
+    def test_multiple_subjects_sorted_by_drop(self, daemon):
+        # Maths chute de 4, Histoire chute de 8 → Histoire en premier
+        notes = [
+            _note("12", cours="Maths"), _note("12", cours="Maths"),
+            _note("16", cours="Maths"), _note("16", cours="Maths"),
+            _note("6", cours="Histoire"), _note("6", cours="Histoire"),
+            _note("14", cours="Histoire"), _note("14", cours="Histoire"),
+        ]
+        out = daemon.detect_subject_trends(notes)
+        subjects = [d["matiere"] for d in out["matiere_en_baisse_detail"]]
+        assert subjects == ["Histoire", "Maths"]
+        assert out["matiere_en_baisse"] == "Histoire · Maths"

@@ -252,6 +252,18 @@ try {
         $eqLogic->checkAndUpdateCmd('derniere_note', "Pas de dernière note retournée");
     }
 
+    // Moyenne générale (numérique, historisée) — n'écrit que si une valeur exploitable est calculée (F3, v1.1.0)
+    if (isset($result["Notes"]["moyenne_generale"]) && $result["Notes"]["moyenne_generale"] !== "" && $eqLogic->getCmd(null, 'moyenne_generale')) {
+        log::add('ProJote', 'debug', 'Champ reçu : moyenne_generale - Valeur reçue : ' . $result["Notes"]["moyenne_generale"]);
+        $eqLogic->checkAndUpdateCmd('moyenne_generale', $result["Notes"]["moyenne_generale"]);
+    }
+
+    // Matière(s) en baisse (chaîne, détection heuristique sur les notes) (F3, v1.1.0)
+    if (isset($result["Notes"]["matiere_en_baisse"]) && $eqLogic->getCmd(null, 'matiere_en_baisse')) {
+        log::add('ProJote', 'debug', 'Champ reçu : matiere_en_baisse - Valeur reçue : ' . $result["Notes"]["matiere_en_baisse"]);
+        $eqLogic->checkAndUpdateCmd('matiere_en_baisse', $result["Notes"]["matiere_en_baisse"]);
+    }
+
     // Vérifie les entrées des Retards (tableaux "retard", "dernier_retard" et "nb_retard")
     if (isset($result["Retards"]["retard"]) && $eqLogic->getCmd(null, 'retard')) {
         log::add('ProJote', 'debug', 'Champ reçu : retard - Valeur reçue : ' . json_encode($result["Retards"]["retard"]));

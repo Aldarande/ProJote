@@ -1102,6 +1102,104 @@ def evaluations(client):
         time.sleep(5)
 
 
+def compute_moyenne_generale(note_list):
+    """Moyenne générale pondérée sur 20, calculée à partir de la liste de notes.
+
+    Reprend la logique du widget : chaque note est ramenée sur 20 puis pondérée
+    par son coefficient. Sont exclues les notes non numériques, à dénominateur
+    nul ou négatif, et de coefficient nul ou négatif (bonus / optionnel).
+
+    Args:
+        note_list (list[dict]): notes sérialisées (clés note, sur, coeff).
+    Returns:
+        float | None: moyenne arrondie à 2 décimales, ou None si aucune note exploitable.
+    """
+    tot = 0.0
+    coefs = 0.0
+    for n in note_list or []:
+        try:
+            note_f = float(str(n.get("note", "")).replace(",", "."))
+        except (ValueError, AttributeError):
+            continue
+        sur_str = str(n.get("sur", "20")).replace(",", ".") or "20"
+        try:
+            sur_f = float(sur_str)
+        except ValueError:
+            sur_f = 20.0
+        try:
+            coeff_f = float(str(n.get("coeff", "1")).replace(",", "."))
+        except ValueError:
+            coeff_f = 1.0
+        if sur_f <= 0 or coeff_f <= 0:
+            continue
+        tot += (note_f / sur_f) * 20.0 * coeff_f
+        coefs += coeff_f
+    if coefs <= 0:
+        return None
+    return round(tot / coefs, 2)
+
+
+def detect_subject_trends(note_list, min_notes=4, drop_threshold=2.0):
+    """Détecte les matières en baisse à partir des notes (ramenées sur 20).
+
+    Pour chaque matière comptant au moins `min_notes` notes numériques, compare
+    la moyenne de la moitié la plus récente à celle de la moitié la plus ancienne.
+    Une chute supérieure ou égale à `drop_threshold` points (sur 20) signale une
+    matière en baisse.
+
+    `note_list` est attendue triée du plus récent au plus ancien (cf. notes()).
+
+    Returns:
+        dict avec :
+          - matiere_en_baisse        : noms séparés par " · " (ou "")
+          - matiere_en_baisse_detail : liste [{matiere, ancienne_moyenne, recente_moyenne, delta}]
+    """
+    empty = {"matiere_en_baisse": "", "matiere_en_baisse_detail": []}
+    if not note_list:
+        return empty
+
+    by_subject = {}
+    for n in note_list:
+        try:
+            note_f = float(str(n.get("note", "")).replace(",", "."))
+            sur_f = float(str(n.get("sur", "20")).replace(",", ".") or "20")
+        except (ValueError, AttributeError):
+            continue
+        if sur_f <= 0:
+            continue
+        subj = n.get("cours", "Inconnu") or "Inconnu"
+        by_subject.setdefault(subj, []).append((note_f / sur_f) * 20.0)
+
+    detail = []
+    for subj, notes20 in by_subject.items():
+        if len(notes20) < min_notes:
+            continue
+        # notes20 va du plus récent au plus ancien → remettre en ordre chronologique
+        chrono = list(reversed(notes20))
+        half = len(chrono) // 2
+        anciennes = chrono[:half]
+        recentes = chrono[len(chrono) - half:]
+        if not anciennes or not recentes:
+            continue
+        moy_anc = sum(anciennes) / len(anciennes)
+        moy_rec = sum(recentes) / len(recentes)
+        if (moy_anc - moy_rec) >= drop_threshold:
+            detail.append(
+                {
+                    "matiere": subj,
+                    "ancienne_moyenne": round(moy_anc, 2),
+                    "recente_moyenne": round(moy_rec, 2),
+                    "delta": round(moy_rec - moy_anc, 2),
+                }
+            )
+
+    detail.sort(key=lambda d: d["delta"])  # plus forte baisse en premier
+    return {
+        "matiere_en_baisse": " · ".join(d["matiere"] for d in detail),
+        "matiere_en_baisse_detail": detail,
+    }
+
+
 def notes(client):
     """
     Récupère toutes les notes de l'année scolaire (toutes périodes) et les formate en JSON.
@@ -1218,6 +1316,11 @@ def notes(client):
 
             if data["note"]:
                 data["derniere_note"].append(data["note"][0])
+
+            # ── Moyenne générale + détection des matières en baisse (F3, v1.1.0) ─
+            moy_gen = compute_moyenne_generale(data["note"])
+            data["moyenne_generale"] = "" if moy_gen is None else str(moy_gen)
+            data.update(detect_subject_trends(data["note"]))
 
             # ── Calcul debug de la moyenne (même logique que le widget JS) ──────
             if logging.getLogger().isEnabledFor(logging.DEBUG):
