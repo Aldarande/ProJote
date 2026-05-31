@@ -18,7 +18,9 @@ resources/ProJoted/test_token_persistence.py
 .cspell/
 .continue/
 .claude/
-.github/
+
+# Cache des outils de test
+.pytest_cache/
 
 # Fichiers locaux divers
 rules/

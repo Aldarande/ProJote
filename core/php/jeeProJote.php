@@ -252,6 +252,18 @@ try {
         $eqLogic->checkAndUpdateCmd('derniere_note', "Pas de dernière note retournée");
     }
 
+    // Moyenne générale (numérique, historisée) — n'écrit que si une valeur exploitable est calculée (F3, v1.1.0)
+    if (isset($result["Notes"]["moyenne_generale"]) && $result["Notes"]["moyenne_generale"] !== "" && $eqLogic->getCmd(null, 'moyenne_generale')) {
+        log::add('ProJote', 'debug', 'Champ reçu : moyenne_generale - Valeur reçue : ' . $result["Notes"]["moyenne_generale"]);
+        $eqLogic->checkAndUpdateCmd('moyenne_generale', $result["Notes"]["moyenne_generale"]);
+    }
+
+    // Matière(s) en baisse (chaîne, détection heuristique sur les notes) (F3, v1.1.0)
+    if (isset($result["Notes"]["matiere_en_baisse"]) && $eqLogic->getCmd(null, 'matiere_en_baisse')) {
+        log::add('ProJote', 'debug', 'Champ reçu : matiere_en_baisse - Valeur reçue : ' . $result["Notes"]["matiere_en_baisse"]);
+        $eqLogic->checkAndUpdateCmd('matiere_en_baisse', $result["Notes"]["matiere_en_baisse"]);
+    }
+
     // Vérifie les entrées des Retards (tableaux "retard", "dernier_retard" et "nb_retard")
     if (isset($result["Retards"]["retard"]) && $eqLogic->getCmd(null, 'retard')) {
         log::add('ProJote', 'debug', 'Champ reçu : retard - Valeur reçue : ' . json_encode($result["Retards"]["retard"]));
@@ -437,6 +449,50 @@ try {
         $eqLogic->setConfiguration('Liste_Enfant', $listeEnfant);
     }
     // ── SAUVEGARDE DES DONNÉES DU WIDGET ────────────────────────────────────
+    // ── Centre d'alertes (F4, v1.1.0) ──────────────────────────────────────────
+    // Génère des événements ProJote en comparant les compteurs courants à ceux du
+    // cycle précédent (mémorisés en configuration eqLogic = BDD Jeedom). FIFO de 50.
+    $newCounters = array(
+        'absences'  => (int)(isset($result['Absences']['nb_absences']) ? $result['Absences']['nb_absences'] : 0),
+        'retards'   => (int)(isset($result['Retards']['nb_retard']) ? $result['Retards']['nb_retard'] : 0),
+        'punitions' => (int)(isset($result['Punitions']['Nb_Punitions']) ? $result['Punitions']['Nb_Punitions'] : 0),
+        'msg_nl'    => (int)(isset($result['Messages']['Nb_messages_non_lus']) ? $result['Messages']['Nb_messages_non_lus'] : 0),
+        'ds'        => (string)(isset($result['Devoirs']['prochain_DS_matiere']) ? $result['Devoirs']['prochain_DS_matiere'] : '')
+                     . '|' . (string)(isset($result['Devoirs']['prochain_DS_date']) ? $result['Devoirs']['prochain_DS_date'] : ''),
+        'meb'       => (string)(isset($result['Notes']['matiere_en_baisse']) ? $result['Notes']['matiere_en_baisse'] : ''),
+    );
+    $prevCounters = json_decode($eqLogic->getConfiguration('projote_counters_prev', '{}'), true);
+    if (!is_array($prevCounters)) $prevCounters = array();
+    $events = json_decode($eqLogic->getConfiguration('projote_events', '[]'), true);
+    if (!is_array($events)) $events = array();
+
+    $now = date('d/m/Y H:i');
+    $addEvent = function ($type, $label) use (&$events, $now) {
+        array_unshift($events, array('date' => $now, 'type' => $type, 'label' => $label));
+    };
+    // On ne génère des événements qu'à partir du 2e cycle (snapshot précédent présent),
+    // pour éviter une avalanche d'alertes au premier rafraîchissement.
+    if (!empty($prevCounters)) {
+        if ($newCounters['absences']  > (isset($prevCounters['absences'])  ? $prevCounters['absences']  : 0)) $addEvent('absence',  'Nouvelle absence');
+        if ($newCounters['retards']   > (isset($prevCounters['retards'])   ? $prevCounters['retards']   : 0)) $addEvent('retard',   'Nouveau retard');
+        if ($newCounters['punitions'] > (isset($prevCounters['punitions']) ? $prevCounters['punitions'] : 0)) $addEvent('punition', 'Nouvelle punition');
+        if ($newCounters['msg_nl']    > (isset($prevCounters['msg_nl'])    ? $prevCounters['msg_nl']    : 0)) $addEvent('message',  'Nouveau message non lu');
+        if ($newCounters['ds'] !== (isset($prevCounters['ds']) ? $prevCounters['ds'] : '')
+            && isset($result['Devoirs']['prochain_DS_matiere']) && $result['Devoirs']['prochain_DS_matiere'] !== '') {
+            $addEvent('ds', 'Contrôle détecté : ' . $result['Devoirs']['prochain_DS_matiere']
+                . ' le ' . (isset($result['Devoirs']['prochain_DS_date']) ? $result['Devoirs']['prochain_DS_date'] : '?'));
+        }
+        if ($newCounters['meb'] !== (isset($prevCounters['meb']) ? $prevCounters['meb'] : '') && $newCounters['meb'] !== '') {
+            $addEvent('baisse', 'Matière en baisse : ' . $newCounters['meb']);
+        }
+    }
+    $events = array_slice($events, 0, 50);
+    $eqLogic->setConfiguration('projote_events', json_encode($events));
+    $eqLogic->setConfiguration('projote_counters_prev', json_encode($newCounters));
+    if (count($events) && $eqLogic->getCmd(null, 'event')) {
+        $eqLogic->checkAndUpdateCmd('event', $events[0]['label']);
+    }
+
     // Le widget ProJote utilise toHtml() sur l'eqLogic (plus de commande Widget).
     // Les données sont stockées en configuration de l'équipement sous la clé 'widget_json'.
     // toHtml() les lit à chaque rendu ; le JS les récupère via l'action GetWidgetData.
@@ -463,6 +519,11 @@ try {
         'edt_next_days'         => isset($result['Emploi_du_temps']['edt_next_days'])          ? $result['Emploi_du_temps']['edt_next_days']          : array(),
         'photo'                 => $resolvedPhoto,
         'pronote_photo'         => $pronotePhotoUrl ?? '',
+        'moyenne_generale'         => isset($result['Notes']['moyenne_generale'])         ? $result['Notes']['moyenne_generale']         : '',
+        'matiere_en_baisse'        => isset($result['Notes']['matiere_en_baisse'])        ? $result['Notes']['matiere_en_baisse']        : '',
+        'matiere_en_baisse_detail' => isset($result['Notes']['matiere_en_baisse_detail']) ? $result['Notes']['matiere_en_baisse_detail'] : array(),
+        'notifications'            => isset($result['Notifications']['Notification'])      ? $result['Notifications']['Notification']      : array(),
+        'events'                   => $events,
         'last_update'           => date('c'),
     );
     $eqLogic->setConfiguration('widget_json', json_encode($widget_data));

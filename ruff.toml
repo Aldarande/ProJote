@@ -1,0 +1,9 @@
+# Configuration ruff pour ProJote.
+# La cible Python du démon est 3.8+ (cf. resources/post-install.sh).
+target-version = "py38"
+
+# Code tiers / vendoré (framework démon fourni par Jeedom) — non maintenu ici.
+extend-exclude = [
+    "resources/ProJoted/jeedom",
+    "resources/python_venv",
+]
