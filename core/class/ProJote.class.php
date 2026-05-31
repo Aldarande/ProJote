@@ -82,7 +82,7 @@ class ProJote extends eqLogic
         'type'              => 'select',
         'label'             => 'Onglet par défaut',
         'default'           => 'dv',
-        'values'            => ['dv' => 'Devoirs', 'notes' => 'Notes', 'abs' => 'Absences', 'ret' => 'Retards', 'pun' => 'Punitions', 'menu' => 'Menu cantine', 'msg' => 'Messagerie', 'stats' => 'Statistiques'],
+        'values'            => ['dv' => 'Devoirs', 'notes' => 'Notes', 'abs' => 'Absences', 'ret' => 'Retards', 'pun' => 'Punitions', 'menu' => 'Menu cantine', 'msg' => 'Messagerie', 'stats' => 'Statistiques', 'alertes' => 'Alertes'],
       ],
       'edt_nav_mode' => [
         'allow_displayType' => ['dashboard', 'mobile'],
@@ -584,6 +584,8 @@ class ProJote extends eqLogic
       "prochain_DS_date"      => array("Prochain DS - date",                               'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
       "prochain_DS_dans_jours" => array("Prochain DS - jours restants",                    'info',   'numeric', "j",     0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
       "prochains_DS_html"     => array("Liste HTML des prochains DS",                      'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
+      // ── Centre d'alertes (v1.1.0) ──────────────────────────────────────────
+      "event"                 => array("Dernier événement",                               'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
     );
   }
 
@@ -767,6 +769,8 @@ class ProJote extends eqLogic
       'prochain_ds'      => $vis['prochain_DS_matiere'] ?? true,
       // v1.1.0 — onglet Statistiques
       'stats'            => $vis['moyenne_generale']  ?? true,
+      // v1.1.0 — onglet Alertes (événements ProJote + notifications Pronote)
+      'alertes'          => ($vis['event'] ?? true) || ($vis['notifications'] ?? true),
     ];
 
     // 4b. Séries d'historique pour l'onglet Statistiques (v1.1.0).

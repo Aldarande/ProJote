@@ -432,6 +432,8 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
             <tr><td colspan="3" style="background:rgba(41,128,185,.08);font-weight:600;">— Statistiques (v1.1.0) —</td></tr>
             <tr><td>moyenne_generale</td><td>info</td><td>Moyenne générale pondérée sur 20, calculée par le démon à partir de toutes les notes (même formule que le widget). <strong>Historisée</strong> — exploitable dans un graphique d'historique Jeedom. Vide si aucune note exploitable.</td></tr>
             <tr><td>matiere_en_baisse</td><td>info</td><td>Matière(s) dont la moyenne récente chute d'au moins 2 points sur 20 par rapport au début (matières ayant ≥ 4 notes). Plusieurs matières séparées par « · ». Vide si aucune baisse détectée.</td></tr>
+            <tr><td colspan="3" style="background:rgba(155,89,182,.10);font-weight:600;">— Centre d'alertes (v1.1.0) —</td></tr>
+            <tr><td>event</td><td>info</td><td>Libellé du dernier événement ProJote détecté (nouvelle absence/retard/punition, nouveau message, contrôle détecté, matière en baisse). Pratique comme déclencheur de scénario. La liste complète (50 derniers) est affichée dans l'onglet Alertes du widget.</td></tr>
         </tbody>
     </table>
     <div class="callout callout-info">
@@ -477,8 +479,9 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
         <li><strong>Vie scolaire</strong> — badges circulaires pour absences, retards, punitions, devoirs non faits</li>
         <li><strong>Emploi du temps</strong> — cours d'aujourd'hui + navigation vers les 4 prochains jours scolaires, nombre de cours annulés depuis la rentrée</li>
         <li><strong>Moyenne générale</strong> — barre dégradée rouge→vert avec tendance (hausse/baisse)</li>
-        <li><strong>Onglets</strong> — Devoirs · Notes · Absences · Retards · Punitions · <strong>Menu cantine</strong> (v1.0.1) · <strong>Messagerie</strong> (v1.0.1) · <strong>Statistiques</strong> (v1.1.0)</li>
+        <li><strong>Onglets</strong> — Devoirs · Notes · Absences · Retards · Punitions · <strong>Menu cantine</strong> (v1.0.1) · <strong>Messagerie</strong> (v1.0.1) · <strong>Statistiques</strong> (v1.1.0) · <strong>Alertes</strong> (v1.1.0)</li>
         <li><strong>Onglet Statistiques</strong> <em>(v1.1.0)</em> — courbes d'évolution (sparklines) de la moyenne générale, des absences, retards et devoirs non faits sur ~120 jours, à partir des données historisées par Jeedom. Affiche aussi les éventuelles matières en baisse. L'onglet n'affiche des courbes qu'une fois assez d'historique accumulé.</li>
+        <li><strong>Onglet Alertes</strong> <em>(v1.1.0)</em> — centre regroupant les <strong>événements ProJote</strong> générés automatiquement (nouvelle absence, nouveau retard, nouvelle punition, nouveau message non lu, contrôle détecté, matière en baisse — historique des 50 derniers) et les <strong>notifications Pronote</strong> (informations &amp; sondages). Un badge indique le nombre de notifications Pronote non lues.</li>
         <li><strong>Allergènes / labels du menu</strong> <em>(v1.1.0)</em> — l'onglet Menu cantine affiche les labels Pronote (Bio, Local, Porc, allergènes…) sous forme de puces discrètes, lorsqu'ils sont renseignés par l'établissement.</li>
         <li><strong>Badge "Prochain DS"</strong> <em>(v1.0.1)</em> — en-tête, libellé adaptatif <em>aujourd'hui</em> / <em>demain</em> / <em>J-X</em>. Visible uniquement si un DS est à venir. Un clic ouvre l'onglet Devoirs.</li>
         <li><strong>Détail cours annulés</strong> <em>(v1.0.1)</em> — affichage <code>Matière · Professeur · Salle — Annulé</code> dans l'EDT.</li>
