@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [works, dev, main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  lint-python:
+    name: Lint Python (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Installer ruff
+        run: pip install ruff
+      - name: Erreurs critiques (tout le dépôt)
+        # E9 = syntaxe ; F63/F7/F82 = noms indéfinis, comparaisons douteuses…
+        run: ruff check . --select E9,F63,F7,F82
+      - name: Lint complet (tests/)
+        run: ruff check tests/
+
+  lint-shell:
+    name: Lint Shell (shellcheck)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Installer shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+      - name: shellcheck (erreurs bloquantes)
+        run: shellcheck --severity=error resources/post-install.sh
+      - name: shellcheck (warnings, non bloquant)
+        run: shellcheck resources/post-install.sh || true
+
+  lint-php:
+    name: Lint PHP (php -l)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.1"
+      - name: php -l sur les fichiers PHP
+        run: find core -name '*.php' -print0 | xargs -0 -r -n1 php -l
+
+  test:
+    name: Tests unitaires (pytest)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.8", "3.11"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Installer les dépendances de dev
+        run: pip install -r requirements-dev.txt
+      - name: pytest
+        run: pytest -q

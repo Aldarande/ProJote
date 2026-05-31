@@ -254,6 +254,8 @@
         <a href="#prerequis">Prérequis</a>
         <a href="#utilisation">Commandes disponibles</a>
         <a href="#widget">Widget</a>
+        <a href="#ical">Export iCalendar</a>
+        <a href="#scenarios">Exemples de scénarios</a>
         <a href="#version">Historique des versions</a>
 
         <div class="sidebar-section">Aide</div>
@@ -428,8 +430,21 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
             <tr><td>prochain_DS_date</td><td>info</td><td>Date au format <code>dd/mm/yyyy</code>.</td></tr>
             <tr><td>prochain_DS_dans_jours</td><td>info</td><td>Nombre de jours avant le DS (entier). Pratique pour scénarios <em>mode révision</em>.</td></tr>
             <tr><td>prochains_DS_html</td><td>info</td><td>Liste HTML des 5 prochains DS détectés.</td></tr>
+            <tr><td colspan="3" style="background:rgba(41,128,185,.08);font-weight:600;">— Statistiques (v1.1.0) —</td></tr>
+            <tr><td>moyenne_generale</td><td>info</td><td>Moyenne générale pondérée sur 20, calculée par le démon à partir de toutes les notes (même formule que le widget). <strong>Historisée</strong> — exploitable dans un graphique d'historique Jeedom. Vide si aucune note exploitable.</td></tr>
+            <tr><td>matiere_en_baisse</td><td>info</td><td>Matière(s) dont la moyenne récente chute d'au moins 2 points sur 20 par rapport au début (matières ayant ≥ 4 notes). Plusieurs matières séparées par « · ». Vide si aucune baisse détectée.</td></tr>
+            <tr><td colspan="3" style="background:rgba(155,89,182,.10);font-weight:600;">— Centre d'alertes (v1.1.0) —</td></tr>
+            <tr><td>event</td><td>info</td><td>Libellé du dernier événement ProJote détecté (nouvelle absence/retard/punition, nouveau message, contrôle détecté, matière en baisse). Pratique comme déclencheur de scénario. La liste complète (50 derniers) est affichée dans l'onglet Alertes du widget.</td></tr>
         </tbody>
     </table>
+    <div class="callout callout-info">
+        <strong>Historisation (v1.1.0)</strong>
+        Les commandes <code>Nb_absences</code>, <code>Nb_retard</code>, <code>Nb_devoir_NF</code> et
+        <code>moyenne_generale</code> sont <strong>historisées par défaut</strong> : Jeedom conserve
+        leur évolution dans le temps, consultable via un graphique d'historique (widget « historique »
+        ou page de la commande). L'historisation est activée automatiquement, y compris sur les
+        équipements créés avant la 1.1.0.
+    </div>
     <div class="callout callout-info">
         <strong>Fenêtre de synchronisation</strong>
         Le cron Jeedom déclenche une collecte automatique toutes les heures, <strong>désactivé entre 22h et 4h</strong>
@@ -442,6 +457,21 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
         Si une information n'est pas disponible sur le portail Pronote de l'établissement, elle ne remontera pas.
     </div>
 
+    <div class="callout callout-info">
+        <strong>Notes chiffrées vs compétences</strong>
+        Depuis 2021, Pronote distingue deux systèmes d'évaluation, exposés par <strong>deux commandes
+        distinctes</strong> dans ProJote :
+        <ul style="margin:6px 0 0 18px;">
+            <li><code>note</code> / <code>derniere_note</code> — les <strong>notes chiffrées</strong>
+            (sur 20, avec coefficients) utilisées pour le calcul de la moyenne.</li>
+            <li><code>competences</code> — les <strong>évaluations par compétences</strong>
+            (acquis / non acquis, niveaux de maîtrise), sans valeur numérique et donc
+            <strong>jamais intégrées à la moyenne</strong>.</li>
+        </ul>
+        Selon l'établissement et la matière, l'un, l'autre, ou les deux peuvent être renseignés.
+        Une matière évaluée uniquement par compétences n'apparaîtra pas dans la liste des notes.
+    </div>
+
     <!-- ── Widget ─────────────────────────── -->
     <h1 id="widget">Widget</h1>
     <p>Le widget principal (<em>projote</em>) regroupe toutes les informations sur un seul tuile de tableau de bord :</p>
@@ -450,7 +480,10 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
         <li><strong>Vie scolaire</strong> — badges circulaires pour absences, retards, punitions, devoirs non faits</li>
         <li><strong>Emploi du temps</strong> — cours d'aujourd'hui + navigation vers les 4 prochains jours scolaires, nombre de cours annulés depuis la rentrée</li>
         <li><strong>Moyenne générale</strong> — barre dégradée rouge→vert avec tendance (hausse/baisse)</li>
-        <li><strong>Onglets</strong> — Devoirs · Notes · Absences · Retards · Punitions · <strong>Menu cantine</strong> (v1.0.1) · <strong>Messagerie</strong> (v1.0.1)</li>
+        <li><strong>Onglets</strong> — Devoirs · Notes · Absences · Retards · Punitions · <strong>Menu cantine</strong> (v1.0.1) · <strong>Messagerie</strong> (v1.0.1) · <strong>Statistiques</strong> (v1.1.0) · <strong>Alertes</strong> (v1.1.0)</li>
+        <li><strong>Onglet Statistiques</strong> <em>(v1.1.0)</em> — courbes d'évolution (sparklines) de la moyenne générale, des absences, retards et devoirs non faits sur ~120 jours, à partir des données historisées par Jeedom. Affiche aussi les éventuelles matières en baisse. L'onglet n'affiche des courbes qu'une fois assez d'historique accumulé.</li>
+        <li><strong>Onglet Alertes</strong> <em>(v1.1.0)</em> — centre regroupant les <strong>événements ProJote</strong> générés automatiquement (nouvelle absence, nouveau retard, nouvelle punition, nouveau message non lu, contrôle détecté, matière en baisse — historique des 50 derniers) et les <strong>notifications Pronote</strong> (informations &amp; sondages). Un badge indique le nombre de notifications Pronote non lues.</li>
+        <li><strong>Allergènes / labels du menu</strong> <em>(v1.1.0)</em> — l'onglet Menu cantine affiche les labels Pronote (Bio, Local, Porc, allergènes…) sous forme de puces discrètes, lorsqu'ils sont renseignés par l'établissement.</li>
         <li><strong>Badge "Prochain DS"</strong> <em>(v1.0.1)</em> — en-tête, libellé adaptatif <em>aujourd'hui</em> / <em>demain</em> / <em>J-X</em>. Visible uniquement si un DS est à venir. Un clic ouvre l'onglet Devoirs.</li>
         <li><strong>Détail cours annulés</strong> <em>(v1.0.1)</em> — affichage <code>Matière · Professeur · Salle — Annulé</code> dans l'EDT.</li>
         <li><strong>Spinner de chargement</strong> — le logo ProJote tourne dans la zone avatar pendant la collecte ; un clic déclenche un rafraîchissement manuel</li>
@@ -475,7 +508,7 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
             </tr>
             <tr>
                 <td><strong>Onglet par défaut</strong></td>
-                <td>Devoirs · Notes · Absences · Retards · Punitions · Menu cantine · Messagerie</td>
+                <td>Devoirs · Notes · Absences · Retards · Punitions · Menu cantine · Messagerie · Statistiques</td>
                 <td>Devoirs</td>
                 <td>Onglet ouvert à l'affichage initial du widget.</td>
             </tr>
@@ -517,8 +550,166 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
         <strong>Tendance</strong> — L'indicateur ↗/↘ est calculé en comparant la moyenne des 3 dernières notes saisies avec la moyenne des 3 premières notes de l'année (tri chronologique). Il n'apparaît que si au moins 4 notes sont disponibles.
     </div>
 
+    <!-- ── Export iCalendar ───────────────── -->
+    <h1 id="ical">Export iCalendar (.ics) <span class="badge badge-new">v1.1.0</span></h1>
+    <p>
+        ProJote expose un calendrier <strong>iCalendar natif</strong> généré à partir des données
+        déjà collectées (emploi du temps et devoirs), abonnable depuis n'importe quelle application
+        de calendrier (Google Agenda, Apple Calendrier, Thunderbird, Nextcloud…).
+    </p>
+    <table>
+        <thead><tr><th>Contenu</th><th>Détail</th></tr></thead>
+        <tbody>
+            <tr><td><strong>Cours</strong> (VEVENT)</td><td>Emploi du temps du jour, du prochain jour et des 4 jours suivants (J+1 à J+4), avec horaires, salle et professeur. Les cours annulés sont marqués <code>STATUS:CANCELLED</code>.</td></tr>
+            <tr><td><strong>Devoirs</strong> (VTODO)</td><td>Devoirs à faire, avec échéance et statut (fait / à faire).</td></tr>
+        </tbody>
+    </table>
+    <p>URL d'abonnement :</p>
+    <pre><code>https://&lt;votre-jeedom&gt;/plugins/ProJote/core/php/calendar.php?apikey=&lt;clé_API&gt;&amp;id=&lt;id_équipement&gt;</code></pre>
+    <ul>
+        <li><strong>clé_API</strong> : la clé API du plugin ProJote (Réglages → Système → Configuration → API).</li>
+        <li><strong>id_équipement</strong> : l'identifiant de l'équipement ProJote (visible dans l'URL de sa page de configuration).</li>
+    </ul>
+    <div class="callout callout-info">
+        <strong>Différence avec la commande <code>URL iCal</code></strong>
+        La commande <code>URL_Ical</code> pointe vers le calendrier <em>fourni par Pronote</em> (si
+        l'établissement l'active). L'export ci-dessus est <em>généré localement par ProJote</em> : il
+        fonctionne indépendamment de Pronote et inclut les devoirs en tâches (VTODO).
+    </div>
+    <div class="callout callout-warning">
+        <strong>Échéance des devoirs approximative</strong>
+        Pronote ne transmet que le jour et le mois des devoirs (sans l'année) ; ProJote infère
+        l'année (année scolaire en cours). L'échéance peut être décalée d'un an dans de rares cas
+        en fin d'année civile.
+    </div>
+
+    <!-- ── Exemples de scénarios ──────────── -->
+    <h1 id="scenarios">Exemples de scénarios</h1>
+    <p>
+        ProJote n'embarque <strong>aucun scénario prédéfini</strong> : il expose des commandes que
+        vous combinez librement dans vos propres scénarios Jeedom. Voici cinq recettes prêtes à
+        recopier. Chaque recette décrit le <em>déclencheur</em>, la <em>condition</em> et
+        l'<em>action</em> — adaptez les seuils, équipements et messages à votre installation.
+    </p>
+    <div class="callout callout-info">
+        <strong>Comment lire ces recettes</strong>
+        Les commandes citées (<code>#[…]#</code>) sont à remplacer par la référence de la commande
+        de <em>votre</em> équipement ProJote, via le sélecteur de commande de l'éditeur de scénario
+        Jeedom. Les noms entre crochets correspondent aux <em>logicalId</em> listés dans la section
+        <a href="#utilisation">Commandes disponibles</a>.
+    </div>
+
+    <h3>1 — Réveil adaptatif selon l'heure du premier cours</h3>
+    <p>Décale le réveil (ou l'annonce vocale) en fonction de l'heure réelle de début des cours du jour.</p>
+    <table>
+        <thead><tr><th>Élément</th><th>Configuration</th></tr></thead>
+        <tbody>
+            <tr><td><strong>Déclencheur</strong></td><td>Programmation (cron) chaque matin, ex. <code>30 6 * * 1-5</code> (6h30, du lundi au vendredi)</td></tr>
+            <tr><td><strong>Condition</strong></td><td><code>#[…][ProJote][edt_aujourdhui_debut]#</code> n'est pas vide (sinon journée sans cours)</td></tr>
+            <tr><td><strong>Action</strong></td><td>Annonce vocale / notification : « Premier cours à <code>#[…][ProJote][edt_aujourdhui_debut]#</code> ». Optionnel : déclencher la lumière ou le réveil X minutes avant cette heure.</td></tr>
+        </tbody>
+    </table>
+
+    <h3>2 — Anti-oubli des devoirs du lendemain</h3>
+    <p>Rappelle en soirée s'il reste des devoirs non faits pour le jour scolaire suivant.</p>
+    <table>
+        <thead><tr><th>Élément</th><th>Configuration</th></tr></thead>
+        <tbody>
+            <tr><td><strong>Déclencheur</strong></td><td>Programmation (cron) en soirée, ex. <code>0 19 * * 0-4</code> (19h, veille de jour scolaire)</td></tr>
+            <tr><td><strong>Condition</strong></td><td><code>#[…][ProJote][Nb_devoir_Demain_NF]#</code> &gt; 0</td></tr>
+            <tr><td><strong>Action</strong></td><td>Notification listant les devoirs : « <code>#[…][ProJote][Nb_devoir_Demain_NF]#</code> devoir(s) à faire pour demain » + contenu de <code>#[…][ProJote][devoir_Demain]#</code>.</td></tr>
+        </tbody>
+    </table>
+
+    <h3>3 — Alerte parent en cas de nouvelle absence</h3>
+    <p>Prévient dès que le compteur d'absences augmente.</p>
+    <table>
+        <thead><tr><th>Élément</th><th>Configuration</th></tr></thead>
+        <tbody>
+            <tr><td><strong>Déclencheur</strong></td><td>Sur changement de la commande <code>#[…][ProJote][Nb_absences]#</code></td></tr>
+            <tr><td><strong>Condition</strong></td><td>La nouvelle valeur est supérieure à la précédente (utiliser une variable mémorisant l'ancien total, ou le déclencheur « valeur augmente »)</td></tr>
+            <tr><td><strong>Action</strong></td><td>Notification push aux parents avec le détail de <code>#[…][ProJote][derniere_absence]#</code>.</td></tr>
+        </tbody>
+    </table>
+
+    <h3>4 — Mode révision avant un contrôle</h3>
+    <p>Active une ambiance « révision » quand un DS approche (J-2 ou moins).</p>
+    <table>
+        <thead><tr><th>Élément</th><th>Configuration</th></tr></thead>
+        <tbody>
+            <tr><td><strong>Déclencheur</strong></td><td>Sur changement de <code>#[…][ProJote][prochain_DS_dans_jours]#</code>, ou cron quotidien le soir</td></tr>
+            <tr><td><strong>Condition</strong></td><td><code>#[…][ProJote][prochain_DS_dans_jours]#</code> ≥ 0 ET ≤ 2</td></tr>
+            <tr><td><strong>Action</strong></td><td>Rappel vocal / notification : « Contrôle de <code>#[…][ProJote][prochain_DS_matiere]#</code> le <code>#[…][ProJote][prochain_DS_date]#</code> ». Optionnel : tamiser l'éclairage du bureau, couper les notifications de loisir.</td></tr>
+        </tbody>
+    </table>
+
+    <h3>5 — Annonce du menu de la cantine</h3>
+    <p>Annonce le menu du midi au moment du départ pour l'école ou avant le repas.</p>
+    <table>
+        <thead><tr><th>Élément</th><th>Configuration</th></tr></thead>
+        <tbody>
+            <tr><td><strong>Déclencheur</strong></td><td>Programmation (cron), ex. <code>30 7 * * 1-5</code> (7h30) ou <code>0 11 * * 1-5</code> (11h)</td></tr>
+            <tr><td><strong>Condition</strong></td><td><code>#[…][ProJote][menu_midi_aujourdhui]#</code> n'est pas vide</td></tr>
+            <tr><td><strong>Action</strong></td><td>Annonce vocale (TTS) : « Au menu ce midi : <code>#[…][ProJote][menu_midi_aujourdhui]#</code> ».</td></tr>
+        </tbody>
+    </table>
+
+    <div class="callout callout-tip">
+        <strong>Astuce</strong>
+        Pour limiter le bruit, conditionnez vos scénarios à la présence d'une personne à la maison
+        ou à un mode « semaine scolaire ». La commande <code>Statut connexion</code> permet aussi de
+        n'agir que lorsque la dernière synchronisation Pronote a réussi.
+    </div>
+
     <!-- ── Historique ─────────────────────── -->
     <h1 id="version">Historique des versions</h1>
+
+    <h2>1.1.0 — Mai 2026</h2>
+    <table>
+        <thead><tr><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><span class="badge badge-new">Nouveau</span></td>
+                <td><strong>Onglet Statistiques</strong> — courbes d'évolution (sparklines) de la moyenne générale, des absences, retards et devoirs non faits sur ~120 jours, à partir des données <strong>historisées par Jeedom</strong>. Affiche les éventuelles matières en baisse.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-new">Nouveau</span></td>
+                <td><strong>Moyenne générale</strong> — nouvelle commande <code>moyenne_generale</code> (numérique, sur 20, historisée) calculée par le démon. Historisation activée par défaut sur <code>Nb_absences</code>, <code>Nb_retard</code>, <code>Nb_devoir_NF</code> (migration automatique des équipements existants).</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-new">Nouveau</span></td>
+                <td><strong>Détection de matière en baisse</strong> — commande <code>matiere_en_baisse</code> : repère les matières dont la moyenne récente chute d'au moins 2 points (matières ayant ≥ 4 notes).</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-new">Nouveau</span></td>
+                <td><strong>Centre d'alertes</strong> — nouvel onglet <em>Alertes</em> regroupant les événements ProJote générés automatiquement (nouvelle absence/retard/punition, nouveau message non lu, contrôle détecté, matière en baisse — 50 derniers) et les notifications Pronote. Nouvelle commande <code>event</code> (dernier événement, pratique comme déclencheur de scénario).</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-new">Nouveau</span></td>
+                <td><strong>Export iCalendar natif</strong> — endpoint <code>calendar.php</code> générant un calendrier <code>.ics</code> (cours en VEVENT, devoirs en VTODO) abonnable depuis n'importe quelle application de calendrier. Indépendant de l'iCal Pronote.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-new">Nouveau</span></td>
+                <td><strong>Allergènes / labels du menu</strong> — l'onglet Menu cantine affiche les labels Pronote (Bio, Local, Porc, allergènes…) en puces discrètes.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-new">Nouveau</span></td>
+                <td><strong>Exemples de scénarios</strong> — nouvelle section de documentation avec 5 recettes prêtes à recopier (réveil adaptatif, anti-oubli devoirs, alerte absence, mode révision, annonce cantine).</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-perf">Amélioration</span></td>
+                <td><strong>Clarification compétences vs notes</strong> — documentation précisant la distinction entre notes chiffrées (intégrées à la moyenne) et évaluations par compétences (Pronote 2021+).</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-perf">Amélioration</span></td>
+                <td><strong>Onglet par défaut étendu</strong> — les onglets <em>Statistiques</em> et <em>Alertes</em> sont sélectionnables comme onglet par défaut du widget.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-perf">Qualité</span></td>
+                <td><strong>Tests unitaires + intégration continue</strong> — suite de tests pytest sur les fonctions du démon (moyenne, menus, messages, évaluations…), CI GitHub Actions (lint Python/Shell/PHP + tests Python 3.8/3.11), validation automatique du manifest <code>info.json</code>. Le démon est désormais importable hors exécution (guard <code>__main__</code>).</td>
+            </tr>
+        </tbody>
+    </table>
 
     <h2>1.0.1 — Mai 2026</h2>
     <table>

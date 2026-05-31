@@ -138,6 +138,18 @@ _worker_state_lock = threading.Lock()
 _callback_url = None
 _apikey_global = None
 
+# Valeurs par défaut des paramètres du démon. Elles sont surchargées par les
+# arguments de la ligne de commande dans le bloc de démarrage (if __name__ == "__main__").
+# Les définir ici rend le module importable (tests unitaires) sans démarrer le démon.
+_socket_host = "localhost"
+_log_level = "error"
+_callback = ""
+_apikey = ""
+_pidfile = "/tmp/ProJoted.pid"
+_cycle = 0.3
+_socket_port = 55369
+_data_dir = "/var/www/html/plugins/ProJote/data"
+
 
 def send_jeedom_message(message, message_type="error"):
     """
@@ -595,6 +607,23 @@ def _menu_to_text(menu_data):
     return " · ".join(sections)
 
 
+def _menu_labels(menu_data):
+    """Liste dédupliquée des labels/allergènes d'un menu (dans l'ordre d'apparition).
+
+    Les labels Pronote (Bio, Local, Porc, Allergènes…) sont déjà sérialisés par
+    build_menu_data sous chaque aliment. On les agrège au niveau du menu pour
+    un affichage compact dans le widget.
+    """
+    seen = []
+    for key in ("first_meal", "main_meal", "side_meal", "cheese", "dessert", "other_meal"):
+        for item in menu_data.get(key) or []:
+            for label in item.get("labels") or []:
+                name = str(label.get("name", "")).strip()
+                if name and name not in seen:
+                    seen.append(name)
+    return seen
+
+
 def _menu_to_html_row(menu_data):
     """Une ligne HTML compacte représentant un menu pour le widget."""
     import html as _html_mod
@@ -604,11 +633,22 @@ def _menu_to_html_row(menu_data):
     is_dinner = menu_data.get("is_dinner", False)
     repas_label = "🍽️ Midi" if is_lunch else ("🌙 Soir" if is_dinner else "🍴 Repas")
     text = _menu_to_text(menu_data) or "—"
+
+    # Labels / allergènes (Bio, Local, Porc…) en puces discrètes.
+    labels = _menu_labels(menu_data)
+    labels_html = ""
+    if labels:
+        chips = "".join(
+            f'<span class="pj-menu-label">{_html_mod.escape(name)}</span>' for name in labels
+        )
+        labels_html = f'<span class="pj-menu-labels">{chips}</span>'
+
     return (
         f'<div class="pj-menu-row">'
         f'<span class="pj-menu-date">{_html_mod.escape(date_iso)}</span>'
         f'<span class="pj-menu-type">{_html_mod.escape(repas_label)}</span>'
         f'<span class="pj-menu-text">{_html_mod.escape(text)}</span>'
+        f"{labels_html}"
         f"</div>"
     )
 
@@ -1062,6 +1102,104 @@ def evaluations(client):
         time.sleep(5)
 
 
+def compute_moyenne_generale(note_list):
+    """Moyenne générale pondérée sur 20, calculée à partir de la liste de notes.
+
+    Reprend la logique du widget : chaque note est ramenée sur 20 puis pondérée
+    par son coefficient. Sont exclues les notes non numériques, à dénominateur
+    nul ou négatif, et de coefficient nul ou négatif (bonus / optionnel).
+
+    Args:
+        note_list (list[dict]): notes sérialisées (clés note, sur, coeff).
+    Returns:
+        float | None: moyenne arrondie à 2 décimales, ou None si aucune note exploitable.
+    """
+    tot = 0.0
+    coefs = 0.0
+    for n in note_list or []:
+        try:
+            note_f = float(str(n.get("note", "")).replace(",", "."))
+        except (ValueError, AttributeError):
+            continue
+        sur_str = str(n.get("sur", "20")).replace(",", ".") or "20"
+        try:
+            sur_f = float(sur_str)
+        except ValueError:
+            sur_f = 20.0
+        try:
+            coeff_f = float(str(n.get("coeff", "1")).replace(",", "."))
+        except ValueError:
+            coeff_f = 1.0
+        if sur_f <= 0 or coeff_f <= 0:
+            continue
+        tot += (note_f / sur_f) * 20.0 * coeff_f
+        coefs += coeff_f
+    if coefs <= 0:
+        return None
+    return round(tot / coefs, 2)
+
+
+def detect_subject_trends(note_list, min_notes=4, drop_threshold=2.0):
+    """Détecte les matières en baisse à partir des notes (ramenées sur 20).
+
+    Pour chaque matière comptant au moins `min_notes` notes numériques, compare
+    la moyenne de la moitié la plus récente à celle de la moitié la plus ancienne.
+    Une chute supérieure ou égale à `drop_threshold` points (sur 20) signale une
+    matière en baisse.
+
+    `note_list` est attendue triée du plus récent au plus ancien (cf. notes()).
+
+    Returns:
+        dict avec :
+          - matiere_en_baisse        : noms séparés par " · " (ou "")
+          - matiere_en_baisse_detail : liste [{matiere, ancienne_moyenne, recente_moyenne, delta}]
+    """
+    empty = {"matiere_en_baisse": "", "matiere_en_baisse_detail": []}
+    if not note_list:
+        return empty
+
+    by_subject = {}
+    for n in note_list:
+        try:
+            note_f = float(str(n.get("note", "")).replace(",", "."))
+            sur_f = float(str(n.get("sur", "20")).replace(",", ".") or "20")
+        except (ValueError, AttributeError):
+            continue
+        if sur_f <= 0:
+            continue
+        subj = n.get("cours", "Inconnu") or "Inconnu"
+        by_subject.setdefault(subj, []).append((note_f / sur_f) * 20.0)
+
+    detail = []
+    for subj, notes20 in by_subject.items():
+        if len(notes20) < min_notes:
+            continue
+        # notes20 va du plus récent au plus ancien → remettre en ordre chronologique
+        chrono = list(reversed(notes20))
+        half = len(chrono) // 2
+        anciennes = chrono[:half]
+        recentes = chrono[len(chrono) - half:]
+        if not anciennes or not recentes:
+            continue
+        moy_anc = sum(anciennes) / len(anciennes)
+        moy_rec = sum(recentes) / len(recentes)
+        if (moy_anc - moy_rec) >= drop_threshold:
+            detail.append(
+                {
+                    "matiere": subj,
+                    "ancienne_moyenne": round(moy_anc, 2),
+                    "recente_moyenne": round(moy_rec, 2),
+                    "delta": round(moy_rec - moy_anc, 2),
+                }
+            )
+
+    detail.sort(key=lambda d: d["delta"])  # plus forte baisse en premier
+    return {
+        "matiere_en_baisse": " · ".join(d["matiere"] for d in detail),
+        "matiere_en_baisse_detail": detail,
+    }
+
+
 def notes(client):
     """
     Récupère toutes les notes de l'année scolaire (toutes périodes) et les formate en JSON.
@@ -1178,6 +1316,11 @@ def notes(client):
 
             if data["note"]:
                 data["derniere_note"].append(data["note"][0])
+
+            # ── Moyenne générale + détection des matières en baisse (F3, v1.1.0) ─
+            moy_gen = compute_moyenne_generale(data["note"])
+            data["moyenne_generale"] = "" if moy_gen is None else str(moy_gen)
+            data.update(detect_subject_trends(data["note"]))
 
             # ── Calcul debug de la moyenne (même logique que le widget JS) ──────
             if logging.getLogger().isEnabledFor(logging.DEBUG):
@@ -2673,73 +2816,78 @@ def shutdown():
     os._exit(0)
 
 
-# Ici est le script qui va écouter le socket. Mais la premiére chose qu'il va faire est de renvoyer sont PiD pour validation.
-_socket_host = "localhost"
-parser = argparse.ArgumentParser(description="Projoted Daemon for Jeedom plugin")
-parser.add_argument("--loglevel", help="Log Level for the daemon", type=str)
-parser.add_argument("--callback", help="Callback", type=str)
-parser.add_argument("--apikey", help="Apikey", type=str)
-parser.add_argument("--cycle", help="Cycle to send event", type=str)
-parser.add_argument("--pid", help="Pid file", type=str)
-parser.add_argument("--socketport", help="Port for Projote Deamon", type=str)
-parser.add_argument("--datadir", help="Path to plugin data directory", type=str)
-args = parser.parse_args()
+# ── Démarrage du démon ──────────────────────────────────────────────────────
+# Bloc exécuté uniquement quand le fichier est lancé comme script (python ProJoted.py …).
+# Le guard __main__ permet d'importer ce module dans les tests unitaires sans
+# démarrer le démon (pas de parsing d'arguments, pas de socket, pas de signaux).
+def _run_daemon():
+    """Point d'entrée du démon : parse les arguments, ouvre le socket et écoute."""
+    global _socket_host, _log_level, _callback, _apikey, _pidfile, _cycle
+    global _socket_port, _data_dir, _callback_url, _apikey_global
+    global jeedom_com, jeedom_socket
 
-_log_level = args.loglevel or "error"
-_callback = args.callback or ""
-_apikey = args.apikey or ""
-_pidfile = args.pid or "/tmp/ProJoted.pid"
-_cycle = float(args.cycle) if args.cycle else 0.3
-_socket_port = args.socketport or 55369
-_data_dir = args.datadir or "/var/www/html/plugins/ProJote/data"
-_socket_port = int(_socket_port)
-_cycle = int(_cycle)
+    # Ici est le script qui va écouter le socket. Mais la premiére chose qu'il va faire est de renvoyer sont PiD pour validation.
+    _socket_host = "localhost"
+    parser = argparse.ArgumentParser(description="Projoted Daemon for Jeedom plugin")
+    parser.add_argument("--loglevel", help="Log Level for the daemon", type=str)
+    parser.add_argument("--callback", help="Callback", type=str)
+    parser.add_argument("--apikey", help="Apikey", type=str)
+    parser.add_argument("--cycle", help="Cycle to send event", type=str)
+    parser.add_argument("--pid", help="Pid file", type=str)
+    parser.add_argument("--socketport", help="Port for Projote Deamon", type=str)
+    parser.add_argument("--datadir", help="Path to plugin data directory", type=str)
+    args = parser.parse_args()
 
-jeedom_utils.set_log_level(_log_level)
+    _log_level = args.loglevel or "error"
+    _callback = args.callback or ""
+    _apikey = args.apikey or ""
+    _pidfile = args.pid or "/tmp/ProJoted.pid"
+    _cycle = float(args.cycle) if args.cycle else 0.3
+    _socket_port = args.socketport or 55369
+    _data_dir = args.datadir or "/var/www/html/plugins/ProJote/data"
+    _socket_port = int(_socket_port)
+    _cycle = int(_cycle)
 
+    jeedom_utils.set_log_level(_log_level)
 
-# Filtre les messages DEBUG verbeux de PronotePy (champs optionnels absents)
-class _PronotepyNoiseFilter(logging.Filter):
-    def filter(self, record):
-        msg = record.getMessage()
-        return "setting to default" not in msg and "Could not get value for" not in msg
+    # Filtre les messages DEBUG verbeux de PronotePy (champs optionnels absents)
+    class _PronotepyNoiseFilter(logging.Filter):
+        def filter(self, record):
+            msg = record.getMessage()
+            return "setting to default" not in msg and "Could not get value for" not in msg
 
+    for _log_handler in logging.root.handlers:
+        _log_handler.addFilter(_PronotepyNoiseFilter())
 
-for _log_handler in logging.root.handlers:
-    _log_handler.addFilter(_PronotepyNoiseFilter())
+    logging.info("Start demond")
+    logging.info("Log level: %s", _log_level)
+    logging.info("Socket port: %s", _socket_port)
+    logging.info("Socket host: %s", _socket_host)
+    logging.info("PID file: %s", _pidfile)
+    logging.info("Apikey: %s", _apikey)
 
-logging.info("Start demond")
-logging.info("Log level: %s", _log_level)
-logging.info("Socket port: %s", _socket_port)
-logging.info("Socket host: %s", _socket_host)
-logging.info("PID file: %s", _pidfile)
-logging.info("Apikey: %s", _apikey)
+    # Initialiser les variables globales pour les messages Jeedom
+    _callback_url = _callback
+    _apikey_global = _apikey
 
-# Initialiser les variables globales pour les messages Jeedom
-_callback_url = _callback
-_apikey_global = _apikey
+    signal.signal(signal.SIGINT, handler)
+    signal.signal(signal.SIGTERM, handler)
 
-
-signal.signal(signal.SIGINT, handler)
-signal.signal(signal.SIGTERM, handler)
-
-try:
-    jeedom_utils.write_pid(str(_pidfile))
-    jeedom_com = jeedom_com(apikey=_apikey, url=_callback, cycle=_cycle)
-    if not jeedom_com.test():
-        logging.error(
-            "Network communication issues. Please fixe your Jeedom network configuration."
-        )
+    try:
+        jeedom_utils.write_pid(str(_pidfile))
+        jeedom_com = jeedom_com(apikey=_apikey, url=_callback, cycle=_cycle)
+        if not jeedom_com.test():
+            logging.error(
+                "Network communication issues. Please fixe your Jeedom network configuration."
+            )
+            shutdown()
+        jeedom_socket = jeedom_socket(port=_socket_port, address=_socket_host)
+        listen()
+    except Exception as e:
+        logging.error("Fatal error: %s", e)
+        logging.info(traceback.format_exc())
         shutdown()
-    jeedom_socket = jeedom_socket(port=_socket_port, address=_socket_host)
-    listen()
-except Exception as e:
-    logging.error("Fatal error: %s", e)
-    logging.info(traceback.format_exc())
-    shutdown()
-    jeedom_socket = jeedom_socket(port=_socket_port, address=_socket_host)
-    listen()
-except Exception as e:
-    logging.error("Fatal error: %s", e)
-    logging.info(traceback.format_exc())
-    shutdown()
+
+
+if __name__ == "__main__":
+    _run_daemon()
