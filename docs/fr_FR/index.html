@@ -664,6 +664,53 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
     <!-- ── Historique ─────────────────────── -->
     <h1 id="version">Historique des versions</h1>
 
+    <h2>1.1.0 — Mai 2026</h2>
+    <table>
+        <thead><tr><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><span class="badge badge-new">Nouveau</span></td>
+                <td><strong>Onglet Statistiques</strong> — courbes d'évolution (sparklines) de la moyenne générale, des absences, retards et devoirs non faits sur ~120 jours, à partir des données <strong>historisées par Jeedom</strong>. Affiche les éventuelles matières en baisse.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-new">Nouveau</span></td>
+                <td><strong>Moyenne générale</strong> — nouvelle commande <code>moyenne_generale</code> (numérique, sur 20, historisée) calculée par le démon. Historisation activée par défaut sur <code>Nb_absences</code>, <code>Nb_retard</code>, <code>Nb_devoir_NF</code> (migration automatique des équipements existants).</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-new">Nouveau</span></td>
+                <td><strong>Détection de matière en baisse</strong> — commande <code>matiere_en_baisse</code> : repère les matières dont la moyenne récente chute d'au moins 2 points (matières ayant ≥ 4 notes).</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-new">Nouveau</span></td>
+                <td><strong>Centre d'alertes</strong> — nouvel onglet <em>Alertes</em> regroupant les événements ProJote générés automatiquement (nouvelle absence/retard/punition, nouveau message non lu, contrôle détecté, matière en baisse — 50 derniers) et les notifications Pronote. Nouvelle commande <code>event</code> (dernier événement, pratique comme déclencheur de scénario).</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-new">Nouveau</span></td>
+                <td><strong>Export iCalendar natif</strong> — endpoint <code>calendar.php</code> générant un calendrier <code>.ics</code> (cours en VEVENT, devoirs en VTODO) abonnable depuis n'importe quelle application de calendrier. Indépendant de l'iCal Pronote.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-new">Nouveau</span></td>
+                <td><strong>Allergènes / labels du menu</strong> — l'onglet Menu cantine affiche les labels Pronote (Bio, Local, Porc, allergènes…) en puces discrètes.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-new">Nouveau</span></td>
+                <td><strong>Exemples de scénarios</strong> — nouvelle section de documentation avec 5 recettes prêtes à recopier (réveil adaptatif, anti-oubli devoirs, alerte absence, mode révision, annonce cantine).</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-perf">Amélioration</span></td>
+                <td><strong>Clarification compétences vs notes</strong> — documentation précisant la distinction entre notes chiffrées (intégrées à la moyenne) et évaluations par compétences (Pronote 2021+).</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-perf">Amélioration</span></td>
+                <td><strong>Onglet par défaut étendu</strong> — les onglets <em>Statistiques</em> et <em>Alertes</em> sont sélectionnables comme onglet par défaut du widget.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-perf">Qualité</span></td>
+                <td><strong>Tests unitaires + intégration continue</strong> — suite de tests pytest sur les fonctions du démon (moyenne, menus, messages, évaluations…), CI GitHub Actions (lint Python/Shell/PHP + tests Python 3.8/3.11), validation automatique du manifest <code>info.json</code>. Le démon est désormais importable hors exécution (guard <code>__main__</code>).</td>
+            </tr>
+        </tbody>
+    </table>
+
     <h2>1.0.1 — Mai 2026</h2>
     <table>
         <thead><tr><th>Type</th><th>Description</th></tr></thead>
