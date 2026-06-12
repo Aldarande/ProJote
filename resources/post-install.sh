@@ -64,50 +64,19 @@ if [ $? -ne 0 ]; then
 fi
 
 # ── Installation idempotente des paquets ───────────────────────────────────
-# Format : "nom_pip:contrainte_version" — contrainte vide = dernière version.
-PACKAGES=(
-    "pronotepy:>=2.14,<3.0"
-    "autoslot:"
-    "cryptography:"
-    "pycryptodome:==3.20.0"
-    "requests:"
-    "beautifulsoup4:"
-    "pyserial:"
-    "pyudev:"
-)
+# Source de vérité unique : resources/requirements.txt (versions épinglées).
+# pip est idempotent : si les versions exactes sont déjà installées, rien n'est
+# retéléchargé.
+REQUIREMENTS="$RESOURCES_DIR/requirements.txt"
+if [ ! -f "$REQUIREMENTS" ]; then
+    echo "[ProJote][ERROR] Fichier requirements.txt introuvable : $REQUIREMENTS" 1>&2
+    exit 1
+fi
 
-install_failures=0
-for entry in "${PACKAGES[@]}"; do
-    pkg="${entry%%:*}"
-    constraint="${entry#*:}"
-    spec="${pkg}${constraint}"
-
-    if [ -n "$constraint" ]; then
-        # Avec contrainte de version : pip est lui-même idempotent si la version
-        # exacte est déjà installée.
-        echo "[ProJote] Installation/vérification : $spec"
-        pip_err=$(pip install "$spec" --quiet 2>&1)
-        rc=$?
-    else
-        # Sans contrainte : si déjà présent on saute (évite appel réseau inutile).
-        if pip show "$pkg" >/dev/null 2>&1; then
-            installed_version=$(pip show "$pkg" 2>/dev/null | awk '/^Version:/ {print $2}')
-            echo "[ProJote] Déjà installé : $pkg ($installed_version) — saut."
-            continue
-        fi
-        echo "[ProJote] Installation : $pkg"
-        pip_err=$(pip install "$pkg" --quiet 2>&1)
-        rc=$?
-    fi
-
-    if [ $rc -ne 0 ]; then
-        echo "[ProJote][ERROR] Échec installation $pkg : $pip_err" 1>&2
-        install_failures=$((install_failures + 1))
-    fi
-done
-
-if [ $install_failures -gt 0 ]; then
-    echo "[ProJote][ERROR] $install_failures paquet(s) n'ont pas pu être installés." 1>&2
+echo "[ProJote] Installation des dépendances depuis requirements.txt..."
+pip_err=$(pip install -r "$REQUIREMENTS" --quiet 2>&1)
+if [ $? -ne 0 ]; then
+    echo "[ProJote][ERROR] Échec installation des dépendances : $pip_err" 1>&2
     echo "[ProJote][ERROR] Consultez le log d'installation Jeedom pour le détail." 1>&2
     exit 1
 fi
