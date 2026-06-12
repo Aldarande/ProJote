@@ -1,0 +1,13 @@
+# Dépendances Python du démon ProJote (installées dans resources/python_venv).
+# Source de vérité : post-install.sh fait `pip install -r requirements.txt`.
+# Versions relevées par gel du venv de production (python 3.11) — épinglées,
+# sauf pronotepy : borne haute <3.0 pour suivre les correctifs 2.x sans subir
+# un breaking change 3.x (décision v1.0.1).
+pronotepy>=2.14.6,<3.0
+autoslot==2025.11.1
+cryptography==46.0.6
+pycryptodome==3.20.0
+requests==2.33.0
+beautifulsoup4==4.14.3
+pyserial==3.5
+pyudev==0.24.4

@@ -435,6 +435,8 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
             <tr><td>matiere_en_baisse</td><td>info</td><td>Matière(s) dont la moyenne récente chute d'au moins 2 points sur 20 par rapport au début (matières ayant ≥ 4 notes). Plusieurs matières séparées par « · ». Vide si aucune baisse détectée.</td></tr>
             <tr><td colspan="3" style="background:rgba(155,89,182,.10);font-weight:600;">— Centre d'alertes (v1.1.0) —</td></tr>
             <tr><td>event</td><td>info</td><td>Libellé du dernier événement ProJote détecté (nouvelle absence/retard/punition, nouveau message, contrôle détecté, matière en baisse). Pratique comme déclencheur de scénario. La liste complète (50 derniers) est affichée dans l'onglet Alertes du widget.</td></tr>
+            <tr><td>nouvelle_note</td><td>info</td><td>Libellé de la dernière <strong>nouvelle</strong> note détectée par rapport à la sync précédente (ex. « Maths : 16/20 — DS trigonométrie »). Mise à jour uniquement sur une vraie nouveauté → déclencheur de scénario idéal.</td></tr>
+            <tr><td>nouveau_devoir</td><td>info</td><td>Libellé du dernier <strong>nouveau</strong> devoir détecté (ex. « Maths (12/03) : exercices p.42 »). Même logique de déclenchement que <code>nouvelle_note</code>.</td></tr>
         </tbody>
     </table>
     <div class="callout callout-info">
@@ -654,6 +656,21 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
         </tbody>
     </table>
 
+    <h3>6 — Notification WhatsApp à chaque nouvelle note <span class="badge badge-new">v1.1.0</span></h3>
+    <p>Envoie un message dès qu'une nouvelle note est saisie dans Pronote. La commande
+    <code>nouvelle_note</code> est mise à jour (et déclenche donc le scénario) uniquement quand une
+    note <em>nouvelle</em> est détectée par rapport à la synchronisation précédente.</p>
+    <table>
+        <thead><tr><th>Élément</th><th>Configuration</th></tr></thead>
+        <tbody>
+            <tr><td><strong>Déclencheur</strong></td><td>Sur changement de la commande <code>#[…][ProJote][nouvelle_note]#</code></td></tr>
+            <tr><td><strong>Condition</strong></td><td>Aucune (le déclencheur ne se produit que sur une vraie nouveauté). Optionnel : <code>#[…][ProJote][nouvelle_note]#</code> n'est pas vide.</td></tr>
+            <tr><td><strong>Action</strong></td><td>Envoyer un message via votre plugin de messagerie (ex. plugin WhatsApp/jeewhatsapp, Telegram, Pushover…) avec le texte : « 📚 Nouvelle note : <code>#[…][ProJote][nouvelle_note]#</code> » (ex. « Maths : 16/20 — DS trigonométrie »).</td></tr>
+        </tbody>
+    </table>
+    <p>Variante <strong>nouveau devoir</strong> : même principe avec la commande
+    <code>nouveau_devoir</code> comme déclencheur.</p>
+
     <div class="callout callout-tip">
         <strong>Astuce</strong>
         Pour limiter le bruit, conditionnez vos scénarios à la présence d'une personne à la maison
@@ -663,6 +680,33 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
 
     <!-- ── Historique ─────────────────────── -->
     <h1 id="version">Historique des versions</h1>
+
+    <h2>1.2.0 — Juin 2026</h2>
+    <table>
+        <thead><tr><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><span class="badge badge-new">Nouveau</span></td>
+                <td><strong>Notifications « nouvelle note » / « nouveau devoir »</strong> — le démon compare chaque synchronisation à la précédente et expose les commandes <code>nouvelle_note</code> et <code>nouveau_devoir</code>, mises à jour uniquement sur une vraie nouveauté. Idéal pour déclencher un scénario (notification WhatsApp/Telegram…). Les nouveautés alimentent aussi le centre d'alertes. Aucune alerte au premier branchement (anti-avalanche).</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sec">Sécurité</span></td>
+                <td><strong>Apikey en POST</strong> — l'envoi de messages au centre Jeedom passe en POST (corps) au lieu de GET : la clé API n'apparaît plus dans les access logs du serveur web. [CWE-598]</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sec">Sécurité</span></td>
+                <td><strong>Niveau de log initial réduit</strong> — le démon démarre en WARNING (au lieu de DEBUG) jusqu'à l'application de <code>--loglevel</code>, évitant toute fuite verbeuse sur stdout avant l'activation du masquage d'apikey. [CWE-532] · Rapport complet : <code>SECURITY-AUDIT.md</code> (score 88/100).</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-perf">Fiabilité</span></td>
+                <td><strong>Timeout dur par équipement</strong> — un compte Pronote injoignable (ENT qui timeout) n'immobilise plus le worker : au-delà de 120 s le traitement est abandonné et l'équipement suivant est traité. Le circuit breaker applique désormais un <strong>backoff exponentiel</strong> (60 s, 120 s, 240 s… plafonné à 1 h) au lieu d'un délai fixe.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-perf">Maintenance</span></td>
+                <td><strong>Environnement Python allégé</strong> — le venv n'est plus versionné ; les dépendances sont épinglées dans <code>resources/requirements.txt</code> et installées via <code>post-install.sh</code>. Le venv est exclu des sauvegardes Jeedom (<code>backupExclude</code>). <code>maxDependancyInstallTime</code> porté à 120 s.</td>
+            </tr>
+        </tbody>
+    </table>
 
     <h2>1.1.0 — Mai 2026</h2>
     <table>

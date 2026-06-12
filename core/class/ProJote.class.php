@@ -144,6 +144,19 @@ class ProJote extends eqLogic
     return array('script' => $script);
   }
 
+  /**
+   * Chemins (relatifs au dossier du plugin) à exclure des sauvegardes Jeedom.
+   * Le venv Python (~50 Mo de binaires mono-architecture) est reconstruit par
+   * post-install.sh : inutile et contre-productif de l'embarquer dans un backup
+   * (restauration sur une autre architecture = venv inutilisable).
+   */
+  public static function backupExclude()
+  {
+    return array(
+      'resources/python_venv',
+    );
+  }
+
   public static function deamon_info()
   {
     $return = array();
@@ -586,6 +599,9 @@ class ProJote extends eqLogic
       "prochains_DS_html"     => array("Liste HTML des prochains DS",                      'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
       // ── Centre d'alertes (v1.1.0) ──────────────────────────────────────────
       "event"                 => array("Dernier événement",                               'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
+      // ── Nouveautés (P3, v1.1.0) — déclencheurs de scénarios ────────────────
+      "nouvelle_note"         => array("Dernière nouvelle note",                          'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
+      "nouveau_devoir"        => array("Dernier nouveau devoir",                          'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
     );
   }
 
