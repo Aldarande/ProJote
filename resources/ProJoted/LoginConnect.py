@@ -69,6 +69,11 @@ try:
         """
         Déchiffre des données AES-256-CBC chiffrées par PHP.
         La clé est dérivée de l'API key Jeedom via SHA-256.
+
+        Audit sécurité (P2c, juin 2026) : dérivation correcte — l'API key Jeedom
+        est un secret aléatoire à forte entropie (pas une valeur prévisible),
+        SHA-256 suffit comme KDF dans ce cas. Voir SECURITY-AUDIT.md pour les
+        limites connues (CBC non authentifié, fallback brut en cas d'échec).
         """
         if not data:
             return ""

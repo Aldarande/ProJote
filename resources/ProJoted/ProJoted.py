@@ -30,8 +30,12 @@ import contextlib
 try:
     import logging
     import sys
+    # Niveau initial volontairement WARNING : entre l'import et l'appel à
+    # jeedom_utils.set_log_level(--loglevel) dans _run_daemon(), rien de
+    # sensible/verbeux ne doit partir sur stdout (P2a, audit sécurité).
+    # Le niveau définitif est reconfiguré par set_log_level() selon --loglevel.
     logging.basicConfig(
-        level=logging.DEBUG,
+        level=logging.WARNING,
         format="[%(asctime)-15s][%(levelname)s] : %(filename)s:%(lineno)d - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
         stream=sys.stdout,
@@ -188,8 +192,10 @@ def send_jeedom_message(message, message_type="error"):
 
         logging.debug(f"Envoi du message Jeedom vers: {message_action_url}")
 
-        # Envoyer la requête GET (plus simple pour Jeedom)
-        response = requests.get(message_action_url, params=params, timeout=5)
+        # POST avec l'apikey dans le corps : en GET, la clé apparaissait en clair
+        # dans les access logs du serveur web (P2b, audit sécurité). Le endpoint
+        # Jeedom lit init()/$_REQUEST, qui accepte indifféremment GET et POST.
+        response = requests.post(message_action_url, data=params, timeout=5)
 
         if response.status_code == 200:
             logging.info(f"Message Jeedom envoyé avec succès: {message[:50]}...")
@@ -212,6 +218,15 @@ def my_decrypt(data, passphrase=None):
     Si aucune passphrase n'est fournie, la clé est dérivée de l'API key Jeedom
     via SHA-256 (produit 64 hex chars = 32 octets), assurant la cohérence PHP↔Python.
     Format attendu : base64(JSON({iv: base64, data: base64}))
+
+    Audit sécurité (P2c, juin 2026) — dérivation de clé jugée correcte :
+    la clé dérive de l'API key Jeedom, secret ALÉATOIRE à forte entropie généré
+    par le core (pas un ID, une constante ou un nom prévisible). SHA-256 comme
+    KDF est approprié pour une entrée à forte entropie ; PBKDF2 n'apporterait
+    un gain que pour étirer un secret faible (mot de passe humain), ce qui n'est
+    pas le cas ici. Limite connue (acceptée, cf. SECURITY-AUDIT.md) : CBC sans
+    authentification (pas de HMAC/GCM) — le déchiffrement est local, sans oracle
+    exposé à un attaquant réseau.
     """
     if passphrase is None:
         passphrase = hashlib.sha256(_apikey.encode()).hexdigest()
@@ -1200,6 +1215,129 @@ def detect_subject_trends(note_list, min_notes=4, drop_threshold=2.0):
     }
 
 
+# ── Détection des nouveautés (P3, v1.1.0) ───────────────────────────────────
+# À chaque sync, on compare les items courants (notes, devoirs, punitions,
+# absences) à un index « déjà vu » persisté par équipement. Les nouveautés
+# alimentent des commandes Jeedom qui déclenchent les scénarios utilisateur.
+
+def _item_signature(item, *fields):
+    """Signature stable d'un item à partir de champs sélectionnés."""
+    return "|".join(str(item.get(f, "")) for f in fields)
+
+
+def _sig_of(item, kind):
+    """Identifiant stable d'un item selon son type (id Pronote si disponible)."""
+    sid = item.get("id")
+    has_id = sid not in (None, "")
+    if kind == "notes":
+        return str(sid) if has_id else "n:" + _item_signature(item, "cours", "date", "note", "sur", "commentaire")
+    if kind == "devoirs":
+        # Les devoirs n'ont pas d'id Pronote stable exposé → signature de contenu.
+        return "d:" + _item_signature(item, "date", "title", "description")
+    if kind == "punitions":
+        return "p:" + (str(sid) if has_id else _item_signature(item, "date", "raison", "type"))
+    if kind == "absences":
+        return "a:" + (str(sid) if has_id else _item_signature(item, "date_debut", "date_fin"))
+    return _item_signature(item, "id")
+
+
+def format_new_note_label(note):
+    """Libellé lisible d'une nouvelle note. Ex : 'Maths : 16/20 — DS trigonométrie'."""
+    cours = str(note.get("cours", "")).strip() or "?"
+    note_sur = str(note.get("note_sur", "")).replace(" ", " ").strip()
+    if not note_sur:
+        n = str(note.get("note", "")).strip()
+        s = str(note.get("sur", "")).strip()
+        note_sur = f"{n}/{s}" if n and s else n
+    comm = str(note.get("commentaire", "")).strip()
+    label = f"{cours} : {note_sur}" if note_sur else cours
+    if comm:
+        label += f" — {comm}"
+    return label
+
+
+def format_new_devoir_label(dv):
+    """Libellé lisible d'un nouveau devoir. Ex : 'Maths (12/03) : exercices p.42'."""
+    matiere = str(dv.get("title", "")).strip() or "?"
+    date = str(dv.get("date", "")).strip()
+    desc = str(dv.get("description", "")).strip()
+    head = f"{matiere} ({date})" if date else matiere
+    return f"{head} : {desc}" if desc else head
+
+
+def compute_deltas(seen_index, notes_list, devoirs_list, punitions_list, absences_list):
+    """Compare les items courants à l'index « déjà vu » précédent.
+
+    Retourne (deltas, new_index). Au PREMIER passage (index vide/absent), aucun
+    delta n'est émis : on n'enregistre que la baseline pour éviter une avalanche
+    de notifications au branchement initial (même logique que le centre d'alertes).
+
+    deltas contient les compteurs de nouveautés et les libellés de la dernière
+    nouvelle note / du dernier nouveau devoir (vides si rien de neuf).
+    """
+    kinds = (
+        ("notes", notes_list, "nouvelles_notes"),
+        ("devoirs", devoirs_list, "nouveaux_devoirs"),
+        ("punitions", punitions_list, "nouvelles_punitions"),
+        ("absences", absences_list, "nouvelles_absences"),
+    )
+    new_index = {kind: [_sig_of(it, kind) for it in (lst or [])] for kind, lst, _ in kinds}
+
+    deltas = {
+        "nouvelles_notes": 0,
+        "nouveaux_devoirs": 0,
+        "nouvelles_punitions": 0,
+        "nouvelles_absences": 0,
+        "derniere_nouvelle_note": "",
+        "dernier_nouveau_devoir": "",
+    }
+    if not seen_index:
+        return deltas, new_index  # premier passage : baseline seulement
+
+    for kind, lst, count_key in kinds:
+        seen = set(seen_index.get(kind, []))
+        new_sigs = [s for s in new_index[kind] if s not in seen]
+        deltas[count_key] = len(new_sigs)
+
+    new_notes = {s for s in new_index["notes"] if s not in set(seen_index.get("notes", []))}
+    if new_notes:
+        for n in notes_list or []:
+            if _sig_of(n, "notes") in new_notes:
+                deltas["derniere_nouvelle_note"] = format_new_note_label(n)
+                break
+
+    new_dev = {s for s in new_index["devoirs"] if s not in set(seen_index.get("devoirs", []))}
+    if new_dev:
+        for d in devoirs_list or []:
+            if _sig_of(d, "devoirs") in new_dev:
+                deltas["dernier_nouveau_devoir"] = format_new_devoir_label(d)
+                break
+
+    return deltas, new_index
+
+
+def _load_seen_index(data_dir, eq_id):
+    """Charge l'index « déjà vu » d'un équipement (dict, {} si absent/illisible)."""
+    path = os.path.join(str(data_dir), str(eq_id), "seen_index.json")
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            d = json.load(f)
+            return d if isinstance(d, dict) else {}
+    except Exception:
+        return {}
+
+
+def _save_seen_index(data_dir, eq_id, index):
+    """Persiste l'index « déjà vu » d'un équipement."""
+    folder = os.path.join(str(data_dir), str(eq_id))
+    try:
+        os.makedirs(folder, exist_ok=True)
+        with open(os.path.join(folder, "seen_index.json"), "w", encoding="utf-8") as f:
+            json.dump(index, f)
+    except Exception as e:
+        logging.error("Impossible d'écrire seen_index.json (eq %s) : %s", eq_id, e)
+
+
 def notes(client):
     """
     Récupère toutes les notes de l'année scolaire (toutes périodes) et les formate en JSON.
@@ -2170,39 +2308,48 @@ def check_and_update_failed_attempts(eqLogicId, increment=False):
     global failed_attempts
     eqLogicId = str(eqLogicId)
     max_attempts = 3
-    timeout_seconds = 300  # Réinitialiser après 5 minutes
+    base_backoff = 60     # 1re ouverture du circuit : 60 s
+    max_backoff = 3600    # plafond : 1 h
 
     current_time = time.time()
 
     with _failed_attempts_lock:
         # Initialiser si n'existe pas
-        if eqLogicId not in failed_attempts:
-            failed_attempts[eqLogicId] = {"count": 0, "timestamp": current_time}
+        st = failed_attempts.setdefault(
+            eqLogicId, {"count": 0, "timestamp": current_time, "blocked_until": 0}
+        )
+        st.setdefault("blocked_until", 0)
 
-        # Réinitialiser après timeout
-        if current_time - failed_attempts[eqLogicId]["timestamp"] > timeout_seconds:
-            failed_attempts[eqLogicId] = {"count": 0, "timestamp": current_time}
+        # Cooldown (backoff) écoulé → on réautorise (compteur remis à zéro)
+        if st["count"] > max_attempts and current_time >= st["blocked_until"]:
+            st["count"] = 0
+            st["blocked_until"] = 0
 
         # Incrémenter si demandé
         if increment:
-            failed_attempts[eqLogicId]["count"] += 1
-            if failed_attempts[eqLogicId]["count"] > max_attempts:
-                error_msg = (
-                    f"ProJote - Circuit breaker: {failed_attempts[eqLogicId]['count']} tentatives échouées. "
-                    f"Le token Pronote est expiré. Supprimez le token et rescanez le code QR pour générer une nouvelle connexion."
+            st["count"] += 1
+            st["timestamp"] = current_time
+            if st["count"] > max_attempts:
+                # Backoff exponentiel : 60s, 120s, 240s… plafonné à max_backoff.
+                backoff = min(
+                    base_backoff * (2 ** (st["count"] - max_attempts - 1)),
+                    max_backoff,
                 )
+                st["blocked_until"] = current_time + backoff
                 logging.error(
-                    f"Circuit breaker OUVERT pour eqLogicId {eqLogicId}: {error_msg}"
+                    "Circuit breaker OUVERT pour eqLogicId %s : %d échecs consécutifs, "
+                    "prochain essai dans %ds. (Token Pronote expiré ? Rescanez le QR code.)",
+                    eqLogicId, st["count"], int(backoff),
                 )
                 return False
 
-        # Vérifier si circuit est ouvert
-        if failed_attempts[eqLogicId]["count"] > max_attempts:
-            error_msg = (
-                f"ProJote - Circuit breaker bloqué pour eqLogicId {eqLogicId}. "
-                f"Attendez 5 minutes ou supprimez le token manuellement."
+        # Circuit encore en cooldown (backoff non écoulé)
+        if st["count"] > max_attempts and current_time < st["blocked_until"]:
+            remaining = int(st["blocked_until"] - current_time)
+            logging.error(
+                "Circuit breaker bloqué pour eqLogicId %s : nouvel essai dans %ds.",
+                eqLogicId, remaining,
             )
-            logging.error(error_msg)
             return False
 
     return True
@@ -2536,6 +2683,7 @@ def process_message(message):
                         failed_attempts[str(eqLogicId)] = {
                             "count": 0,
                             "timestamp": time.time(),
+                            "blocked_until": 0,
                         }
             else:
                 logging.error("Connection avec le Token échouée. Regénérez le QR code.")
@@ -2633,6 +2781,23 @@ def process_message(message):
             # J'ajoutes l'ICAL
             logging.info("Je récupére l'ICAL")
             jsondata["Ical"] = ical(client)
+            # Détection des nouveautés depuis la sync précédente (P3, v1.1.0)
+            try:
+                _seen = _load_seen_index(_data_dir, message["CmdId"])
+                _dev = jsondata["Devoirs"] if isinstance(jsondata["Devoirs"], dict) else {}
+                _abs = jsondata["Absences"] if isinstance(jsondata["Absences"], dict) else {}
+                _pun = jsondata["Punitions"] if isinstance(jsondata["Punitions"], dict) else {}
+                _deltas, _new_index = compute_deltas(
+                    _seen,
+                    notes_data.get("note", []) if isinstance(notes_data, dict) else [],
+                    _dev.get("devoir", []),
+                    _pun.get("punition", []),
+                    _abs.get("absence", []),
+                )
+                jsondata["Deltas"] = _deltas
+                _save_seen_index(_data_dir, message["CmdId"], _new_index)
+            except Exception as _e:
+                logging.error("Détection des nouveautés (deltas) échouée : %s", _e)
             # J'envoie les données à Jeedom
             logging.debug(
                 "Projoted.py :: Données JSON à envoyer : %s", json.dumps(jsondata)
@@ -2668,6 +2833,33 @@ def process_message(message):
             _queued_eq.discard(eq_id)
 
 
+def _run_with_timeout(target, timeout):
+    """Exécute target() dans un thread et attend au plus `timeout` secondes.
+
+    Retourne True si terminé dans les temps, False sur timeout. Sur timeout, le
+    thread orphelin continue en arrière-plan (impossible de tuer un thread en
+    Python) mais le worker est libéré pour traiter l'équipement suivant : un
+    compte Pronote lent (ENT qui timeout) ne bloque plus les autres enfants.
+    Une éventuelle exception levée par target() est propagée à l'appelant.
+    """
+    holder = {}
+
+    def _wrap():
+        try:
+            target()
+        except Exception as exc:  # noqa: BLE001 - on propage à l'appelant
+            holder["exc"] = exc
+
+    t = threading.Thread(target=_wrap, daemon=True, name="projote-task")
+    t.start()
+    t.join(timeout)
+    if t.is_alive():
+        return False
+    if "exc" in holder:
+        raise holder["exc"]
+    return True
+
+
 def _worker_loop():
     """
     Boucle du thread worker unique.
@@ -2691,7 +2883,21 @@ def _worker_loop():
             _work_queue.qsize(),
         )
         try:
-            process_message(message)
+            # Timeout dur par équipement : au-delà de _WORKER_TIMEOUT, on abandonne
+            # ce traitement (compte injoignable) et on passe au suivant.
+            finished = _run_with_timeout(
+                lambda: process_message(message), _WORKER_TIMEOUT
+            )
+            if not finished:
+                logging.error(
+                    "ProJote — équipement %s : traitement abandonné (timeout dur %ds, "
+                    "Pronote/ENT injoignable ?). Circuit breaker incrémenté, passage au suivant.",
+                    eq_id,
+                    _WORKER_TIMEOUT,
+                )
+                check_and_update_failed_attempts(eq_id, increment=True)
+                with _queued_eq_lock:
+                    _queued_eq.discard(eq_id)
         except Exception as e:
             logging.error("Erreur non capturée pour l'équipement %s : %s", eq_id, e)
         finally:
