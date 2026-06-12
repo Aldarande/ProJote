@@ -2308,39 +2308,48 @@ def check_and_update_failed_attempts(eqLogicId, increment=False):
     global failed_attempts
     eqLogicId = str(eqLogicId)
     max_attempts = 3
-    timeout_seconds = 300  # Réinitialiser après 5 minutes
+    base_backoff = 60     # 1re ouverture du circuit : 60 s
+    max_backoff = 3600    # plafond : 1 h
 
     current_time = time.time()
 
     with _failed_attempts_lock:
         # Initialiser si n'existe pas
-        if eqLogicId not in failed_attempts:
-            failed_attempts[eqLogicId] = {"count": 0, "timestamp": current_time}
+        st = failed_attempts.setdefault(
+            eqLogicId, {"count": 0, "timestamp": current_time, "blocked_until": 0}
+        )
+        st.setdefault("blocked_until", 0)
 
-        # Réinitialiser après timeout
-        if current_time - failed_attempts[eqLogicId]["timestamp"] > timeout_seconds:
-            failed_attempts[eqLogicId] = {"count": 0, "timestamp": current_time}
+        # Cooldown (backoff) écoulé → on réautorise (compteur remis à zéro)
+        if st["count"] > max_attempts and current_time >= st["blocked_until"]:
+            st["count"] = 0
+            st["blocked_until"] = 0
 
         # Incrémenter si demandé
         if increment:
-            failed_attempts[eqLogicId]["count"] += 1
-            if failed_attempts[eqLogicId]["count"] > max_attempts:
-                error_msg = (
-                    f"ProJote - Circuit breaker: {failed_attempts[eqLogicId]['count']} tentatives échouées. "
-                    f"Le token Pronote est expiré. Supprimez le token et rescanez le code QR pour générer une nouvelle connexion."
+            st["count"] += 1
+            st["timestamp"] = current_time
+            if st["count"] > max_attempts:
+                # Backoff exponentiel : 60s, 120s, 240s… plafonné à max_backoff.
+                backoff = min(
+                    base_backoff * (2 ** (st["count"] - max_attempts - 1)),
+                    max_backoff,
                 )
+                st["blocked_until"] = current_time + backoff
                 logging.error(
-                    f"Circuit breaker OUVERT pour eqLogicId {eqLogicId}: {error_msg}"
+                    "Circuit breaker OUVERT pour eqLogicId %s : %d échecs consécutifs, "
+                    "prochain essai dans %ds. (Token Pronote expiré ? Rescanez le QR code.)",
+                    eqLogicId, st["count"], int(backoff),
                 )
                 return False
 
-        # Vérifier si circuit est ouvert
-        if failed_attempts[eqLogicId]["count"] > max_attempts:
-            error_msg = (
-                f"ProJote - Circuit breaker bloqué pour eqLogicId {eqLogicId}. "
-                f"Attendez 5 minutes ou supprimez le token manuellement."
+        # Circuit encore en cooldown (backoff non écoulé)
+        if st["count"] > max_attempts and current_time < st["blocked_until"]:
+            remaining = int(st["blocked_until"] - current_time)
+            logging.error(
+                "Circuit breaker bloqué pour eqLogicId %s : nouvel essai dans %ds.",
+                eqLogicId, remaining,
             )
-            logging.error(error_msg)
             return False
 
     return True
@@ -2674,6 +2683,7 @@ def process_message(message):
                         failed_attempts[str(eqLogicId)] = {
                             "count": 0,
                             "timestamp": time.time(),
+                            "blocked_until": 0,
                         }
             else:
                 logging.error("Connection avec le Token échouée. Regénérez le QR code.")
@@ -2823,6 +2833,33 @@ def process_message(message):
             _queued_eq.discard(eq_id)
 
 
+def _run_with_timeout(target, timeout):
+    """Exécute target() dans un thread et attend au plus `timeout` secondes.
+
+    Retourne True si terminé dans les temps, False sur timeout. Sur timeout, le
+    thread orphelin continue en arrière-plan (impossible de tuer un thread en
+    Python) mais le worker est libéré pour traiter l'équipement suivant : un
+    compte Pronote lent (ENT qui timeout) ne bloque plus les autres enfants.
+    Une éventuelle exception levée par target() est propagée à l'appelant.
+    """
+    holder = {}
+
+    def _wrap():
+        try:
+            target()
+        except Exception as exc:  # noqa: BLE001 - on propage à l'appelant
+            holder["exc"] = exc
+
+    t = threading.Thread(target=_wrap, daemon=True, name="projote-task")
+    t.start()
+    t.join(timeout)
+    if t.is_alive():
+        return False
+    if "exc" in holder:
+        raise holder["exc"]
+    return True
+
+
 def _worker_loop():
     """
     Boucle du thread worker unique.
@@ -2846,7 +2883,21 @@ def _worker_loop():
             _work_queue.qsize(),
         )
         try:
-            process_message(message)
+            # Timeout dur par équipement : au-delà de _WORKER_TIMEOUT, on abandonne
+            # ce traitement (compte injoignable) et on passe au suivant.
+            finished = _run_with_timeout(
+                lambda: process_message(message), _WORKER_TIMEOUT
+            )
+            if not finished:
+                logging.error(
+                    "ProJote — équipement %s : traitement abandonné (timeout dur %ds, "
+                    "Pronote/ENT injoignable ?). Circuit breaker incrémenté, passage au suivant.",
+                    eq_id,
+                    _WORKER_TIMEOUT,
+                )
+                check_and_update_failed_attempts(eq_id, increment=True)
+                with _queued_eq_lock:
+                    _queued_eq.discard(eq_id)
         except Exception as e:
             logging.error("Erreur non capturée pour l'équipement %s : %s", eq_id, e)
         finally:
