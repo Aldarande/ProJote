@@ -30,8 +30,12 @@ import contextlib
 try:
     import logging
     import sys
+    # Niveau initial volontairement WARNING : entre l'import et l'appel à
+    # jeedom_utils.set_log_level(--loglevel) dans _run_daemon(), rien de
+    # sensible/verbeux ne doit partir sur stdout (P2a, audit sécurité).
+    # Le niveau définitif est reconfiguré par set_log_level() selon --loglevel.
     logging.basicConfig(
-        level=logging.DEBUG,
+        level=logging.WARNING,
         format="[%(asctime)-15s][%(levelname)s] : %(filename)s:%(lineno)d - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
         stream=sys.stdout,
@@ -188,8 +192,10 @@ def send_jeedom_message(message, message_type="error"):
 
         logging.debug(f"Envoi du message Jeedom vers: {message_action_url}")
 
-        # Envoyer la requête GET (plus simple pour Jeedom)
-        response = requests.get(message_action_url, params=params, timeout=5)
+        # POST avec l'apikey dans le corps : en GET, la clé apparaissait en clair
+        # dans les access logs du serveur web (P2b, audit sécurité). Le endpoint
+        # Jeedom lit init()/$_REQUEST, qui accepte indifféremment GET et POST.
+        response = requests.post(message_action_url, data=params, timeout=5)
 
         if response.status_code == 200:
             logging.info(f"Message Jeedom envoyé avec succès: {message[:50]}...")
@@ -212,6 +218,15 @@ def my_decrypt(data, passphrase=None):
     Si aucune passphrase n'est fournie, la clé est dérivée de l'API key Jeedom
     via SHA-256 (produit 64 hex chars = 32 octets), assurant la cohérence PHP↔Python.
     Format attendu : base64(JSON({iv: base64, data: base64}))
+
+    Audit sécurité (P2c, juin 2026) — dérivation de clé jugée correcte :
+    la clé dérive de l'API key Jeedom, secret ALÉATOIRE à forte entropie généré
+    par le core (pas un ID, une constante ou un nom prévisible). SHA-256 comme
+    KDF est approprié pour une entrée à forte entropie ; PBKDF2 n'apporterait
+    un gain que pour étirer un secret faible (mot de passe humain), ce qui n'est
+    pas le cas ici. Limite connue (acceptée, cf. SECURITY-AUDIT.md) : CBC sans
+    authentification (pas de HMAC/GCM) — le déchiffrement est local, sans oracle
+    exposé à un attaquant réseau.
     """
     if passphrase is None:
         passphrase = hashlib.sha256(_apikey.encode()).hexdigest()
