@@ -1215,6 +1215,129 @@ def detect_subject_trends(note_list, min_notes=4, drop_threshold=2.0):
     }
 
 
+# ── Détection des nouveautés (P3, v1.1.0) ───────────────────────────────────
+# À chaque sync, on compare les items courants (notes, devoirs, punitions,
+# absences) à un index « déjà vu » persisté par équipement. Les nouveautés
+# alimentent des commandes Jeedom qui déclenchent les scénarios utilisateur.
+
+def _item_signature(item, *fields):
+    """Signature stable d'un item à partir de champs sélectionnés."""
+    return "|".join(str(item.get(f, "")) for f in fields)
+
+
+def _sig_of(item, kind):
+    """Identifiant stable d'un item selon son type (id Pronote si disponible)."""
+    sid = item.get("id")
+    has_id = sid not in (None, "")
+    if kind == "notes":
+        return str(sid) if has_id else "n:" + _item_signature(item, "cours", "date", "note", "sur", "commentaire")
+    if kind == "devoirs":
+        # Les devoirs n'ont pas d'id Pronote stable exposé → signature de contenu.
+        return "d:" + _item_signature(item, "date", "title", "description")
+    if kind == "punitions":
+        return "p:" + (str(sid) if has_id else _item_signature(item, "date", "raison", "type"))
+    if kind == "absences":
+        return "a:" + (str(sid) if has_id else _item_signature(item, "date_debut", "date_fin"))
+    return _item_signature(item, "id")
+
+
+def format_new_note_label(note):
+    """Libellé lisible d'une nouvelle note. Ex : 'Maths : 16/20 — DS trigonométrie'."""
+    cours = str(note.get("cours", "")).strip() or "?"
+    note_sur = str(note.get("note_sur", "")).replace(" ", " ").strip()
+    if not note_sur:
+        n = str(note.get("note", "")).strip()
+        s = str(note.get("sur", "")).strip()
+        note_sur = f"{n}/{s}" if n and s else n
+    comm = str(note.get("commentaire", "")).strip()
+    label = f"{cours} : {note_sur}" if note_sur else cours
+    if comm:
+        label += f" — {comm}"
+    return label
+
+
+def format_new_devoir_label(dv):
+    """Libellé lisible d'un nouveau devoir. Ex : 'Maths (12/03) : exercices p.42'."""
+    matiere = str(dv.get("title", "")).strip() or "?"
+    date = str(dv.get("date", "")).strip()
+    desc = str(dv.get("description", "")).strip()
+    head = f"{matiere} ({date})" if date else matiere
+    return f"{head} : {desc}" if desc else head
+
+
+def compute_deltas(seen_index, notes_list, devoirs_list, punitions_list, absences_list):
+    """Compare les items courants à l'index « déjà vu » précédent.
+
+    Retourne (deltas, new_index). Au PREMIER passage (index vide/absent), aucun
+    delta n'est émis : on n'enregistre que la baseline pour éviter une avalanche
+    de notifications au branchement initial (même logique que le centre d'alertes).
+
+    deltas contient les compteurs de nouveautés et les libellés de la dernière
+    nouvelle note / du dernier nouveau devoir (vides si rien de neuf).
+    """
+    kinds = (
+        ("notes", notes_list, "nouvelles_notes"),
+        ("devoirs", devoirs_list, "nouveaux_devoirs"),
+        ("punitions", punitions_list, "nouvelles_punitions"),
+        ("absences", absences_list, "nouvelles_absences"),
+    )
+    new_index = {kind: [_sig_of(it, kind) for it in (lst or [])] for kind, lst, _ in kinds}
+
+    deltas = {
+        "nouvelles_notes": 0,
+        "nouveaux_devoirs": 0,
+        "nouvelles_punitions": 0,
+        "nouvelles_absences": 0,
+        "derniere_nouvelle_note": "",
+        "dernier_nouveau_devoir": "",
+    }
+    if not seen_index:
+        return deltas, new_index  # premier passage : baseline seulement
+
+    for kind, lst, count_key in kinds:
+        seen = set(seen_index.get(kind, []))
+        new_sigs = [s for s in new_index[kind] if s not in seen]
+        deltas[count_key] = len(new_sigs)
+
+    new_notes = {s for s in new_index["notes"] if s not in set(seen_index.get("notes", []))}
+    if new_notes:
+        for n in notes_list or []:
+            if _sig_of(n, "notes") in new_notes:
+                deltas["derniere_nouvelle_note"] = format_new_note_label(n)
+                break
+
+    new_dev = {s for s in new_index["devoirs"] if s not in set(seen_index.get("devoirs", []))}
+    if new_dev:
+        for d in devoirs_list or []:
+            if _sig_of(d, "devoirs") in new_dev:
+                deltas["dernier_nouveau_devoir"] = format_new_devoir_label(d)
+                break
+
+    return deltas, new_index
+
+
+def _load_seen_index(data_dir, eq_id):
+    """Charge l'index « déjà vu » d'un équipement (dict, {} si absent/illisible)."""
+    path = os.path.join(str(data_dir), str(eq_id), "seen_index.json")
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            d = json.load(f)
+            return d if isinstance(d, dict) else {}
+    except Exception:
+        return {}
+
+
+def _save_seen_index(data_dir, eq_id, index):
+    """Persiste l'index « déjà vu » d'un équipement."""
+    folder = os.path.join(str(data_dir), str(eq_id))
+    try:
+        os.makedirs(folder, exist_ok=True)
+        with open(os.path.join(folder, "seen_index.json"), "w", encoding="utf-8") as f:
+            json.dump(index, f)
+    except Exception as e:
+        logging.error("Impossible d'écrire seen_index.json (eq %s) : %s", eq_id, e)
+
+
 def notes(client):
     """
     Récupère toutes les notes de l'année scolaire (toutes périodes) et les formate en JSON.
@@ -2648,6 +2771,23 @@ def process_message(message):
             # J'ajoutes l'ICAL
             logging.info("Je récupére l'ICAL")
             jsondata["Ical"] = ical(client)
+            # Détection des nouveautés depuis la sync précédente (P3, v1.1.0)
+            try:
+                _seen = _load_seen_index(_data_dir, message["CmdId"])
+                _dev = jsondata["Devoirs"] if isinstance(jsondata["Devoirs"], dict) else {}
+                _abs = jsondata["Absences"] if isinstance(jsondata["Absences"], dict) else {}
+                _pun = jsondata["Punitions"] if isinstance(jsondata["Punitions"], dict) else {}
+                _deltas, _new_index = compute_deltas(
+                    _seen,
+                    notes_data.get("note", []) if isinstance(notes_data, dict) else [],
+                    _dev.get("devoir", []),
+                    _pun.get("punition", []),
+                    _abs.get("absence", []),
+                )
+                jsondata["Deltas"] = _deltas
+                _save_seen_index(_data_dir, message["CmdId"], _new_index)
+            except Exception as _e:
+                logging.error("Détection des nouveautés (deltas) échouée : %s", _e)
             # J'envoie les données à Jeedom
             logging.debug(
                 "Projoted.py :: Données JSON à envoyer : %s", json.dumps(jsondata)

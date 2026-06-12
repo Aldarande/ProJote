@@ -470,6 +470,22 @@ try {
     $addEvent = function ($type, $label) use (&$events, $now) {
         array_unshift($events, array('date' => $now, 'type' => $type, 'label' => $label));
     };
+    // Nouveautés détectées par le démon (P3) : nouvelles notes / nouveaux devoirs.
+    // Le démon n'émet ces libellés qu'à partir du 2e cycle (pas au branchement).
+    $deltas = isset($result['Deltas']) && is_array($result['Deltas']) ? $result['Deltas'] : array();
+    $nouvelleNote   = isset($deltas['derniere_nouvelle_note']) ? trim((string)$deltas['derniere_nouvelle_note']) : '';
+    $nouveauDevoir  = isset($deltas['dernier_nouveau_devoir']) ? trim((string)$deltas['dernier_nouveau_devoir']) : '';
+    // Mise à jour UNIQUEMENT si non vide : écraser par '' déclencherait à tort
+    // les scénarios branchés sur ces commandes.
+    if ($nouvelleNote !== '' && $eqLogic->getCmd(null, 'nouvelle_note')) {
+        $eqLogic->checkAndUpdateCmd('nouvelle_note', $nouvelleNote);
+        $addEvent('note', 'Nouvelle note — ' . $nouvelleNote);
+    }
+    if ($nouveauDevoir !== '' && $eqLogic->getCmd(null, 'nouveau_devoir')) {
+        $eqLogic->checkAndUpdateCmd('nouveau_devoir', $nouveauDevoir);
+        $addEvent('devoir', 'Nouveau devoir — ' . $nouveauDevoir);
+    }
+
     // On ne génère des événements qu'à partir du 2e cycle (snapshot précédent présent),
     // pour éviter une avalanche d'alertes au premier rafraîchissement.
     if (!empty($prevCounters)) {
