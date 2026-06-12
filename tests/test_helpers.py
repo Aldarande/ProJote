@@ -523,3 +523,65 @@ class TestComputeDeltas:
         deltas, _ = daemon.compute_deltas(seen, [], [], punitions, absences)
         assert deltas["nouvelles_punitions"] == 1
         assert deltas["nouvelles_absences"] == 1
+
+
+# ── P4 : circuit breaker avec backoff exponentiel ─────────────────────────────
+class TestCircuitBreaker:
+    def _reset(self, daemon, eq="42"):
+        daemon.failed_attempts.pop(eq, None)
+        return eq
+
+    def test_allows_under_threshold(self, daemon):
+        eq = self._reset(daemon)
+        # 3 échecs max autorisés (max_attempts=3) → toujours True jusqu'au seuil
+        assert daemon.check_and_update_failed_attempts(eq, increment=True) is True
+        assert daemon.check_and_update_failed_attempts(eq, increment=True) is True
+        assert daemon.check_and_update_failed_attempts(eq, increment=True) is True
+
+    def test_opens_after_threshold(self, daemon):
+        eq = self._reset(daemon)
+        for _ in range(3):
+            daemon.check_and_update_failed_attempts(eq, increment=True)
+        # 4e échec → circuit ouvert
+        assert daemon.check_and_update_failed_attempts(eq, increment=True) is False
+
+    def test_backoff_grows(self, daemon):
+        eq = self._reset(daemon)
+        for _ in range(4):  # ouvre le circuit (count=4)
+            daemon.check_and_update_failed_attempts(eq, increment=True)
+        first_block = daemon.failed_attempts[eq]["blocked_until"]
+        # Encore bloqué tant que le backoff n'est pas écoulé
+        assert daemon.check_and_update_failed_attempts(eq, increment=False) is False
+        # Un échec supplémentaire repousse l'échéance plus loin (backoff plus long)
+        daemon.check_and_update_failed_attempts(eq, increment=True)
+        assert daemon.failed_attempts[eq]["blocked_until"] >= first_block
+
+    def test_reset_after_cooldown(self, daemon):
+        eq = self._reset(daemon)
+        for _ in range(4):
+            daemon.check_and_update_failed_attempts(eq, increment=True)
+        # Simuler la fin du cooldown
+        daemon.failed_attempts[eq]["blocked_until"] = 0
+        assert daemon.check_and_update_failed_attempts(eq, increment=False) is True
+        assert daemon.failed_attempts[eq]["count"] == 0
+
+
+# ── P4 : _run_with_timeout ────────────────────────────────────────────────────
+class TestRunWithTimeout:
+    def test_completes_in_time(self, daemon):
+        done = {}
+        assert daemon._run_with_timeout(lambda: done.setdefault("ok", 1), 5) is True
+        assert done.get("ok") == 1
+
+    def test_times_out(self, daemon):
+        import time as _t
+        assert daemon._run_with_timeout(lambda: _t.sleep(2), 0.2) is False
+
+    def test_propagates_exception(self, daemon):
+        import pytest as _pytest
+
+        def boom():
+            raise ValueError("boom")
+
+        with _pytest.raises(ValueError):
+            daemon._run_with_timeout(boom, 5)
