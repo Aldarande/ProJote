@@ -1,8 +1,8 @@
 # 📚 ProJote - Plugin JEEDOM Pronote
 
-![Version](https://img.shields.io/badge/version-1.0-blue)
+![Version](https://img.shields.io/badge/version-1.2.0-blue)
 ![License](https://img.shields.io/badge/license-AGPL%20v3-green)
-![Jeedom](https://img.shields.io/badge/Jeedom-4.3+-orange)
+![Jeedom](https://img.shields.io/badge/Jeedom-4.4+-orange)
 
 **ProJote** est un plugin JEEDOM qui vous permet de **récupérer automatiquement les informations de votre compte Pronote** directement dans Jeedom. Consultez vos notes, emplois du temps, devoirs, absences et bien plus encore!
 
@@ -12,11 +12,18 @@
 
 ✅ **Intégration Pronote complète**
 - Récupération des notes et moyennes
-- Emploi du temps (EDT) du jour et du lendemain
+- Emploi du temps (EDT) du jour et du lendemain (J+1 à J+4)
 - Liste des devoirs et travail à faire
 - Absences et retards
 - Punitions et sanctions
-- Notifications
+- Notifications, messagerie, menu cantine (avec allergènes/labels)
+
+✅ **Suivi & alertes** *(v1.1.0+)*
+- Onglet Statistiques : courbes d'évolution (moyenne, absences, retards) historisées
+- Moyenne générale historisée + détection des matières en baisse
+- Centre d'alertes (événements ProJote + notifications Pronote)
+- Commandes `nouvelle_note` / `nouveau_devoir` : déclenchent vos scénarios sur chaque nouveauté
+- Export iCalendar natif (cours + devoirs) abonnable depuis votre agenda
 
 ✅ **Gestion multi-comptes**
 - Support des comptes élèves
@@ -49,7 +56,7 @@
 
 ## 📋 Prérequis
 
-- **Jeedom 4.3** minimum
+- **Jeedom 4.4** minimum
 - **Python 3.7+** avec environnement virtuel
 - **PronotePy** (installé automatiquement)
 - **PHP 7.4+**
