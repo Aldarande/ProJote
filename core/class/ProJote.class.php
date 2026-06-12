@@ -599,6 +599,9 @@ class ProJote extends eqLogic
       "prochains_DS_html"     => array("Liste HTML des prochains DS",                      'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
       // ── Centre d'alertes (v1.1.0) ──────────────────────────────────────────
       "event"                 => array("Dernier événement",                               'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
+      // ── Nouveautés (P3, v1.1.0) — déclencheurs de scénarios ────────────────
+      "nouvelle_note"         => array("Dernière nouvelle note",                          'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
+      "nouveau_devoir"        => array("Dernier nouveau devoir",                          'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
     );
   }
 

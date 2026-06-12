@@ -455,3 +455,71 @@ class TestDetectSubjectTrends:
         subjects = [d["matiere"] for d in out["matiere_en_baisse_detail"]]
         assert subjects == ["Histoire", "Maths"]
         assert out["matiere_en_baisse"] == "Histoire · Maths"
+
+
+# ── P3 : détection des nouveautés (deltas) ────────────────────────────────────
+class TestNewItemLabels:
+    def test_note_label_full(self, daemon):
+        note = {"cours": "Maths", "note_sur": "16 / 20", "commentaire": "DS trigonométrie"}
+        assert daemon.format_new_note_label(note) == "Maths : 16 / 20 — DS trigonométrie"
+
+    def test_note_label_no_comment(self, daemon):
+        note = {"cours": "Physique", "note": "12", "sur": "20"}
+        assert daemon.format_new_note_label(note) == "Physique : 12/20"
+
+    def test_note_label_missing_subject(self, daemon):
+        assert daemon.format_new_note_label({"note": "8", "sur": "20"}) == "? : 8/20"
+
+    def test_devoir_label_full(self, daemon):
+        dv = {"title": "Maths", "date": "12/03", "description": "exercices p.42"}
+        assert daemon.format_new_devoir_label(dv) == "Maths (12/03) : exercices p.42"
+
+    def test_devoir_label_no_desc(self, daemon):
+        assert daemon.format_new_devoir_label({"title": "Anglais", "date": "05/04"}) == "Anglais (05/04)"
+
+
+class TestComputeDeltas:
+    def _note(self, id, cours="Maths", note="15"):
+        return {"id": id, "cours": cours, "date": "01/03", "note": note, "sur": "20",
+                "note_sur": note + "/20", "commentaire": ""}
+
+    def test_first_run_no_deltas(self, daemon):
+        notes = [self._note(1), self._note(2)]
+        deltas, index = daemon.compute_deltas({}, notes, [], [], [])
+        assert deltas["nouvelles_notes"] == 0
+        assert deltas["derniere_nouvelle_note"] == ""
+        # La baseline est enregistrée pour le prochain passage.
+        assert len(index["notes"]) == 2
+
+    def test_detects_new_note(self, daemon):
+        seen = {"notes": ["1"], "devoirs": [], "punitions": [], "absences": []}
+        notes = [self._note(2, cours="Histoire", note="17"), self._note(1)]
+        deltas, index = daemon.compute_deltas(seen, notes, [], [], [])
+        assert deltas["nouvelles_notes"] == 1
+        assert deltas["derniere_nouvelle_note"] == "Histoire : 17/20"
+        assert set(index["notes"]) == {"1", "2"}
+
+    def test_no_new_when_all_seen(self, daemon):
+        seen = {"notes": ["1", "2"], "devoirs": [], "punitions": [], "absences": []}
+        notes = [self._note(1), self._note(2)]
+        deltas, _ = daemon.compute_deltas(seen, notes, [], [], [])
+        assert deltas["nouvelles_notes"] == 0
+        assert deltas["derniere_nouvelle_note"] == ""
+
+    def test_detects_new_devoir_by_signature(self, daemon):
+        seen = {"notes": [], "devoirs": ["d:12/03|Maths|ex p.10"], "punitions": [], "absences": []}
+        devoirs = [
+            {"date": "13/03", "title": "Physique", "description": "TP"},
+            {"date": "12/03", "title": "Maths", "description": "ex p.10"},
+        ]
+        deltas, index = daemon.compute_deltas(seen, [], devoirs, [], [])
+        assert deltas["nouveaux_devoirs"] == 1
+        assert deltas["dernier_nouveau_devoir"] == "Physique (13/03) : TP"
+
+    def test_counts_punitions_and_absences(self, daemon):
+        seen = {"notes": [], "devoirs": [], "punitions": ["p:5"], "absences": []}
+        punitions = [{"id": 5}, {"id": 6}]
+        absences = [{"id": 9}]
+        deltas, _ = daemon.compute_deltas(seen, [], [], punitions, absences)
+        assert deltas["nouvelles_punitions"] == 1
+        assert deltas["nouvelles_absences"] == 1
