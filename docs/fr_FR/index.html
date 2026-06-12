@@ -681,6 +681,33 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
     <!-- ── Historique ─────────────────────── -->
     <h1 id="version">Historique des versions</h1>
 
+    <h2>1.2.0 — Juin 2026</h2>
+    <table>
+        <thead><tr><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><span class="badge badge-new">Nouveau</span></td>
+                <td><strong>Notifications « nouvelle note » / « nouveau devoir »</strong> — le démon compare chaque synchronisation à la précédente et expose les commandes <code>nouvelle_note</code> et <code>nouveau_devoir</code>, mises à jour uniquement sur une vraie nouveauté. Idéal pour déclencher un scénario (notification WhatsApp/Telegram…). Les nouveautés alimentent aussi le centre d'alertes. Aucune alerte au premier branchement (anti-avalanche).</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sec">Sécurité</span></td>
+                <td><strong>Apikey en POST</strong> — l'envoi de messages au centre Jeedom passe en POST (corps) au lieu de GET : la clé API n'apparaît plus dans les access logs du serveur web. [CWE-598]</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sec">Sécurité</span></td>
+                <td><strong>Niveau de log initial réduit</strong> — le démon démarre en WARNING (au lieu de DEBUG) jusqu'à l'application de <code>--loglevel</code>, évitant toute fuite verbeuse sur stdout avant l'activation du masquage d'apikey. [CWE-532] · Rapport complet : <code>SECURITY-AUDIT.md</code> (score 88/100).</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-perf">Fiabilité</span></td>
+                <td><strong>Timeout dur par équipement</strong> — un compte Pronote injoignable (ENT qui timeout) n'immobilise plus le worker : au-delà de 120 s le traitement est abandonné et l'équipement suivant est traité. Le circuit breaker applique désormais un <strong>backoff exponentiel</strong> (60 s, 120 s, 240 s… plafonné à 1 h) au lieu d'un délai fixe.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-perf">Maintenance</span></td>
+                <td><strong>Environnement Python allégé</strong> — le venv n'est plus versionné ; les dépendances sont épinglées dans <code>resources/requirements.txt</code> et installées via <code>post-install.sh</code>. Le venv est exclu des sauvegardes Jeedom (<code>backupExclude</code>). <code>maxDependancyInstallTime</code> porté à 120 s.</td>
+            </tr>
+        </tbody>
+    </table>
+
     <h2>1.1.0 — Mai 2026</h2>
     <table>
         <thead><tr><th>Type</th><th>Description</th></tr></thead>
