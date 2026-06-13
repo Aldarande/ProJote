@@ -9,6 +9,7 @@
 	"author": "Aldarande",
 	"require": "4.4",
 	"category": "organization",
+	"display": "panel",
 	"hasDependency": true,
 	"hasOwnDeamon": true,
 	"maxDependancyInstallTime": 120,
