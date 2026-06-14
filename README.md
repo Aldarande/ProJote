@@ -1,6 +1,6 @@
 # 📚 ProJote - Plugin JEEDOM Pronote
 
-![Version](https://img.shields.io/badge/version-1.2.0-blue)
+![Version](https://img.shields.io/badge/version-1.3.0-blue)
 ![License](https://img.shields.io/badge/license-AGPL%20v3-green)
 ![Jeedom](https://img.shields.io/badge/Jeedom-4.4+-orange)
 
@@ -24,6 +24,11 @@
 - Centre d'alertes (événements ProJote + notifications Pronote)
 - Commandes `nouvelle_note` / `nouveau_devoir` : déclenchent vos scénarios sur chaque nouveauté
 - Export iCalendar natif (cours + devoirs) abonnable depuis votre agenda
+
+✅ **Panneau desktop multi-élèves** *(v1.3.0+)*
+- Page dédiée accessible via une icône sous le menu **Accueil** de Jeedom
+- Activation par la case *« Afficher le panneau desktop »* (Plugins → Gestion des plugins → ProJote)
+- Un onglet par élève : identité, statistiques, EDT, notes, devoirs, punitions, iCal
 
 ✅ **Gestion multi-comptes**
 - Support des comptes élèves
