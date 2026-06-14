@@ -540,6 +540,10 @@ try {
         'matiere_en_baisse_detail' => isset($result['Notes']['matiere_en_baisse_detail']) ? $result['Notes']['matiere_en_baisse_detail'] : array(),
         'notifications'            => isset($result['Notifications']['Notification'])      ? $result['Notifications']['Notification']      : array(),
         'events'                   => $events,
+        'prochain_DS_matiere'      => isset($result['Devoirs']['prochain_DS_matiere'])     ? $result['Devoirs']['prochain_DS_matiere']     : '',
+        'prochain_DS_date'         => isset($result['Devoirs']['prochain_DS_date'])        ? $result['Devoirs']['prochain_DS_date']        : '',
+        'prochain_DS_dans_jours'   => isset($result['Devoirs']['prochain_DS_dans_jours'])  ? $result['Devoirs']['prochain_DS_dans_jours']  : null,
+        'URL_Ical'                 => isset($result['Ical'])                                ? $result['Ical']                                : '',
         'last_update'           => date('c'),
     );
     $eqLogic->setConfiguration('widget_json', json_encode($widget_data));

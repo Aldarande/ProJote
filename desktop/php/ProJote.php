@@ -19,21 +19,29 @@ sendVarToJS('eqLogicId', $eqLogic);
 	<!-- Page d'accueil du plugin -->
 	<div class="col-xs-12 eqLogicThumbnailDisplay">
 		<legend><i class="fas fa-cog"></i> {{Gestion}}</legend>
-		<!-- Boutons de gestion du plugin -->
-		<div class="eqLogicThumbnailContainer">
-			<div class="cursor eqLogicAction logoPrimary" data-action="add">
+		<!-- Boutons de gestion du plugin — grandes icônes + libellé court dessous -->
+		<style>
+			.pj-gestion { display:flex; flex-wrap:wrap; gap:10px; padding:6px 2px; }
+			.pj-gestion .pj-tile {
+				display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
+				width:120px; padding:16px 8px 12px; border-radius:10px; cursor:pointer;
+				text-align:center; transition:background .15s ease, transform .1s ease;
+			}
+			.pj-gestion .pj-tile:hover { background:rgba(127,127,127,.14); transform:translateY(-1px); }
+			.pj-gestion .pj-tile i { font-size:44px; line-height:1; margin-bottom:12px; }
+			.pj-gestion .pj-tile span { font-size:13px; font-weight:600; }
+		</style>
+		<div class="eqLogicThumbnailContainer pj-gestion">
+			<div class="pj-tile eqLogicAction logoPrimary" data-action="add">
 				<i class="fas fa-plus-circle"></i>
-				<br>
 				<span>{{Ajouter}}</span>
 			</div>
-			<div class="cursor eqLogicAction logoSecondary" data-action="gotoPluginConf">
+			<div class="pj-tile eqLogicAction logoSecondary" data-action="gotoPluginConf">
 				<i class="fas fa-wrench"></i>
-				<br>
 				<span>{{Configuration}}</span>
 			</div>
-			<div class="cursor logoSecondary" id="bt_donProJote" title="{{Faire un don}}">
+			<div class="pj-tile logoSecondary" id="bt_donProJote" title="{{Faire un don}}">
 				<i class="fas fa-mug-hot"></i>
-				<br>
 				<span>{{Don}}</span>
 			</div>
 		</div>
