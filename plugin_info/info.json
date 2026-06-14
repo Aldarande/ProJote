@@ -1,7 +1,7 @@
 {
 	"id": "ProJote",
 	"name": "ProJote",
-	"pluginVersion": "1.2.0",
+	"pluginVersion": "1.3.0",
 	"description": {
 		"fr_FR": "Plugin destiné à récupérer les informations de Pronote"
 	},
@@ -9,6 +9,7 @@
 	"author": "Aldarande",
 	"require": "4.4",
 	"category": "organization",
+	"display": "panel",
 	"hasDependency": true,
 	"hasOwnDeamon": true,
 	"maxDependancyInstallTime": 120,
