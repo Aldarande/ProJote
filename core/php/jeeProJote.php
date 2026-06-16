@@ -518,6 +518,7 @@ try {
         'etablissement'         => isset($result['Eleve']['Etablissement'])                    ? $result['Eleve']['Etablissement']                    : '',
         'notes'                 => isset($result['Notes']['note'])                            ? $result['Notes']['note']                            : array(),
         'moyennes_periodes'     => isset($result['Notes']['moyennes_periodes'])               ? $result['Notes']['moyennes_periodes']               : array(),
+        'competences'           => isset($result['Competences']['evaluations'])               ? $result['Competences']['evaluations']               : array(),
         'edt_aujourdhui'        => isset($result['Emploi_du_temps']['edt_aujourdhui'])        ? $result['Emploi_du_temps']['edt_aujourdhui']        : array(),
         'edt_prochainjour'      => isset($result['Emploi_du_temps']['edt_prochainjour'])      ? $result['Emploi_du_temps']['edt_prochainjour']      : array(),
         'edt_prochainjour_date' => isset($result['Emploi_du_temps']['edt_prochainjour_date']) ? $result['Emploi_du_temps']['edt_prochainjour_date'] : '',
@@ -540,6 +541,15 @@ try {
         'matiere_en_baisse_detail' => isset($result['Notes']['matiere_en_baisse_detail']) ? $result['Notes']['matiere_en_baisse_detail'] : array(),
         'notifications'            => isset($result['Notifications']['Notification'])      ? $result['Notifications']['Notification']      : array(),
         'events'                   => $events,
+        // Menu cantine (onglet Menu) — corrige l'oubli de câblage v1.0.1
+        'menu_midi_aujourdhui'     => isset($result['Menus']['menu_midi_aujourdhui'])      ? $result['Menus']['menu_midi_aujourdhui']      : '',
+        'menu_midi_demain'         => isset($result['Menus']['menu_midi_demain'])          ? $result['Menus']['menu_midi_demain']          : '',
+        'menu_semaine'             => isset($result['Menus']['menu_semaine'])              ? $result['Menus']['menu_semaine']              : '',
+        'Nb_menus_semaine'         => isset($result['Menus']['Nb_menus_semaine'])          ? $result['Menus']['Nb_menus_semaine']          : 0,
+        // Messagerie (onglet Msg) — corrige l'oubli de câblage v1.0.1
+        'messages_html'            => isset($result['Messages']['messages_html'])          ? $result['Messages']['messages_html']          : '',
+        'Nb_messages'              => isset($result['Messages']['Nb_messages'])            ? $result['Messages']['Nb_messages']            : 0,
+        'Nb_messages_non_lus'      => isset($result['Messages']['Nb_messages_non_lus'])    ? $result['Messages']['Nb_messages_non_lus']    : 0,
         'prochain_DS_matiere'      => isset($result['Devoirs']['prochain_DS_matiere'])     ? $result['Devoirs']['prochain_DS_matiere']     : '',
         'prochain_DS_date'         => isset($result['Devoirs']['prochain_DS_date'])        ? $result['Devoirs']['prochain_DS_date']        : '',
         'prochain_DS_dans_jours'   => isset($result['Devoirs']['prochain_DS_dans_jours'])  ? $result['Devoirs']['prochain_DS_dans_jours']  : null,
