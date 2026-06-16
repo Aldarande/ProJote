@@ -82,7 +82,7 @@ class ProJote extends eqLogic
         'type'              => 'select',
         'label'             => 'Onglet par défaut',
         'default'           => 'dv',
-        'values'            => ['dv' => 'Devoirs', 'notes' => 'Notes', 'abs' => 'Absences', 'ret' => 'Retards', 'pun' => 'Punitions', 'menu' => 'Menu cantine', 'msg' => 'Messagerie', 'stats' => 'Statistiques', 'alertes' => 'Alertes'],
+        'values'            => ['dv' => 'Devoirs', 'notes' => 'Notes', 'abs' => 'Absences', 'ret' => 'Retards', 'pun' => 'Punitions', 'menu' => 'Menu cantine', 'msg' => 'Messagerie', 'stats' => 'Statistiques', 'alertes' => 'Alertes', 'comp' => 'Compétences'],
       ],
       'edt_nav_mode' => [
         'allow_displayType' => ['dashboard', 'mobile'],
@@ -787,6 +787,8 @@ class ProJote extends eqLogic
       'stats'            => $vis['moyenne_generale']  ?? true,
       // v1.1.0 — onglet Alertes (événements ProJote + notifications Pronote)
       'alertes'          => ($vis['event'] ?? true) || ($vis['notifications'] ?? true),
+      // v1.2.0 — onglet Compétences
+      'competences'      => $vis['competences']      ?? true,
     ];
 
     // 4b. Séries d'historique pour l'onglet Statistiques (v1.1.0).

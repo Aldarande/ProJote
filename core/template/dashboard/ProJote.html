@@ -861,6 +861,23 @@
     }
     .pjw-#id# .pj-notif-author { font-weight: 600; }
     .pjw-#id# .pj-notif-subject { margin-top: 2px; }
+
+    /* ── v1.2.0 — Onglet Compétences ────────────────────────── */
+    .pjw-#id# .pj-comp-row {
+        padding: 6px 8px;
+        border-bottom: 1px solid rgba(0,0,0,.06);
+        font-size: 0.86em;
+    }
+    .pjw-#id# .pj-comp-row:last-child { border-bottom: none; }
+    .pjw-#id# .pj-comp-head { display: flex; justify-content: space-between; gap: 8px; }
+    .pjw-#id# .pj-comp-sub { font-weight: 600; }
+    .pjw-#id# .pj-comp-date { opacity: .6; white-space: nowrap; }
+    .pjw-#id# .pj-comp-name { opacity: .85; margin-top: 2px; }
+    .pjw-#id# .pj-comp-pills { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+    .pjw-#id# .pj-comp-pill {
+        font-size: 0.82em; line-height: 1.3; padding: 1px 7px;
+        border-radius: 8px; border: 1px solid rgba(0,0,0,.18); opacity: .85; white-space: nowrap;
+    }
 </style>
 
 <div class="pjw-#id#">
@@ -947,6 +964,8 @@
                     id="pjwbstats#id#"></span></button>
             <button class="tab-btn" data-tab="alertes#id#"><i class="fas fa-bell"></i> Alertes<span class="tab-badge"
                     id="pjwbalertes#id#"></span></button>
+            <button class="tab-btn" data-tab="comp#id#"><i class="fas fa-award"></i> Compét.<span class="tab-badge"
+                    id="pjwbcomp#id#"></span></button>
         </div>
 
         <!-- Devoirs (défaut) -->
@@ -1009,6 +1028,13 @@
         <div class="tab-pane" id="alertes#id#">
             <div id="pjwalertes#id#">
                 <div class="p-empty">Aucune alerte</div>
+            </div>
+        </div>
+
+        <!-- v1.2.0 — Compétences -->
+        <div class="tab-pane" id="comp#id#">
+            <div id="pjwcomp#id#">
+                <div class="p-empty">Aucune compétence</div>
             </div>
         </div>
     </div>
@@ -1739,6 +1765,39 @@
             elA.innerHTML = html || '<div class="p-empty">Aucune alerte</div>';
         }
 
+        /* ─── COMPÉTENCES (v1.2.0) ────────────────────────── */
+        function renderCompetences(d) {
+            var elC = el('pjwcomp' + ID);
+            if (!elC) return;
+            if (VIS && VIS.competences === false) {
+                var pane = el('comp' + ID); if (pane) pane.style.display = 'none';
+                return;
+            }
+            var list = d.competences || [];
+            if (!list.length) { elC.innerHTML = '<div class="p-empty">Aucune compétence</div>'; return; }
+            var html = '';
+            list.forEach(function (ev) {
+                var acqs = ev.acquisitions, acqArr = [];
+                if (Array.isArray(acqs)) {
+                    acqArr = acqs;
+                } else if (acqs && typeof acqs === 'object') {
+                    acqArr = Object.keys(acqs).map(function (k) { return acqs[k]; });
+                }
+                var pills = acqArr.map(function (a) {
+                    var lvl = (a && (a.level || a.abbreviation)) || '';
+                    var name = (a && a.name) || '';
+                    return '<span class="pj-comp-pill" title="' + esc(name) + '">' + esc(lvl || '—') + '</span>';
+                }).join('');
+                html += '<div class="pj-comp-row">' +
+                    '<div class="pj-comp-head"><span class="pj-comp-sub">' + esc(ev.Sujet || ev.domaine || '—') + '</span>' +
+                    '<span class="pj-comp-date">' + esc(ev.date || '') + '</span></div>' +
+                    (ev.nom ? '<div class="pj-comp-name">' + esc(ev.nom) + '</div>' : '') +
+                    (pills ? '<div class="pj-comp-pills">' + pills + '</div>' : '') +
+                    '</div>';
+            });
+            elC.innerHTML = html;
+        }
+
         /* ─── BADGE PROCHAIN DS (v1.0.1) ──────────────────── */
         function renderProchainDS(d) {
             var elDS = el('pjwds' + ID);
@@ -1840,6 +1899,8 @@
             // v1.1.0
             renderStats();
             renderAlertes(d);
+            // v1.2.0
+            renderCompetences(d);
             // Masquer les boutons d'onglets des sections non visibles
             var tabsEl = el('pjwtabs' + ID);
             if (tabsEl) {
@@ -1847,7 +1908,8 @@
                     'abs': VIS.absences, 'ret': VIS.retards, 'pun': VIS.punitions,
                     'notes': VIS.notes, 'dv': VIS.devoirs,
                     'menu': VIS.menu !== false, 'msg': VIS.messages !== false,
-                    'stats': VIS.stats !== false, 'alertes': VIS.alertes !== false
+                    'stats': VIS.stats !== false, 'alertes': VIS.alertes !== false,
+                    'comp': VIS.competences !== false
                 };
                 tabsEl.querySelectorAll('.tab-btn').forEach(function (btn) {
                     var tab = (btn.getAttribute('data-tab') || '').replace(ID, '');
@@ -1870,6 +1932,8 @@
                 return n.lu === false || n.lu === 0;
             }).length;
             setBadge('pjwbalertes' + ID, unreadNotifs);
+            // v1.2.0 : badge nombre d'évaluations par compétences
+            setBadge('pjwbcomp' + ID, (d.competences || []).length);
         }
 
         /* ─── INITIALISATION ──────────────────────────────── */

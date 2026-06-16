@@ -518,6 +518,7 @@ try {
         'etablissement'         => isset($result['Eleve']['Etablissement'])                    ? $result['Eleve']['Etablissement']                    : '',
         'notes'                 => isset($result['Notes']['note'])                            ? $result['Notes']['note']                            : array(),
         'moyennes_periodes'     => isset($result['Notes']['moyennes_periodes'])               ? $result['Notes']['moyennes_periodes']               : array(),
+        'competences'           => isset($result['Competences']['evaluations'])               ? $result['Competences']['evaluations']               : array(),
         'edt_aujourdhui'        => isset($result['Emploi_du_temps']['edt_aujourdhui'])        ? $result['Emploi_du_temps']['edt_aujourdhui']        : array(),
         'edt_prochainjour'      => isset($result['Emploi_du_temps']['edt_prochainjour'])      ? $result['Emploi_du_temps']['edt_prochainjour']      : array(),
         'edt_prochainjour_date' => isset($result['Emploi_du_temps']['edt_prochainjour_date']) ? $result['Emploi_du_temps']['edt_prochainjour_date'] : '',
