@@ -19,30 +19,36 @@ sendVarToJS('eqLogicId', $eqLogic);
 	<!-- Page d'accueil du plugin -->
 	<div class="col-xs-12 eqLogicThumbnailDisplay">
 		<legend><i class="fas fa-cog"></i> {{Gestion}}</legend>
-		<!-- Boutons de gestion du plugin — grandes icônes + libellé court dessous -->
+		<!-- Boutons de gestion — cartes à grandes icônes (style jeeninswi, accent ProJote) -->
 		<style>
-			.pj-gestion { display:flex; flex-wrap:wrap; gap:10px; padding:6px 2px; }
-			.pj-gestion .pj-tile {
-				display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
-				width:120px; padding:16px 8px 12px; border-radius:10px; cursor:pointer;
-				text-align:center; transition:background .15s ease, transform .1s ease;
+			.pj-manage-grid { display:flex; flex-wrap:wrap; gap:14px; margin:10px 0 20px; }
+			.pj-manage-card {
+				display:flex; flex-direction:column; align-items:center; justify-content:center;
+				width:120px; padding:18px 10px; border-radius:10px; cursor:pointer;
+				background:rgba(127,127,127,.08); border:1px solid rgba(127,127,127,.18);
+				transition:transform .12s ease, background .12s ease, border-color .12s ease;
 			}
-			.pj-gestion .pj-tile:hover { background:rgba(127,127,127,.14); transform:translateY(-1px); }
-			.pj-gestion .pj-tile i { font-size:44px; line-height:1; margin-bottom:12px; }
-			.pj-gestion .pj-tile span { font-size:13px; font-weight:600; }
+			.pj-manage-card:hover { transform:translateY(-3px); background:rgba(148,201,4,.10); border-color:#94C904; }
+			.pj-manage-ico { font-size:46px; line-height:1; color:#8a8a8a; transition:color .12s ease; }
+			.pj-manage-card:hover .pj-manage-ico { color:#94C904; }
+			.pj-manage-ico.pj-ico-add { color:#5cb85c; }
+			.pj-manage-card:hover .pj-ico-add { color:#4cae4c; }
+			.pj-manage-ico.pj-ico-don { color:#d99a2b; }
+			.pj-manage-card:hover .pj-ico-don { color:#d99a2b; }
+			.pj-manage-lbl { margin-top:12px; font-size:14px; font-weight:600; color:inherit; text-align:center; }
 		</style>
-		<div class="eqLogicThumbnailContainer pj-gestion">
-			<div class="pj-tile eqLogicAction logoPrimary" data-action="add">
-				<i class="fas fa-plus-circle"></i>
-				<span>{{Ajouter}}</span>
+		<div class="pj-manage-grid">
+			<div class="pj-manage-card cursor eqLogicAction" data-action="add">
+				<i class="fas fa-plus-circle pj-manage-ico pj-ico-add"></i>
+				<span class="pj-manage-lbl">{{Ajouter}}</span>
 			</div>
-			<div class="pj-tile eqLogicAction logoSecondary" data-action="gotoPluginConf">
-				<i class="fas fa-wrench"></i>
-				<span>{{Configuration}}</span>
+			<div class="pj-manage-card cursor eqLogicAction" data-action="gotoPluginConf">
+				<i class="fas fa-wrench pj-manage-ico"></i>
+				<span class="pj-manage-lbl">{{Configuration}}</span>
 			</div>
-			<div class="pj-tile logoSecondary" id="bt_donProJote" title="{{Faire un don}}">
-				<i class="fas fa-mug-hot"></i>
-				<span>{{Don}}</span>
+			<div class="pj-manage-card cursor" id="bt_donProJote" title="{{Faire un don}}">
+				<i class="fas fa-mug-hot pj-manage-ico pj-ico-don"></i>
+				<span class="pj-manage-lbl">{{Don}}</span>
 			</div>
 		</div>
 
