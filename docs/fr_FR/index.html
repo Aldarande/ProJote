@@ -682,6 +682,21 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
     <!-- ── Historique ─────────────────────── -->
     <h1 id="version">Historique des versions</h1>
 
+    <h2>1.3.1 — Juin 2026</h2>
+    <table>
+        <thead><tr><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>Validation par QR Code réparée</strong> — la connexion par QR Code échouait silencieusement (code retour 2). Le script <code>QRConnect.py</code> ne déclarait pas l'argument <code>--apikey</code> ajouté côté PHP (lot sécurité 1.2.0), ce qui faisait échouer l'analyse des arguments. L'argument est désormais accepté.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>Saisie du code PIN du QR Code</strong> — la fenêtre de saisie du PIN n'apparaissait plus : les navigateurs récents (Chrome 92+, Firefox) bloquent <code>prompt()</code> hors d'un geste utilisateur direct, or l'appel se faisait dans un contexte asynchrone. Remplacée par une modale Jeedom (bootbox) avec un champ de saisie dédié (4 chiffres, validation par Entrée).</td>
+            </tr>
+        </tbody>
+    </table>
+
     <h2>1.3.0 — Juin 2026</h2>
     <table>
         <thead><tr><th>Type</th><th>Description</th></tr></thead>

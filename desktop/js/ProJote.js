@@ -447,6 +447,82 @@ document.querySelector('.rectangle').addEventListener('drop', function (e) {
   reader.readAsDataURL(file);
 });
 
+// Dernier QR décodé avec succès — permet de relancer la saisie du PIN
+// en cliquant sur l'aperçu de l'image (voir displayImage).
+let lastQRData = null;
+
+/**
+ * Demande le code PIN puis envoie le QR au serveur.
+ *
+ * Remplace l'ancien window.prompt() : les navigateurs récents (Chrome 92+, Firefox)
+ * bloquent silencieusement prompt()/alert() déclenchés hors d'un geste utilisateur
+ * direct. Or ici l'appel se fait au fond d'une chaîne asynchrone
+ * (FileReader.onload → Promise.then → img.onload), donc le geste « coller » est perdu
+ * et la fenêtre de saisie du PIN n'apparaissait plus.
+ *
+ * bootbox (modale Bootstrap chargée par le core Jeedom sur la page plugin) n'est pas
+ * soumis à cette restriction. Fallback sur prompt() natif si bootbox est indisponible.
+ */
+function askPinAndSend(qrData) {
+  let pinRegex = /^\d{4}$/;
+
+  // Fallback navigateur si bootbox indisponible.
+  if (typeof bootbox === 'undefined') {
+    let pin = prompt('Veuillez entrer votre code PIN de 4 chiffres :');
+    if (pin === null) return;
+    if (pinRegex.test(pin)) sendImageToServer(qrData, pin);
+    else alert('Code PIN invalide. Veuillez entrer un code PIN de 4 chiffres.');
+    return;
+  }
+
+  // On construit notre propre champ de saisie (bootbox.prompt rend un input
+  // que le thème Jeedom masque) → contrôle total via bootbox.dialog.
+  let dialog = bootbox.dialog({
+    title: 'Code PIN Pronote',
+    message:
+      '<p>Veuillez entrer votre code PIN de 4 chiffres :</p>' +
+      '<div style="text-align:center;">' +
+      '<input type="text" inputmode="numeric" maxlength="4" autocomplete="off" ' +
+      'id="projote_pin_input" class="form-control" placeholder="0000" ' +
+      'style="width:130px;display:inline-block;text-align:center;letter-spacing:8px;' +
+      'font-size:1.5em;font-weight:bold;">' +
+      '<div id="projote_pin_err" style="color:red;margin-top:6px;display:none;">' +
+      'Code PIN invalide : 4 chiffres attendus.</div>' +
+      '</div>',
+    buttons: {
+      cancel: { label: 'Annuler', className: 'btn-default' },
+      confirm: {
+        label: 'Valider',
+        className: 'btn-success',
+        callback: function () {
+          let inp = document.getElementById('projote_pin_input');
+          let pin = inp ? inp.value.trim() : '';
+          if (!pinRegex.test(pin)) {
+            let err = document.getElementById('projote_pin_err');
+            if (err) err.style.display = 'block';
+            if (inp) { inp.style.borderColor = 'red'; inp.focus(); }
+            return false; // empêche la fermeture de la modale
+          }
+          sendImageToServer(qrData, pin);
+        }
+      }
+    }
+  });
+
+  // Autofocus + validation à la touche Entrée.
+  dialog.on('shown.bs.modal', function () {
+    let inp = document.getElementById('projote_pin_input');
+    if (!inp) return;
+    inp.focus();
+    inp.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        dialog.find('.btn-success').trigger('click');
+      }
+    });
+  });
+}
+
 function sendImageToServer(code, pin) {
   // Fonction for send QRcode data to AJAX and python script
   document.querySelector('.form-group.QRCode .fa-hourglass-half').classList.remove('hidden');
@@ -535,17 +611,12 @@ function displayImage(imageData) {
     rectangle.appendChild(container);
     // Ajoutez l'image à l'élément div
     container.appendChild(img);
-    // Ajoutez ce gestionnaire d'événements pour afficher une fenêtre de demande de code PIN
+    // Cliquer sur l'aperçu permet de ressaisir le PIN et de renvoyer le dernier QR décodé.
+    img.style.cursor = 'pointer';
+    img.title = 'Cliquer pour ressaisir le code PIN';
     img.addEventListener('click', function () {
-      let pin = prompt('Veuillez entrer votre code PIN de 4 chiffres :');
-      // Vérifiez le code PIN ici
-      let pinRegex = /^\d{4}$/;
-      if (pinRegex.test(pin)) {
-        // Le code PIN est valide
-        console.log('Code PIN valide :', pin);
-      } else {
-        // Le code PIN est invalide
-        alert('Code PIN invalide. Veuillez entrer un code PIN de 4 chiffres.');
+      if (lastQRData) {
+        askPinAndSend(lastQRData);
       }
     });
   } else {
@@ -569,13 +640,8 @@ function handleImage(imageData) {
       if (code) {
         console.log('Données du QR code :', code.data);
         // Demande le code PIN à l'utilisateur uniquement si le QR est valide
-        let pin = prompt('Veuillez entrer votre code PIN de 4 chiffres :');
-        let pinRegex = /^\d{4}$/;
-        if (pinRegex.test(pin)) {
-          sendImageToServer(code.data, pin);
-        } else {
-          alert('Code PIN invalide. Veuillez entrer un code PIN de 4 chiffres.');
-        }
+        lastQRData = code.data;
+        askPinAndSend(code.data);
       } else {
         console.log('Impossible de décoder le code QR');
         $('#error-message').text('Erreur : Impossible de décoder le QRcode ');
