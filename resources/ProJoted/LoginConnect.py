@@ -312,7 +312,8 @@ try:
                 response = requests.get(url)
             # Vérifier si la requête a réussi (code de statut 200)
             if response.status_code == 200:
-                # J'aimerai un valider que l'image récupérée via url est bien différente de l'image de filepath
+                # Ne réécrire le fichier que si l'image a réellement changé,
+                # pour éviter les écritures disque inutiles.
                 if os.path.exists(filepath):
                     with open(filepath, "rb") as f:
                         existing_image = f.read()
@@ -320,14 +321,19 @@ try:
                         logging.info(
                             "L'image est déjà à jour, pas besoin de la télécharger."
                         )
-
-                    else:
-                        # Ouvrir un fichier en mode écriture binaire
-                        logging.info("L'image est différente,je la télécharge.")
-                        with open(filepath, "wb") as f:
-                            # Écrire le contenu de l'image dans le fichier
-                            f.write(response.content)
-                    return True
+                        return True
+                    logging.info("L'image est différente, je la télécharge.")
+                # Premier téléchargement OU image modifiée : on écrit le fichier.
+                with open(filepath, "wb") as f:
+                    f.write(response.content)
+                return True
+            elif response.status_code == 404:
+                # Pas de photo de profil sur ce compte Pronote : c'est un cas normal
+                # (tous les comptes n'ont pas de photo), non bloquant pour la connexion.
+                logging.warning(
+                    "Pas de photo de profil disponible (404), téléchargement ignoré."
+                )
+                return False
             else:
                 # Afficher un message d'erreur si la requête a échoué
                 logging.error(
