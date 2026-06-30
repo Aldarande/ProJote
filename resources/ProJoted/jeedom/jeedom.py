@@ -197,17 +197,22 @@ class jeedom_utils:
     def set_log_level(level="error"):
         FORMAT = "[%(asctime)-15s][%(levelname)s] : %(filename)s:%(lineno)d - %(message)s"
 
-        class _MaskApikey(logging.Formatter):
-            _RE = re.compile(r'(apikey[=:"\s\']+)[^\s&"\'\\,}\]]+', re.IGNORECASE)
+        class _MaskSecrets(logging.Formatter):
+            # Masque l'apikey Jeedom...
+            _RE_APIKEY = re.compile(r'(apikey[=:"\s\']+)[^\s&"\'\\,}\]]+', re.IGNORECASE)
+            # ...et le code PIN du QR code (pronotepy logue la requête {'code': '1234'})
+            _RE_PIN = re.compile(r'([\'"]code[\'"]\s*:\s*[\'"])[^\'"]+([\'"])')
             def format(self, record):
                 msg = super().format(record)
-                return self._RE.sub(r'\1***', msg)
+                msg = self._RE_APIKEY.sub(r'\1***', msg)
+                msg = self._RE_PIN.sub(r'\1***\2', msg)
+                return msg
 
         root = logging.getLogger()
         for h in root.handlers[:]:
             root.removeHandler(h)
         handler = logging.StreamHandler()
-        handler.setFormatter(_MaskApikey(fmt=FORMAT, datefmt="%Y-%m-%d %H:%M:%S"))
+        handler.setFormatter(_MaskSecrets(fmt=FORMAT, datefmt="%Y-%m-%d %H:%M:%S"))
         root.addHandler(handler)
         root.setLevel(jeedom_utils.convert_log_level(level))
 

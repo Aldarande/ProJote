@@ -267,6 +267,10 @@ try {
 
       // Envoi des données au frontend
       ajax::success($data); // Note: L'ancien code envoyait $output, mais $data est plus correct et cohérent.
+    } elseif ($return_var === 3) {
+      // Code 3 = QR code expiré ou illisible (cf. QRConnect.py). C'est le cas le
+      // plus fréquent : le QR code Pronote n'est valide que 10 minutes.
+      ajax::error('Le QR code a expiré (il n\'est valide que 10 minutes). Générez-en un nouveau dans l\'application Pronote et scannez-le immédiatement.');
     } else {
       ajax::error('Erreur lors de l\'exécution du script Python. Vérifiez les logs pour plus de détails.');
     }
