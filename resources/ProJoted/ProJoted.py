@@ -1373,6 +1373,71 @@ def _save_seen_index(data_dir, eq_id, index):
         logging.error("Impossible d'écrire seen_index.json (eq %s) : %s", eq_id, e)
 
 
+def _periodes_couvrantes(periods):
+    """Sous-ensemble minimal de périodes couvrant la même plage de dates.
+
+    Pronote publie une douzaine de découpages qui se recouvrent — « Année
+    continue », « année », semestres, mi-semestres, trimestres, « DNB blanc »,
+    « Hors période »… Or les absences, retards et punitions s'interrogent par
+    plage de dates (requête ``PagePresence``) : les demander période par période
+    renvoie douze fois les mêmes enregistrements.
+
+    Le coût est loin d'être théorique. Sur les serveurs 2026, chaque
+    ``PagePresence`` échoue d'abord sur « La page a expiré », ce qui pousse
+    pronotepy à se ré-authentifier entièrement avant de rejouer la requête.
+    Mesuré sur un cycle réel : 12 périodes × 3 collectes = 36 requêtes, 72 appels
+    et 40 authentifications — chacune faisant tourner le jeton, jusqu'à la
+    suspension de l'adresse IP par Pronote.
+
+    On retient donc la période la plus large, puis uniquement celles qui
+    dépassent de la couverture déjà acquise. La plage interrogée reste
+    rigoureusement identique, mais une seule requête suffit dans le cas normal.
+    """
+    valides = []
+    for period in periods or []:
+        debut = getattr(period, "start", None)
+        fin = getattr(period, "end", None)
+        if debut and fin and fin >= debut:
+            valides.append((debut, fin, period))
+    if not valides:
+        # Aucune date exploitable : on ne sait pas raisonner, on rend tout.
+        return list(periods or [])
+
+    # Les périodes Pronote se suivent sans se chevaucher : un trimestre finit le
+    # 23 novembre et le suivant commence le 24. Sans tolérance, la fusion verrait
+    # un trou d'une journée entre deux périodes pourtant contiguës, et garderait
+    # inutilement toute période à cheval sur la jointure.
+    tolerance = datetime.timedelta(days=1)
+
+    def _couvert(debut, fin, intervalles):
+        return any(d <= debut and fin <= f for d, f in intervalles)
+
+    retenues = []
+    couverture = []
+    for debut, fin, period in sorted(valides, key=lambda v: v[1] - v[0], reverse=True):
+        if _couvert(debut, fin, couverture):
+            continue
+        retenues.append(period)
+        couverture = sorted(couverture + [(debut, fin)])
+        fusionnes = [couverture[0]]
+        for d, f in couverture[1:]:
+            dernier_d, dernier_f = fusionnes[-1]
+            if d <= dernier_f + tolerance:
+                fusionnes[-1] = (dernier_d, max(dernier_f, f))
+            else:
+                fusionnes.append((d, f))
+        couverture = fusionnes
+
+    if len(retenues) < len(valides):
+        logging.debug(
+            "Périodes : %d découpages retournés par Pronote, %d suffisent à couvrir "
+            "la même plage de dates.",
+            len(valides),
+            len(retenues),
+        )
+    return retenues
+
+
 def periodes(client):
     """
     Récupère la période Pronote en cours et ses dates de début / fin.
@@ -1825,7 +1890,7 @@ def retards(client):
             return {"retard": [], "dernier_retard": [], "nb_retard": 0, "error": str(e)}
 
         all_retards_map = {}
-        for period in all_periods:
+        for period in _periodes_couvrantes(all_periods):
             try:
                 for d in period.delays or []:
                     all_retards_map[d.id] = d
@@ -1877,7 +1942,7 @@ def absences(client):
             }
 
         all_absences_map = {}
-        for period in all_periods:
+        for period in _periodes_couvrantes(all_periods):
             try:
                 for a in period.absences or []:
                     all_absences_map[a.id] = a
@@ -1930,7 +1995,7 @@ def punitions(client):
             }
 
         all_punitions_map = {}
-        for period in all_periods:
+        for period in _periodes_couvrantes(all_periods):
             try:
                 for p in period.punishments or []:
                     all_punitions_map[p.id] = p
