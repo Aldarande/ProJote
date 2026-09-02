@@ -182,8 +182,10 @@ try {
         'periode_fin'      => 'periode_fin',
     );
     foreach ($periodeCmds as $cle => $logicalId) {
-        if (!empty($result['Periodes'][$cle]) && $eqLogic->getCmd(null, $logicalId)) {
-            $eqLogic->checkAndUpdateCmd($logicalId, $result['Periodes'][$cle]);
+        $valeur = isset($result['Periodes'][$cle]) ? $result['Periodes'][$cle] : '';
+        log::add('ProJote', 'debug', 'Champ reçu : ' . $logicalId . ' - Valeur reçue : ' . $valeur);
+        if ($valeur !== '' && $eqLogic->getCmd(null, $logicalId)) {
+            $eqLogic->checkAndUpdateCmd($logicalId, $valeur);
         }
     }
     // Met à jour le lien Ical

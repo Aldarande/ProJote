@@ -2859,9 +2859,13 @@ def process_message(message):
             )
             if local_picture_path:
                 jsondata["Local_Picture"] = local_picture_path
-            # je renew le token
-            logging.info("Je renew le Token")
-            jsondata["Token"] = RenewToken(client)
+            # Le token n'est PAS exporté ici : PRONOTE le fait tourner à chaque
+            # authentification, et pronotepy se ré-authentifie à chaque requête
+            # (plusieurs dizaines de fois par cycle). Un token capturé maintenant
+            # serait périmé dès la fin de la collecte, et la connexion suivante
+            # échouerait sur « Token invalide, regénérer le QR CODE ». Il est donc
+            # exporté juste avant l'envoi à Jeedom, une fois toutes les requêtes
+            # terminées : voir plus bas, avant send_change_immediate().
             # Je valide que le fichier équipement est à jours
             # je lance la foncton qui recherche si le nom de l'enfant à changer dans l'équipement
             Checkeleve(client, message["CmdId"])
@@ -2924,6 +2928,10 @@ def process_message(message):
                 _save_seen_index(_data_dir, message["CmdId"], _new_index)
             except Exception as _e:
                 logging.error("Détection des nouveautés (deltas) échouée : %s", _e)
+            # Export du token en tout dernier, après la totalité des requêtes :
+            # c'est la seule valeur encore acceptée par PRONOTE au prochain cycle.
+            logging.info("Je renew le Token")
+            jsondata["Token"] = RenewToken(client)
             # J'envoie les données à Jeedom
             logging.debug(
                 "Projoted.py :: Données JSON à envoyer : %s", json.dumps(jsondata)
