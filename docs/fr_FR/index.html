@@ -693,6 +693,14 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
             </tr>
             <tr>
                 <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>Décodage de l'image du QR Code</strong> — l'image était redimensionnée en 200 × 200 px (ratio écrasé) <em>avant</em> d'être passée au décodeur. Un QR Code Pronote fait 89 modules de côté : à cette taille la grille devenait illisible et le décodage échouait sur des captures pourtant nettes. Le décodage se fait désormais sur l'image d'origine, avec plusieurs échelles de repli ; le 200 × 200 ne sert plus qu'à l'aperçu.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>Messages d'erreur du QR Code</strong> — un code PIN erroné affichait « le QR Code a expiré », ce qui poussait à régénérer un QR Code inutilement. PIN incorrect, QR Code illisible et QR Code expiré / déjà utilisé sont maintenant distingués (codes de sortie 3, 4 et 5 de <code>QRConnect.py</code>). Une connexion refusée par Pronote n'est plus rapportée comme un succès.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
                 <td><strong>Saisie du code PIN du QR Code</strong> — la fenêtre de saisie du PIN n'apparaissait plus : les navigateurs récents (Chrome 92+, Firefox) bloquent <code>prompt()</code> hors d'un geste utilisateur direct, or l'appel se faisait dans un contexte asynchrone. Remplacée par une modale Jeedom (bootbox) avec un champ de saisie dédié (4 chiffres, validation par Entrée).</td>
             </tr>
         </tbody>
@@ -1031,6 +1039,31 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
     <h2>Mon QR Code ne fonctionne pas, pourquoi ?</h2>
     <p>Chaque QR Code Pronote est à <strong>usage unique</strong>. Si la connexion a échoué ou si vous avez
     rechargé la page, retournez sur Pronote pour en générer un nouveau.</p>
+    <p>Le message affiché indique désormais l'origine exacte du problème :</p>
+    <table>
+        <thead><tr><th>Message</th><th>Cause</th></tr></thead>
+        <tbody>
+            <tr>
+                <td>Impossible de décoder le QR Code</td>
+                <td>L'image n'a pas pu être lue (capture floue, recadrée au plus juste ou fortement
+                    redimensionnée). Recollez la capture d'écran d'origine.</td>
+            </tr>
+            <tr>
+                <td>Ce QR Code n'est pas un QR Code de connexion Pronote</td>
+                <td>L'image lue contient autre chose que le trio <code>jeton / login / url</code> attendu
+                    (par exemple le QR Code d'une autre application).</td>
+            </tr>
+            <tr>
+                <td>Code PIN incorrect</td>
+                <td>Le déchiffrement du jeton a échoué : il faut saisir exactement le code à 4 chiffres
+                    choisi au moment de la génération du QR Code. Ce n'est pas un QR Code expiré.</td>
+            </tr>
+            <tr>
+                <td>Le QR Code a expiré ou a déjà été utilisé</td>
+                <td>Pronote a refusé le jeton : le QR Code n'est valide que 10 minutes et une seule fois.</td>
+            </tr>
+        </tbody>
+    </table>
 
     <h2>Comment changer mes identifiants stockés ?</h2>
     <p>Modifiez les champs dans la configuration de l'équipement et cliquez sur <strong>Valider</strong> pour
