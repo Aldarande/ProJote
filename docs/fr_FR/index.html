@@ -688,6 +688,10 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
         <thead><tr><th>Type</th><th>Description</th></tr></thead>
         <tbody>
             <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>« Regénérez le QR Code » à chaque cycle</strong> — le jeton de connexion était invalidé par le démon lui-même. PRONOTE fait tourner le <code>jetonConnexionAppliMobile</code> à <em>chaque</em> authentification, et pronotepy se ré-authentifie à chaque requête : un cycle de collecte en compte une quarantaine. Or le plugin exportait le jeton juste après la connexion, soit avec une quarantaine de rotations de retard ; la connexion suivante était donc refusée et réclamait un nouveau QR Code. L'export a lieu désormais en tout dernier, une fois toutes les requêtes terminées. Deux cycles consécutifs s'enchaînent maintenant sans nouvelle validation.</td>
+            </tr>
+            <tr>
                 <td><span class="badge badge-new">Nouveauté</span></td>
                 <td><strong>Dates de la période en cours</strong> — trois commandes s'ajoutent : <code>Période en cours</code>, <code>Début de la période</code> et <code>Fin de la période</code> (dates au format jj/mm/aaaa). La période retenue est celle que Pronote désigne lui-même pour l'onglet Notes (<code>current_period</code>) ; si l'instance ne la publie pas, le démon retient la période contenant la date du jour, la plus courte d'abord — sans quoi un découpage « Année continue » l'emporterait sur le trimestre réel. Les commandes manquantes sont créées automatiquement sur les équipements existants lors de la mise à jour du plugin.</td>
             </tr>

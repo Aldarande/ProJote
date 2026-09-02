@@ -28,13 +28,17 @@ https://github.com/bain3/pronotepy/issues/346 (cause et correctif) et
 https://github.com/bain3/pronotepy/issues/348 (même instance que la nôtre,
 PRONOTE 2026.2.5.7).
 
+Le JS officiel du client PRONOTE 2026 confirme le nouveau comportement : sa
+méthode ``getNouveauChallenge()`` chiffre directement la chaîne reçue, sans
+aucune étape de déchiffrement ni de retrait d'aléa. Ce n'est donc pas un
+contournement mais bien le protocole en vigueur.
+
 Plutôt que de dupliquer les 110 lignes de ``ClientBase._login``, on intercepte
-``_Encryption.aes_decrypt`` **pendant la seule durée du login**. Quand le
-déchiffrement d'un bloc unique échoue, on renvoie la chaîne hexadécimale du
-challenge avec chaque caractère doublé : ``_enleverAlea()`` — qui ne garde qu'un
-caractère sur deux — restitue alors exactement le challenge d'origine, que
-pronotepy rechiffre et renvoie. Le résultat est celui du correctif de l'issue
-#346, sans réécrire la méthode.
+``_Encryption.aes_decrypt`` **pendant la seule durée du login**. Pour le
+challenge, on renvoie sa chaîne hexadécimale avec chaque caractère doublé :
+``_enleverAlea()`` — qui ne garde qu'un caractère sur deux — restitue alors
+exactement le challenge, que pronotepy rechiffre et renvoie. Le résultat est
+celui du correctif de l'issue #346, sans réécrire la méthode.
 
 Le patch est délibérément limité :
 
@@ -42,9 +46,16 @@ Le patch est délibérément limité :
       ne pas masquer un code PIN erroné : le champ « login » d'un QR Code fait
       lui aussi un seul bloc, et un PIN faux doit continuer à lever
       QRCodeDecryptError ;
-    - déclenché uniquement sur un bloc unique de 16 octets ;
-    - sans effet sur les serveurs conformes, où le déchiffrement réussit et le
-      chemin d'origine s'applique.
+    - réservé à l'instance ``_Encryption`` locale à ``_login`` — celle qui
+      traite le challenge — et non à celle de la communication, qui déchiffre
+      les réponses du serveur et la clé de session dans ``after_auth`` ;
+    - déclenché sur un challenge d'un seul bloc AES, signature du protocole
+      2026 : les serveurs antérieurs renvoient une chaîne entrelacée d'aléa,
+      toujours plus longue. Trancher sur la taille plutôt que sur l'échec du
+      déchiffrement évite un piège : avec une mauvaise clé, le dépadding
+      réussit par hasard environ une fois sur 256, et l'ancien chemin
+      produirait alors une réponse fausse — soit, au rythme du démon, un échec
+      inexpliqué tous les deux jours environ.
 
 À retirer quand pronotepy publiera son propre correctif (le plancher de version
 de requirements.txt devra alors être relevé).
@@ -94,23 +105,58 @@ def _install() -> None:
     _original_decrypt = _Encryption.aes_decrypt
     _original_login = clients.ClientBase._login
 
-    def _decrypt_avec_repli(self, data: bytes) -> bytes:
-        try:
-            return _original_decrypt(self, data)
-        except CryptoError:
-            if len(data) != 16:
-                # Autre chose que le challenge : on laisse remonter l'erreur.
-                raise
-            logging.info(
-                "pronote_compat :: challenge non chiffré détecté (bloc unique de "
-                "16 octets) : application du mode PRONOTE >= 2026.2.5."
-            )
-            # Chaque caractère doublé pour survivre au filtrage un-sur-deux
-            # de _enleverAlea() et restituer le challenge intact.
-            return "".join(c * 2 for c in data.hex().upper()).encode()
+    def _challenge_brut(data: bytes) -> bytes:
+        """Rend le challenge tel quel, sous une forme que pronotepy restituera.
+
+        pronotepy applique `_enleverAlea()` (un caractère sur deux) au résultat
+        du déchiffrement ; on double donc chaque caractère pour qu'il retrouve
+        la chaîne d'origine, qu'il rechiffrera et renverra au serveur.
+        """
+        return "".join(c * 2 for c in data.hex().upper()).encode()
 
     def _login_avec_repli(self) -> bool:
-        _Encryption.aes_decrypt = _decrypt_avec_repli
+        # Le challenge est déchiffré dans _login par une instance _Encryption
+        # locale, distincte de celle de la communication (qui sert, elle, aux
+        # réponses du serveur et à la clé de session dans after_auth). Cette
+        # distinction permet de ne détourner QUE le challenge.
+        communication = getattr(self, "communication", None)
+        chiffrement_session = getattr(communication, "encryption", None)
+
+        def _decrypt(enc_self, data: bytes) -> bytes:
+            challenge = (
+                chiffrement_session is not None
+                and enc_self is not chiffrement_session
+                and len(data) == 16
+            )
+            if challenge:
+                # Un challenge d'un seul bloc AES est la signature du protocole
+                # PRONOTE >= 2026.2.5 : le client officiel ne le déchiffre plus
+                # du tout (getNouveauChallenge() chiffre la chaîne brute). On
+                # tranche donc sur la taille plutôt que sur l'échec du
+                # déchiffrement : avec une mauvaise clé, le dépadding réussit
+                # par hasard une fois sur 256 environ, et pronotepy repartirait
+                # alors sur l'ancien chemin pour produire une réponse fausse.
+                # Sur les serveurs antérieurs, le challenge contient une chaîne
+                # entrelacée d'aléa : il fait toujours plus d'un bloc.
+                logging.info(
+                    "pronote_compat :: challenge d'un seul bloc : mode PRONOTE "
+                    ">= 2026.2.5 (chiffrement direct de la chaîne brute)."
+                )
+                return _challenge_brut(data)
+            try:
+                return _original_decrypt(enc_self, data)
+            except CryptoError:
+                if len(data) != 16:
+                    raise
+                # Filet de sécurité si la structure interne de pronotepy change
+                # et que le challenge n'est plus reconnaissable ci-dessus.
+                logging.info(
+                    "pronote_compat :: repli sur le mode PRONOTE >= 2026.2.5 "
+                    "après échec du déchiffrement d'un bloc unique."
+                )
+                return _challenge_brut(data)
+
+        _Encryption.aes_decrypt = _decrypt
         try:
             return _original_login(self)
         finally:
