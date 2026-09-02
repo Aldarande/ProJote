@@ -55,6 +55,54 @@ _installe = False
 
 NOM_FICHIER = "token_secours.json"
 
+# Un incident réseau ou un serveur momentanément fermé n'invalide pas le jeton :
+# le rejouer avec celui de secours ne servirait à rien et brûlerait la réserve.
+# Cas vécu : « Your IP address is suspended. » après trop de connexions.
+_MARQUEURS_TRANSITOIRES = (
+    "suspended",
+    "suspendue",
+    "timeout",
+    "timed out",
+    "connection",
+    "unreachable",
+    "unavailable",
+    "indisponible",
+    "momentan",
+    "temporarily",
+    "network",
+)
+
+# Signes que Pronote a bel et bien refusé le jeton : c'est là que le fichier de
+# secours a une chance d'aider. « dataSec » couvre le cas où l'authentification
+# est refusée sans exception dédiée : pronotepy échoue ensuite en lisant la
+# réponse d'un login qui n'a pas eu lieu.
+_MARQUEURS_AUTH = (
+    "expir",
+    "invalid",
+    "refus",
+    "unauthorized",
+    "authenticat",
+    "credentials",
+    "datasec",
+    "donneessec",
+)
+
+
+def erreur_de_jeton(exception):
+    """Le jeton est-il en cause, ou s'agit-il d'un incident passager ?
+
+    ``None`` signifie « Pronote a refusé la connexion sans lever d'exception » :
+    le jeton est alors en cause.
+    """
+    if exception is None:
+        return True
+    message = str(exception).lower()
+    if any(marqueur in message for marqueur in _MARQUEURS_TRANSITOIRES):
+        return False
+    if type(exception).__name__ in ("ExpiredObject", "CryptoError", "QRCodeDecryptError"):
+        return True
+    return any(marqueur in message for marqueur in _MARQUEURS_AUTH)
+
 
 def _chemin(datadir, eq_id):
     return os.path.join(str(datadir), str(eq_id), NOM_FICHIER)
@@ -74,6 +122,11 @@ def enregistrer(datadir, eq_id, credentials):
         temporaire = chemin + ".tmp"
         with open(temporaire, "w", encoding="utf-8") as f:
             json.dump(credentials, f)
+            # Sans fsync, le renommage peut être visible avant que les données
+            # ne soient réellement sur le disque : une coupure de courant
+            # laisserait un fichier vide, et le compte serait perdu.
+            f.flush()
+            os.fsync(f.fileno())
         os.chmod(temporaire, 0o600)
         os.replace(temporaire, chemin)
     except Exception as e:
