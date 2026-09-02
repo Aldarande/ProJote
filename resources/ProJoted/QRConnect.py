@@ -26,6 +26,13 @@ Arguments attendus en ligne de commande :
   --Eqid     : Identifiant de l'équipement Jeedom
   --Uuid     : UUID unique de l'équipement (identifiant de session Pronote)
   --Loglevel : Niveau de verbosité des logs
+
+Codes de sortie (interprétés par ProJote.ajax.php pour afficher un message clair) :
+  0 : connexion réussie, token sauvegardé
+  1 : erreur générique (voir les logs)
+  3 : déchiffrement impossible → code PIN erroné
+  4 : contenu du QR Code invalide (mal décodé, champs manquants, PIN mal formé)
+  5 : Pronote a refusé le jeton → QR Code expiré (10 min) ou déjà utilisé
 """
 try:
     import pronotepy
@@ -34,6 +41,7 @@ try:
     import argparse
     import logging
     import os
+    import re
 
     # Activation du logging dès le départ pour que les erreurs précoces soient visibles
     logging.basicConfig(
@@ -114,6 +122,29 @@ try:
         }
         # Ne pas logger Qrcode_data : contient le jeton et le login (credentials)
 
+        # Validation du contenu du QR Code AVANT d'appeler pronotepy.
+        # « jeton » et « login » sont chiffrés puis encodés en hexadécimal par
+        # Pronote : si l'image a été mal décodée côté navigateur, on obtient ici
+        # des caractères non hexadécimaux et pronotepy plante sur un
+        # « non-hexadecimal number found in fromhex() » peu parlant.
+        if not re.fullmatch(r"[0-9a-fA-F]+", Jeton) or not re.fullmatch(
+            r"[0-9a-fA-F]+", QRLogin
+        ):
+            logging.error(
+                "QRConnect.py :: Contenu du QR Code illisible : jeton/login ne sont pas "
+                "hexadécimaux (longueurs jeton=%d login=%d). Le QR Code a probablement "
+                "été mal décodé.",
+                len(Jeton),
+                len(QRLogin),
+            )
+            sys.exit(4)
+        if not re.fullmatch(r"[0-9]{4}", Pin):
+            logging.error(
+                "QRConnect.py :: Code PIN invalide : 4 chiffres attendus (reçu %d caractère(s))",
+                len(Pin),
+            )
+            sys.exit(4)
+
         # Tentative de connexion via le QR code.
         # L'URL Pronote indique si c'est un compte parent ("parent.html") ou élève.
         # L'UUID permet à Pronote d'identifier cet équipement de manière unique.
@@ -130,67 +161,99 @@ try:
             )
             logging.debug(f"QRConnect.py :: {Account}")
 
-        if Account.logged_in:
-            logging.info("Client connecté")
+        if not Account.logged_in:
+            # Sans ce garde-fou, le script sortait en code 0 sans rien sauvegarder :
+            # le PHP annonçait alors une connexion réussie alors qu'aucun token
+            # n'avait été écrit.
+            logging.error(
+                "QRConnect.py :: Pronote a refusé la connexion (aucune session ouverte). "
+                "Le QR Code a probablement déjà été utilisé ou a expiré."
+            )
+            sys.exit(5)
 
-            # Génération d'un token backup pour permettre une reconnexion automatique
-            # même si le jeton principal est invalidé plus tard.
-            #
-            # Attention : ici la session provient déjà d'un qrcode_login (session
-            # « token », sans mot de passe). Certaines instances Pronote ne renvoient
-            # alors pas un QR code complet — la clé "login" est absente — ce qui faisait
-            # planter qrcode_login avec « KeyError: 'login' ». On valide donc la structure
-            # avant de tenter le login backup, et on échoue proprement sans bloquer la
-            # connexion principale (déjà sauvegardée juste après).
-            backup_credentials = None
-            try:
-                backup_uuid = (Uuid + "-bk") if Uuid else None
-                Qrcode_backup = Account.request_qr_code_data(Pin)
+        logging.info("Client connecté")
 
-                missing = [
-                    k for k in ("jeton", "login", "url")
-                    if not (isinstance(Qrcode_backup, dict) and Qrcode_backup.get(k))
-                ]
-                if missing:
-                    logging.warning(
-                        "Token backup non généré : la session QR ne permet pas d'émettre "
-                        "un second jeton (champ(s) manquant(s) : %s). La reconnexion "
-                        "automatique utilisera le token principal.",
-                        ", ".join(missing),
-                    )
-                elif "parent" not in QRUrl:
-                    BackupAccount = pronotepy.Client.qrcode_login(
-                        qr_code=Qrcode_backup, pin=Pin, uuid=backup_uuid
-                    )
-                    if BackupAccount.logged_in:
-                        backup_credentials = BackupAccount.export_credentials()
-                        logging.info("Token backup généré avec succès")
-                else:
-                    BackupAccount = pronotepy.ParentClient.qrcode_login(
-                        qr_code=Qrcode_backup, pin=Pin, uuid=backup_uuid
-                    )
-                    if BackupAccount.logged_in:
-                        backup_credentials = BackupAccount.export_credentials()
-                        logging.info("Token backup généré avec succès")
-            except Exception as e:
-                logging.warning("Génération du token backup échouée : %s", e)
+        # Génération d'un token backup pour permettre une reconnexion automatique
+        # même si le jeton principal est invalidé plus tard.
+        #
+        # Attention : ici la session provient déjà d'un qrcode_login (session
+        # « token », sans mot de passe). Certaines instances Pronote ne renvoient
+        # alors pas un QR code complet — la clé "login" est absente — ce qui faisait
+        # planter qrcode_login avec « KeyError: 'login' ». On valide donc la structure
+        # avant de tenter le login backup, et on échoue proprement sans bloquer la
+        # connexion principale (déjà sauvegardée juste après).
+        backup_credentials = None
+        try:
+            backup_uuid = (Uuid + "-bk") if Uuid else None
+            Qrcode_backup = Account.request_qr_code_data(Pin)
 
-            # Sauvegarde du token principal + backup
-            writedataPronotepy(Account, DataDir, EqID, backup_token=backup_credentials)
+            missing = [
+                k for k in ("jeton", "login", "url")
+                if not (isinstance(Qrcode_backup, dict) and Qrcode_backup.get(k))
+            ]
+            if missing:
+                logging.warning(
+                    "Token backup non généré : la session QR ne permet pas d'émettre "
+                    "un second jeton (champ(s) manquant(s) : %s). La reconnexion "
+                    "automatique utilisera le token principal.",
+                    ", ".join(missing),
+                )
+            elif "parent" not in QRUrl:
+                BackupAccount = pronotepy.Client.qrcode_login(
+                    qr_code=Qrcode_backup, pin=Pin, uuid=backup_uuid
+                )
+                if BackupAccount.logged_in:
+                    backup_credentials = BackupAccount.export_credentials()
+                    logging.info("Token backup généré avec succès")
+            else:
+                BackupAccount = pronotepy.ParentClient.qrcode_login(
+                    qr_code=Qrcode_backup, pin=Pin, uuid=backup_uuid
+                )
+                if BackupAccount.logged_in:
+                    backup_credentials = BackupAccount.export_credentials()
+                    logging.info("Token backup généré avec succès")
+        except Exception as e:
+            logging.warning("Génération du token backup échouée : %s", e)
+
+        # Sauvegarde du token principal + backup
+        writedataPronotepy(Account, DataDir, EqID, backup_token=backup_credentials)
 except Exception as e:
     import traceback
     tb_lineno = e.__traceback__.tb_lineno if e.__traceback__ else '?'
     print(f"QRConnect.py ERREUR (ligne {tb_lineno}): {e}", flush=True)
     print(traceback.format_exc(), flush=True)
-    # Code de sortie dédié (3) quand le QR code est expiré ou illisible, afin que
-    # le PHP affiche un message clair : le QR n'est valide que 10 minutes.
+    # Codes de sortie dédiés, pour que le PHP affiche un message utile plutôt
+    # qu'un « erreur lors de l'exécution du script » générique :
+    #   3 → déchiffrement impossible  → code PIN erroné (cas le plus fréquent)
+    #   4 → contenu du QR Code invalide (mal décodé, champs manquants)
+    #   5 → Pronote refuse le jeton   → QR Code expiré ou déjà utilisé
+    #   1 → autre erreur
+    #
+    # Attention : pronotepy lève QRCodeDecryptError("invalid confirmation code")
+    # quand le déchiffrement AES échoue. Ce déchiffrement est purement local et
+    # ne dépend QUE du code PIN : ce n'est donc PAS un QR Code expiré (ce dernier
+    # est refusé plus tard, par le serveur Pronote). L'ancien code renvoyait 3
+    # dans les deux cas et affichait « le QR code a expiré », ce qui envoyait
+    # l'utilisateur régénérer un QR Code alors qu'il avait juste saisi le mauvais PIN.
     exc_name = type(e).__name__
     msg = str(e).lower()
     if (
         exc_name in ("CryptoError", "QRCodeDecryptError")
-        or "expired" in msg
+        or "invalid confirmation code" in msg
         or "padding is incorrect" in msg
         or "decryption failed" in msg
     ):
         sys.exit(3)
+    if exc_name == "KeyError" or "fromhex" in msg or "non-hexadecimal" in msg:
+        sys.exit(4)
+    if exc_name == "ExpiredObject" or "expired" in msg or "expir" in msg:
+        sys.exit(5)
+    try:
+        _api_error = pronotepy.PronoteAPIError
+    except NameError:  # l'import de pronotepy lui-même a échoué
+        _api_error = ()
+    if isinstance(e, _api_error):
+        # Le serveur a rejeté le jeton : QR déjà consommé, expiré, ou espace
+        # mobile désactivé par l'établissement.
+        sys.exit(5)
     sys.exit(1)

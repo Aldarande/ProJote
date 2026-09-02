@@ -197,9 +197,29 @@ try {
     // Le JSON est reçu comme une chaîne de caractères, il faut le "parser" (décoder)
     // pour le transformer en objet ou tableau PHP.
     $data = json_decode($dataJson, true);
-    if ($data === null) {
+    if (!is_array($data)) {
       // Si le JSON est mal formé, on s'arrête ici.
       ajax::error('Données JSON du QR Code invalides.');
+      return;
+    }
+    // Vérification de la structure attendue : un QR Code de connexion Pronote
+    // contient { jeton, login, url }, jeton et login étant hexadécimaux.
+    // Sans ce contrôle, un QR Code étranger (ou une image mal décodée) provoquait
+    // un warning PHP « Undefined array key » puis une erreur Python obscure.
+    foreach (['jeton', 'login', 'url'] as $key) {
+      if (!isset($data[$key]) || !is_string($data[$key]) || $data[$key] === '') {
+        log::add('ProJote', 'error', 'Ajax::QR - Champ manquant dans le QR Code : ' . $key);
+        ajax::error('Ce QR Code n\'est pas un QR Code de connexion Pronote (champ « ' . $key . ' » manquant).');
+        return;
+      }
+    }
+    if (!preg_match('/^[0-9a-fA-F]+$/', $data['jeton']) || !preg_match('/^[0-9a-fA-F]+$/', $data['login'])) {
+      log::add('ProJote', 'error', 'Ajax::QR - Contenu du QR Code non hexadécimal : image probablement mal décodée.');
+      ajax::error('Le contenu du QR Code est illisible (image mal décodée). Recollez la capture d\'écran d\'origine.');
+      return;
+    }
+    if (!preg_match('/^\d{4}$/', (string) $pin)) {
+      ajax::error('Code PIN invalide : 4 chiffres attendus.');
       return;
     }
     // Extraction des informations du QR Code
@@ -268,9 +288,16 @@ try {
       // Envoi des données au frontend
       ajax::success($data); // Note: L'ancien code envoyait $output, mais $data est plus correct et cohérent.
     } elseif ($return_var === 3) {
-      // Code 3 = QR code expiré ou illisible (cf. QRConnect.py). C'est le cas le
-      // plus fréquent : le QR code Pronote n'est valide que 10 minutes.
-      ajax::error('Le QR code a expiré (il n\'est valide que 10 minutes). Générez-en un nouveau dans l\'application Pronote et scannez-le immédiatement.');
+      // Code 3 = déchiffrement impossible (cf. QRConnect.py). Ce déchiffrement est
+      // purement local et ne dépend que du code PIN : c'est donc un PIN erroné,
+      // pas un QR Code expiré.
+      ajax::error('Code PIN incorrect. Saisissez le code à 4 chiffres choisi lors de la génération du QR Code dans l\'application Pronote.');
+    } elseif ($return_var === 4) {
+      // Code 4 = contenu du QR Code invalide (mal décodé, champs manquants).
+      ajax::error('Le contenu du QR Code est illisible. Recollez la capture d\'écran d\'origine (non recadrée au plus juste, non redimensionnée).');
+    } elseif ($return_var === 5) {
+      // Code 5 = Pronote a refusé le jeton : QR Code expiré (10 minutes) ou déjà utilisé.
+      ajax::error('Le QR Code a expiré ou a déjà été utilisé (il n\'est valide que 10 minutes et à usage unique). Générez-en un nouveau dans l\'application Pronote.');
     } else {
       ajax::error('Erreur lors de l\'exécution du script Python. Vérifiez les logs pour plus de détails.');
     }
