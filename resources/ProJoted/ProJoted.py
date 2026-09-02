@@ -1365,6 +1365,102 @@ def _save_seen_index(data_dir, eq_id, index):
         logging.error("Impossible d'écrire seen_index.json (eq %s) : %s", eq_id, e)
 
 
+def periodes(client):
+    """
+    Récupère la période Pronote en cours et ses dates de début / fin.
+
+    Pronote publie plusieurs découpages simultanés (trimestres, semestres,
+    « Année continue »…). `client.current_period` renvoie celui que Pronote
+    désigne lui-même par défaut pour l'onglet Notes : c'est la source la plus
+    fiable, et elle évite d'avoir à deviner. En cas d'échec (structure absente
+    sur certaines instances), on retombe sur la période qui contient la date du
+    jour, en retenant la plus courte — sans quoi un découpage englobant toute
+    l'année scolaire l'emporterait sur le trimestre réellement en cours.
+
+    Retourne les trois valeurs câblées aux commandes Jeedom
+    (periode_courante / periode_debut / periode_fin), plus la liste complète
+    des périodes de l'année à toutes fins utiles.
+    """
+    data = {
+        "periode_courante": "",
+        "periode_debut": "",
+        "periode_fin": "",
+        "periodes": [],
+    }
+
+    try:
+        all_periods = list(client.periods or [])
+    except Exception as e:
+        logging.error("Erreur lors de l'accès aux périodes : %s", e)
+        data["error"] = str(e)
+        return data
+
+    def _format_date(valeur):
+        """Formate une date Pronote comme le reste du plugin (jj/mm/aaaa)."""
+        if not valeur:
+            return ""
+        try:
+            return valeur.strftime("%d/%m/%Y")
+        except Exception:
+            return ""
+
+    courante = None
+    try:
+        courante = client.current_period
+    except Exception as e:
+        logging.debug(
+            "current_period indisponible (%s) : repli sur la date du jour.", e
+        )
+
+    if courante is None:
+        today = datetime.date.today()
+        candidates = []
+        for period in all_periods:
+            debut = getattr(period, "start", None)
+            fin = getattr(period, "end", None)
+            if not debut or not fin:
+                continue
+            try:
+                if debut.date() <= today <= fin.date():
+                    candidates.append((fin - debut, period))
+            except Exception:
+                continue
+        if candidates:
+            # La plus courte : « Trimestre 1 » plutôt que « Année continue ».
+            courante = min(candidates, key=lambda c: c[0])[1]
+
+    id_courante = getattr(courante, "id", None) if courante is not None else None
+    for period in all_periods:
+        data["periodes"].append(
+            {
+                "nom": getattr(period, "name", "") or "",
+                "debut": _format_date(getattr(period, "start", None)),
+                "fin": _format_date(getattr(period, "end", None)),
+                "en_cours": id_courante is not None
+                and getattr(period, "id", None) == id_courante,
+            }
+        )
+
+    if courante is not None:
+        data["periode_courante"] = getattr(courante, "name", "") or ""
+        data["periode_debut"] = _format_date(getattr(courante, "start", None))
+        data["periode_fin"] = _format_date(getattr(courante, "end", None))
+        logging.debug(
+            "Période en cours : %s (%s → %s)",
+            data["periode_courante"],
+            data["periode_debut"],
+            data["periode_fin"],
+        )
+    else:
+        logging.warning(
+            "Aucune période en cours identifiée parmi les %d périodes retournées "
+            "par Pronote.",
+            len(all_periods),
+        )
+
+    return data
+
+
 def notes(client):
     """
     Récupère toutes les notes de l'année scolaire (toutes périodes) et les formate en JSON.
@@ -2781,6 +2877,9 @@ def process_message(message):
             jsondata["Notes"] = notes_data
             if "error" in notes_data:
                 jsondata["error"] = notes_data["error"]
+            # J'ajoute les dates de la période en cours
+            logging.info("Je récupére les dates de période")
+            jsondata["Periodes"] = periodes(client)
             # j'ajoute les menus
             logging.info("Je récupére les menus")
             jsondata["Menus"] = menus(client)

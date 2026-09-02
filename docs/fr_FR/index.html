@@ -683,13 +683,13 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
     <!-- ── Historique ─────────────────────── -->
     <h1 id="version">Historique des versions</h1>
 
-    <h2>1.3.1 — Juin 2026</h2>
+    <h2>1.4.1 — Septembre 2026</h2>
     <table>
         <thead><tr><th>Type</th><th>Description</th></tr></thead>
         <tbody>
             <tr>
-                <td><span class="badge badge-fix">Correctif</span></td>
-                <td><strong>Validation par QR Code réparée</strong> — la connexion par QR Code échouait silencieusement (code retour 2). Le script <code>QRConnect.py</code> ne déclarait pas l'argument <code>--apikey</code> ajouté côté PHP (lot sécurité 1.2.0), ce qui faisait échouer l'analyse des arguments. L'argument est désormais accepté.</td>
+                <td><span class="badge badge-new">Nouveauté</span></td>
+                <td><strong>Dates de la période en cours</strong> — trois commandes s'ajoutent : <code>Période en cours</code>, <code>Début de la période</code> et <code>Fin de la période</code> (dates au format jj/mm/aaaa). La période retenue est celle que Pronote désigne lui-même pour l'onglet Notes (<code>current_period</code>) ; si l'instance ne la publie pas, le démon retient la période contenant la date du jour, la plus courte d'abord — sans quoi un découpage « Année continue » l'emporterait sur le trimestre réel. Les commandes manquantes sont créées automatiquement sur les équipements existants lors de la mise à jour du plugin.</td>
             </tr>
             <tr>
                 <td><span class="badge badge-fix">Correctif</span></td>
@@ -698,6 +698,17 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
             <tr>
                 <td><span class="badge badge-fix">Correctif</span></td>
                 <td><strong>Cause réelle distinguée d'un code PIN erroné</strong> — le déchiffrement du contenu du QR Code (local, avec le PIN) et celui du challenge (serveur) lèvent la même exception dans pronotepy. Les confondre affichait « Code PIN incorrect » alors que le PIN était bon. Seul <code>QRCodeDecryptError</code> met désormais le PIN en cause (code 3) ; un échec au challenge est rapporté comme un jeton refusé (code 5).</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>1.3.1 — Juin 2026</h2>
+    <table>
+        <thead><tr><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>Validation par QR Code réparée</strong> — la connexion par QR Code échouait silencieusement (code retour 2). Le script <code>QRConnect.py</code> ne déclarait pas l'argument <code>--apikey</code> ajouté côté PHP (lot sécurité 1.2.0), ce qui faisait échouer l'analyse des arguments. L'argument est désormais accepté.</td>
             </tr>
             <tr>
                 <td><span class="badge badge-fix">Correctif</span></td>

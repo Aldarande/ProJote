@@ -173,6 +173,19 @@ try {
     if (isset($result['Punitions']['Nb_Punitions']) && $eqLogic->getCmd(null, 'Nb_punitions')) {
         $eqLogic->checkAndUpdateCmd('Nb_punitions', $result['Punitions']['Nb_Punitions']);
     }
+    // Met à jour la période Pronote en cours et ses bornes.
+    // Une valeur vide signifie que le démon n'a pas su identifier la période :
+    // on préfère conserver la dernière valeur connue plutôt que l'effacer.
+    $periodeCmds = array(
+        'periode_courante' => 'periode_courante',
+        'periode_debut'    => 'periode_debut',
+        'periode_fin'      => 'periode_fin',
+    );
+    foreach ($periodeCmds as $cle => $logicalId) {
+        if (!empty($result['Periodes'][$cle]) && $eqLogic->getCmd(null, $logicalId)) {
+            $eqLogic->checkAndUpdateCmd($logicalId, $result['Periodes'][$cle]);
+        }
+    }
     // Met à jour le lien Ical
     if (isset($result['Ical']) && $eqLogic->getCmd(null, 'URL_Ical')) {
         $eqLogic->checkAndUpdateCmd('URL_Ical', $result['Ical']);
