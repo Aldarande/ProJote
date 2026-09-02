@@ -553,6 +553,10 @@ class ProJote extends eqLogic
       "Nom_Eleve"             => array("Nom de l'éleve",                                   'info',   'string',  "",      0, 1, "GENERIC_NAME ",   'core::badge',          'core::badge'),
       "Nom_Classe"            => array('Nom de la classe',                                 'info',   'string',  "",      0, 1, "GENERIC_NAME ",   'core::badge',          'core::badge'),
       "Etablissement"         => array('Etablissement',                                    'info',   'string',  "",      0, 1, "GENERIC_NAME ",   'core::badge',          'core::badge'),
+      // Période Pronote en cours (trimestre / semestre) et ses bornes.
+      "periode_courante"      => array('Période en cours',                                 'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
+      "periode_debut"         => array('Début de la période',                              'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
+      "periode_fin"           => array('Fin de la période',                                'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
       "Picture"               => array('Photo de profil',                                  'info',   'string',  "",      0, 1, "GENERIC_PICTURE", 'ProJote::picture',     'picture'),
       "URL_Ical"              => array('URL Ical',                                         'info',   'string',  "",      0, 1, "GENERIC_URL",     'core::badge',          'core::badge'),
       "Nb_absences"           => array("Nombre d'absence",                                 'info',   'numeric', "",      1, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
