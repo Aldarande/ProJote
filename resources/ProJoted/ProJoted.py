@@ -2770,6 +2770,9 @@ def process_message(message):
                 )
                 return
 
+            # Retenue pour distinguer un jeton refusé d'un incident passager :
+            # reste à None si Pronote refuse la connexion sans lever d'exception.
+            _erreur_connexion = None
             try:
                 if "parent.html" in message["TokenUrl"]:
                     client = pronotepy.ParentClient.token_login(
@@ -2801,6 +2804,7 @@ def process_message(message):
                     "Token invalide, regénérer le QR CODE ou re valider le compte : %s",
                     e,
                 )
+                _erreur_connexion = e
                 client = None
             # Le jeton transmis par Jeedom est refusé : avant d'exiger un
             # nouveau QR Code, on retente avec le dernier jeton rangé sur disque
@@ -2811,6 +2815,16 @@ def process_message(message):
             if client is None or not client.logged_in:
                 _eq_id = message.get("CmdId", "")
                 _secours = token_secours.charger(_data_dir, _eq_id)
+                if not token_secours.erreur_de_jeton(_erreur_connexion):
+                    # Incident réseau ou serveur momentanément fermé : le jeton
+                    # stocké reste valable et sera rejoué au prochain cycle.
+                    # Consommer le jeton de secours ici le gaspillerait.
+                    logging.warning(
+                        "Échec de connexion sans rapport avec le jeton (%s) : le jeton "
+                        "de secours est conservé intact.",
+                        _erreur_connexion,
+                    )
+                    _secours = None
                 if _secours and _secours.get("password") != message.get("TokenPassword"):
                     logging.warning(
                         "Jeton refusé par Pronote : nouvelle tentative avec le jeton "

@@ -84,3 +84,44 @@ class TestLectureRobuste:
 
         monkeypatch.setattr(token_secours.os, "makedirs", _refuse)
         token_secours.enregistrer(str(tmp_path), 4, IDENTIFIANTS)  # ne lève pas
+
+
+class TestClassificationDesErreurs:
+    """Le jeton de secours ne doit être consommé que si le jeton est en cause.
+
+    Un incident réseau laisse le jeton stocké parfaitement valable : le brûler
+    reviendrait à perdre la réserve pour rien.
+    """
+
+    def test_refus_sans_exception_met_le_jeton_en_cause(self):
+        assert token_secours.erreur_de_jeton(None) is True
+
+    @pytest.mark.parametrize(
+        "message",
+        [
+            "Your IP address is suspended.",
+            "Connection timed out",
+            "Le site est momentanément indisponible",
+            "Max retries exceeded: connection refused",
+        ],
+    )
+    def test_incidents_passagers_preservent_le_secours(self, message):
+        assert token_secours.erreur_de_jeton(RuntimeError(message)) is False
+
+    @pytest.mark.parametrize(
+        "exception",
+        [
+            KeyError("dataSec"),
+            RuntimeError("Session expired"),
+            RuntimeError("invalid token"),
+            RuntimeError("Bad credentials"),
+        ],
+    )
+    def test_refus_du_jeton_declenche_le_secours(self, exception):
+        assert token_secours.erreur_de_jeton(exception) is True
+
+    def test_suspension_ip_prime_sur_le_mot_invalid(self):
+        """Un message mêlant les deux doit rester classé comme passager."""
+        erreur = RuntimeError("invalid request: your IP address is suspended")
+
+        assert token_secours.erreur_de_jeton(erreur) is False
