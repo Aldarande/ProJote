@@ -307,7 +307,7 @@
             <tr><td>Paquet système</td><td><code>python3-venv</code> (installé automatiquement par Jeedom dans la plupart des cas)</td></tr>
             <tr><td>Compte Pronote</td><td>Compte élève ou parent actif sur le portail Pronote de l'établissement</td></tr>
             <tr><td>Réseau</td><td>Accès sortant HTTPS vers le serveur Pronote de l'établissement (et l'ENT si utilisé)</td></tr>
-            <tr><td>pronotepy</td><td>Branche 2.x (installation contrainte à <code>&gt;=2.14,&lt;3.0</code> depuis la v1.0.1)</td></tr>
+            <tr><td>pronotepy</td><td>Branche 2.x (installation contrainte à <code>&gt;=2.15.6,&lt;3.0</code> — plancher relevé pour les serveurs PRONOTE 2026)</td></tr>
         </tbody>
     </table>
 
@@ -693,6 +693,14 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
             </tr>
             <tr>
                 <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>Compatibilité serveurs PRONOTE 2026</strong> — toute connexion échouait sur <code>KeyError: 'onload'</code> : les serveurs 2026 ne publient plus l'appel <code>Start({...})</code> dans l'attribut <code>onload</code> du <code>&lt;body&gt;</code>, que pronotepy &le; 2.14.6 lisait directement. Le plancher passe à <strong>pronotepy 2.15.6</strong>. La vérification des dépendances de Jeedom contrôle désormais la version installée (et plus seulement la présence du module), afin de proposer la réinstallation.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>Onglet Informations avec pronotepy 2.15</strong> — <code>Information.content</code> est devenu une méthode (le contenu est chargé à la demande) alors que c'était une propriété en 2.14. Le démon gère les deux formes.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
                 <td><strong>Décodage de l'image du QR Code</strong> — l'image était redimensionnée en 200 × 200 px (ratio écrasé) <em>avant</em> d'être passée au décodeur. Un QR Code Pronote fait 89 modules de côté : à cette taille la grille devenait illisible et le décodage échouait sur des captures pourtant nettes. Le décodage se fait désormais sur l'image d'origine, avec plusieurs échelles de repli ; le 200 × 200 ne sert plus qu'à l'aperçu.</td>
             </tr>
             <tr>
@@ -1064,6 +1072,15 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
             </tr>
         </tbody>
     </table>
+
+    <h2>Erreur « KeyError: 'onload' » dans les logs, que faire ?</h2>
+    <p>Les serveurs <strong>PRONOTE 2026</strong> ne publient plus l'appel <code>Start({...})</code> dans
+    l'attribut <code>onload</code> de la page de connexion. Les versions de pronotepy jusqu'à la 2.14.6
+    lisaient cet attribut et échouent donc sur toutes les connexions — QR Code comme identifiants.</p>
+    <p>Le correctif est côté bibliothèque : ProJote exige désormais <strong>pronotepy 2.15.6 minimum</strong>.
+    Allez dans la configuration du plugin et cliquez sur <strong>Installer les dépendances</strong>, puis
+    relancez la connexion. Jeedom signale maintenant de lui-même les dépendances comme « à installer »
+    lorsque la version de pronotepy présente dans le venv est trop ancienne.</p>
 
     <h2>Comment changer mes identifiants stockés ?</h2>
     <p>Modifiez les champs dans la configuration de l'équipement et cliquez sur <strong>Valider</strong> pour

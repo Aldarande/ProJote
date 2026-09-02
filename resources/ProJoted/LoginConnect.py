@@ -621,4 +621,37 @@ try:
             )
 
 except Exception as e:
-    line_number = e.__traceback__.tb_lineno
+    # Ce gestionnaire ne journalisait rien et ne changeait pas le code de sortie :
+    # toute erreur de connexion (identifiants ou serveur) terminait le script en
+    # code 0, et ProJote.ajax.php annonçait alors une validation réussie alors
+    # qu'aucun token n'avait été écrit. Les logs ne contenaient rien non plus.
+    # Réimportés ici : si l'import de pronotepy (première ligne du try) a échoué,
+    # sys et logging ne sont pas encore définis dans ce gestionnaire.
+    import sys
+    import logging
+    import traceback
+
+    line_number = e.__traceback__.tb_lineno if e.__traceback__ else "?"
+    logging.error("LoginConnect.py :: Erreur (ligne %s) : %s", line_number, e)
+    print(f"LoginConnect.py ERREUR (ligne {line_number}): {e}", flush=True)
+    print(traceback.format_exc(), flush=True)
+
+    # Importé par ProJoted.py / QRConnect.py : on journalise sans tuer l'appelant.
+    if __name__ == "__main__":
+        exc_name = type(e).__name__
+        msg = str(e).lower()
+        # Page de connexion Pronote non reconnue par pronotepy — cf. QRConnect.py :
+        # les serveurs PRONOTE 2026 ne publient plus Start({...}) dans l'attribut
+        # « onload » du <body>, que pronotepy <= 2.14.6 lisait directement.
+        if (
+            (exc_name == "KeyError" and "onload" in msg)
+            or "page html is different than expected" in msg
+            or "unable to connect to pronote" in msg
+        ):
+            logging.error(
+                "La page de connexion Pronote n'est pas reconnue par pronotepy. "
+                "Mettez à jour les dépendances du plugin : Configuration du plugin → "
+                "« Installer les dépendances » (pronotepy 2.15.6 minimum)."
+            )
+            sys.exit(6)
+        sys.exit(1)

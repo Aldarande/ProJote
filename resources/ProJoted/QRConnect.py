@@ -33,6 +33,7 @@ Codes de sortie (interprétés par ProJote.ajax.php pour afficher un message cla
   3 : déchiffrement impossible → code PIN erroné
   4 : contenu du QR Code invalide (mal décodé, champs manquants, PIN mal formé)
   5 : Pronote a refusé le jeton → QR Code expiré (10 min) ou déjà utilisé
+  6 : page de connexion Pronote non reconnue → pronotepy trop ancien
 """
 try:
     import pronotepy
@@ -218,6 +219,10 @@ try:
         # Sauvegarde du token principal + backup
         writedataPronotepy(Account, DataDir, EqID, backup_token=backup_credentials)
 except Exception as e:
+    # Réimportés ici : si l'import de pronotepy (première ligne du try) a échoué,
+    # sys et logging ne sont pas encore définis dans ce gestionnaire.
+    import sys
+    import logging
     import traceback
     tb_lineno = e.__traceback__.tb_lineno if e.__traceback__ else '?'
     print(f"QRConnect.py ERREUR (ligne {tb_lineno}): {e}", flush=True)
@@ -227,6 +232,7 @@ except Exception as e:
     #   3 → déchiffrement impossible  → code PIN erroné (cas le plus fréquent)
     #   4 → contenu du QR Code invalide (mal décodé, champs manquants)
     #   5 → Pronote refuse le jeton   → QR Code expiré ou déjà utilisé
+    #   6 → page de connexion non reconnue → pronotepy trop ancien
     #   1 → autre erreur
     #
     # Attention : pronotepy lève QRCodeDecryptError("invalid confirmation code")
@@ -244,8 +250,25 @@ except Exception as e:
         or "decryption failed" in msg
     ):
         sys.exit(3)
-    if exc_name == "KeyError" or "fromhex" in msg or "non-hexadecimal" in msg:
+    if "fromhex" in msg or "non-hexadecimal" in msg:
         sys.exit(4)
+    # Page de connexion Pronote non reconnue par pronotepy. Cas vécu à la
+    # rentrée 2026 : les serveurs PRONOTE 2026 ne publient plus l'appel
+    # Start({...}) dans l'attribut « onload » du <body>, et pronotepy <= 2.14.6
+    # échouait sur « KeyError: 'onload' ». Corrigé par pronotepy 2.15.6, d'où le
+    # plancher de version dans requirements.txt : il faut réinstaller les
+    # dépendances du plugin.
+    if (
+        (exc_name == "KeyError" and "onload" in msg)
+        or "page html is different than expected" in msg
+        or "unable to connect to pronote" in msg
+    ):
+        logging.error(
+            "La page de connexion Pronote n'est pas reconnue par pronotepy. "
+            "Mettez à jour les dépendances du plugin : Configuration du plugin → "
+            "« Installer les dépendances » (pronotepy 2.15.6 minimum)."
+        )
+        sys.exit(6)
     if exc_name == "ExpiredObject" or "expired" in msg or "expir" in msg:
         sys.exit(5)
     try:
