@@ -6,6 +6,11 @@
 """
 pronote_compat.py — Correctifs de compatibilité appliqués à pronotepy.
 
+Deux correctifs sans rapport entre eux, tous deux posés sur les classes de
+pronotepy au chargement du plugin : le traitement du challenge
+d'authentification (protocole PRONOTE 2026), et la suppression d'une
+ré-authentification inutile sur les onglets non accessibles.
+
 # Challenge d'authentification non chiffré (PRONOTE >= 2026.2.5)
 
 Depuis le 2 septembre 2026, certaines instances PRONOTE ne chiffrent plus le
@@ -99,7 +104,7 @@ def apply() -> None:
 def _install() -> None:
     """Pose effectivement le correctif sur les classes de pronotepy."""
     from pronotepy import clients
-    from pronotepy.exceptions import CryptoError
+    from pronotepy.exceptions import CryptoError, PronoteAPIError
     from pronotepy.pronoteAPI import _Encryption
 
     _original_decrypt = _Encryption.aes_decrypt
@@ -163,3 +168,28 @@ def _install() -> None:
             _Encryption.aes_decrypt = _original_decrypt
 
     clients.ClientBase._login = _login_avec_repli
+
+    # ── Onglets non accessibles ───────────────────────────────────────────
+    # pronotepy rejette lui-même, avant tout appel réseau, une requête visant un
+    # onglet absent de « authorized_onglets ». Mais ClientBase.post traite cette
+    # PronoteAPIError comme n'importe quelle autre : il se ré-authentifie
+    # entièrement puis rejoue la requête — qui échoue de nouveau, forcément,
+    # puisqu'une nouvelle session ne donne aucun droit supplémentaire.
+    #
+    # Le coût n'est pas nul : chaque authentification fait tourner le jeton de
+    # connexion, et leur accumulation a valu une suspension d'adresse IP par
+    # Pronote. On lève donc l'erreur avant d'entrer dans ce mécanisme.
+    _original_post = clients.ClientBase.post
+
+    def _post_sans_reauth_inutile(self, function_name, onglet=None, data=None):
+        autorises = getattr(
+            getattr(self, "communication", None), "authorized_onglets", None
+        )
+        if onglet is not None and autorises and onglet not in autorises:
+            raise PronoteAPIError(
+                "Onglet %s non accessible pour ce compte (%s)"
+                % (onglet, function_name)
+            )
+        return _original_post(self, function_name, onglet, data)
+
+    clients.ClientBase.post = _post_sans_reauth_inutile
