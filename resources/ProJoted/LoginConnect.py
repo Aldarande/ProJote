@@ -51,6 +51,13 @@ try:
     import binascii
     from Crypto.Cipher import AES
 
+    # Correctifs de compatibilité pronotepy (voir pronote_compat.py) :
+    # PRONOTE >= 2026.2.5 ne chiffre plus le challenge d'authentification,
+    # ce qui fait échouer TOUS les modes de connexion de pronotepy 2.15.6.
+    import pronote_compat
+
+    pronote_compat.apply()
+
     try:
         from jeedom.jeedom import *
     except ImportError as e:

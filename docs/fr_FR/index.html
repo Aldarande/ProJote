@@ -693,6 +693,14 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
             </tr>
             <tr>
                 <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>Compatibilité PRONOTE 2026.2.5 — challenge d'authentification non chiffré</strong> — depuis le 2 septembre 2026, ces serveurs ne chiffrent plus le « challenge » renvoyé à l'Identification. pronotepy 2.15.6 applique toujours le cycle historique <em>déchiffrer → retirer l'alea → rechiffrer</em> : la première étape échoue et <strong>toutes</strong> les connexions se soldent par <code>CryptoError: Decryption failed while trying to un pad</code> — QR Code, identifiants et jeton du démon. Symptôme caractéristique : réponse d'Identification sans champ <code>alea</code> et challenge tenant en un seul bloc AES de 16 octets. Le nouveau module <code>resources/ProJoted/pronote_compat.py</code> rétablit le comportement attendu (chiffrement direct de la chaîne brute) le temps du login uniquement, sans masquer un code PIN erroné. Voir <a href="https://github.com/bain3/pronotepy/issues/346">pronotepy #346</a> et <a href="https://github.com/bain3/pronotepy/issues/348">#348</a> ; à retirer quand pronotepy publiera son propre correctif.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>Cause réelle distinguée d'un code PIN erroné</strong> — le déchiffrement du contenu du QR Code (local, avec le PIN) et celui du challenge (serveur) lèvent la même exception dans pronotepy. Les confondre affichait « Code PIN incorrect » alors que le PIN était bon. Seul <code>QRCodeDecryptError</code> met désormais le PIN en cause (code 3) ; un échec au challenge est rapporté comme un jeton refusé (code 5).</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
                 <td><strong>Compatibilité serveurs PRONOTE 2026</strong> — toute connexion échouait sur <code>KeyError: 'onload'</code> : les serveurs 2026 ne publient plus l'appel <code>Start({...})</code> dans l'attribut <code>onload</code> du <code>&lt;body&gt;</code>, que pronotepy &le; 2.14.6 lisait directement. Le plancher passe à <strong>pronotepy 2.15.6</strong>. La vérification des dépendances de Jeedom contrôle désormais la version installée (et plus seulement la présence du module), afin de proposer la réinstallation.</td>
             </tr>
             <tr>

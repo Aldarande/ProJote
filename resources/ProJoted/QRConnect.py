@@ -30,9 +30,11 @@ Arguments attendus en ligne de commande :
 Codes de sortie (interprétés par ProJote.ajax.php pour afficher un message clair) :
   0 : connexion réussie, token sauvegardé
   1 : erreur générique (voir les logs)
-  3 : déchiffrement impossible → code PIN erroné
+  3 : déchiffrement du contenu du QR Code impossible → code PIN erroné
   4 : contenu du QR Code invalide (mal décodé, champs manquants, PIN mal formé)
   5 : Pronote a refusé le jeton → QR Code expiré (10 min) ou déjà utilisé
+      (inclut l'échec de déchiffrement du challenge d'authentification :
+       le PIN est bon, c'est le jeton du QR qui n'est plus valable)
   6 : page de connexion Pronote non reconnue → pronotepy trop ancien
 """
 try:
@@ -54,6 +56,13 @@ try:
 
     # Ajout du répertoire du script au `path` pour les imports relatifs
     sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+    # Correctifs de compatibilité pronotepy (voir pronote_compat.py) :
+    # PRONOTE >= 2026.2.5 ne chiffre plus le challenge d'authentification,
+    # ce qui fait échouer TOUS les modes de connexion de pronotepy 2.15.6.
+    import pronote_compat
+
+    pronote_compat.apply()
 
     try:
         from jeedom.jeedom import *
@@ -149,18 +158,51 @@ try:
         # Tentative de connexion via le QR code.
         # L'URL Pronote indique si c'est un compte parent ("parent.html") ou élève.
         # L'UUID permet à Pronote d'identifier cet équipement de manière unique.
-        if "parent" not in QRUrl:
-            # Connexion en tant qu'ÉLÈVE directement
-            Account = pronotepy.Client.qrcode_login(
-                qr_code=Qrcode_data, pin=Pin, uuid=Uuid
+        #
+        # Deux déchiffrements AES très différents ont lieu dans qrcode_login, et
+        # tous deux lèvent une CryptoError « Decryption failed while trying to un
+        # pad » :
+        #   1. le contenu du QR Code (jeton/login), déchiffré LOCALEMENT avec
+        #      MD5(PIN) → pronotepy lève QRCodeDecryptError : c'est le seul cas
+        #      où le code PIN est réellement en cause ;
+        #   2. le « challenge » renvoyé par le serveur pendant l'authentification,
+        #      déchiffré avec le jeton issu du QR → CryptoError simple. Le PIN est
+        #      alors forcément bon (sinon on n'aurait pas dépassé l'étape 1) : c'est
+        #      le jeton que Pronote n'accepte plus (QR Code expiré au bout de
+        #      10 minutes, ou déjà consommé).
+        # On distingue donc les deux ici : l'ancien code renvoyait 3 (« Code PIN
+        # incorrect ») dans les deux cas et envoyait l'utilisateur vérifier un PIN
+        # pourtant correct.
+        try:
+            if "parent" not in QRUrl:
+                # Connexion en tant qu'ÉLÈVE directement
+                Account = pronotepy.Client.qrcode_login(
+                    qr_code=Qrcode_data, pin=Pin, uuid=Uuid
+                )
+            else:
+                # Connexion en tant que PARENT (qui peut avoir plusieurs enfants)
+                logging.debug(f"QRConnect.py :: Compte parent")
+                Account = pronotepy.ParentClient.qrcode_login(
+                    qr_code=Qrcode_data, pin=Pin, uuid=Uuid
+                )
+                logging.debug(f"QRConnect.py :: {Account}")
+        except pronotepy.QRCodeDecryptError as e:
+            logging.error(
+                "QRConnect.py :: Déchiffrement du contenu du QR Code impossible : "
+                "le code PIN saisi ne correspond pas à celui choisi dans l'application "
+                "Pronote (%s)",
+                e,
             )
-        else:
-            # Connexion en tant que PARENT (qui peut avoir plusieurs enfants)
-            logging.debug(f"QRConnect.py :: Compte parent")
-            Account = pronotepy.ParentClient.qrcode_login(
-                qr_code=Qrcode_data, pin=Pin, uuid=Uuid
+            sys.exit(3)
+        except pronotepy.CryptoError as e:
+            logging.error(
+                "QRConnect.py :: Le contenu du QR Code a bien été déchiffré (le code PIN "
+                "est donc correct), mais le serveur Pronote a refusé le jeton lors de "
+                "l'authentification : le QR Code a expiré (10 minutes) ou a déjà été "
+                "utilisé. Générez-en un nouveau dans l'application Pronote. (%s)",
+                e,
             )
-            logging.debug(f"QRConnect.py :: {Account}")
+            sys.exit(5)
 
         if not Account.logged_in:
             # Sans ce garde-fou, le script sortait en code 0 sans rien sauvegarder :
@@ -229,27 +271,28 @@ except Exception as e:
     print(traceback.format_exc(), flush=True)
     # Codes de sortie dédiés, pour que le PHP affiche un message utile plutôt
     # qu'un « erreur lors de l'exécution du script » générique :
-    #   3 → déchiffrement impossible  → code PIN erroné (cas le plus fréquent)
+    #   3 → contenu du QR Code indéchiffrable → code PIN erroné
     #   4 → contenu du QR Code invalide (mal décodé, champs manquants)
     #   5 → Pronote refuse le jeton   → QR Code expiré ou déjà utilisé
     #   6 → page de connexion non reconnue → pronotepy trop ancien
     #   1 → autre erreur
     #
-    # Attention : pronotepy lève QRCodeDecryptError("invalid confirmation code")
-    # quand le déchiffrement AES échoue. Ce déchiffrement est purement local et
-    # ne dépend QUE du code PIN : ce n'est donc PAS un QR Code expiré (ce dernier
-    # est refusé plus tard, par le serveur Pronote). L'ancien code renvoyait 3
-    # dans les deux cas et affichait « le QR code a expiré », ce qui envoyait
-    # l'utilisateur régénérer un QR Code alors qu'il avait juste saisi le mauvais PIN.
+    # Attention : « Decryption failed while trying to un pad » recouvre DEUX cas
+    # bien distincts (cf. le try/except autour de qrcode_login ci-dessus) :
+    #   • QRCodeDecryptError → déchiffrement local du QR avec MD5(PIN) : PIN erroné ;
+    #   • CryptoError nue    → déchiffrement du challenge d'authentification, donc
+    #     PIN correct mais jeton refusé par le serveur : QR expiré / déjà utilisé.
+    # Les confondre affichait « Code PIN incorrect » à un utilisateur dont le PIN
+    # était bon (cas vécu le 2 septembre 2026, QR régénéré depuis plus de 10 min).
     exc_name = type(e).__name__
     msg = str(e).lower()
-    if (
-        exc_name in ("CryptoError", "QRCodeDecryptError")
-        or "invalid confirmation code" in msg
-        or "padding is incorrect" in msg
-        or "decryption failed" in msg
-    ):
+    # Seul le déchiffrement LOCAL du QR Code (QRCodeDecryptError) met le PIN en
+    # cause. Une CryptoError « nue » provient du challenge d'authentification :
+    # le PIN était bon, c'est le jeton qui est refusé (QR expiré / déjà utilisé).
+    if exc_name == "QRCodeDecryptError" or "invalid confirmation code" in msg:
         sys.exit(3)
+    if exc_name == "CryptoError" or "padding is incorrect" in msg or "decryption failed" in msg:
+        sys.exit(5)
     if "fromhex" in msg or "non-hexadecimal" in msg:
         sys.exit(4)
     # Page de connexion Pronote non reconnue par pronotepy. Cas vécu à la

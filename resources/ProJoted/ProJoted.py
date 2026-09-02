@@ -58,6 +58,13 @@ try:
     from pronotepy.ent import *
     import pronotepy.dataClasses
 
+    # Correctifs de compatibilité pronotepy (voir pronote_compat.py) :
+    # PRONOTE >= 2026.2.5 ne chiffre plus le challenge d'authentification,
+    # ce qui fait échouer TOUS les modes de connexion de pronotepy 2.15.6.
+    import pronote_compat
+
+    pronote_compat.apply()
+
     # Monkey patch : Correction à la volée pour gérer l'absence de noteMax/noteMin/estBonus
     _original_grade_init = pronotepy.dataClasses.Grade.__init__
 
