@@ -772,6 +772,26 @@ def _safe_attr(obj, *names, default=""):
     return default
 
 
+def _information_content(notif):
+    """Contenu texte d'une information Pronote, quelle que soit la version de pronotepy.
+
+    pronotepy <= 2.14 exposait `Information.content` comme une propriété (le texte
+    était déjà chargé). Depuis 2.15, c'est une méthode : le contenu est récupéré à
+    la demande par une requête supplémentaire vers Pronote. Sans ce garde-fou, le
+    widget recevait l'objet méthode lui-même (non sérialisable en JSON).
+    """
+    try:
+        content = getattr(notif, "content", "")
+        return content() if callable(content) else content
+    except Exception as e:
+        logging.warning(
+            "Contenu de l'information « %s » non récupéré : %s",
+            _safe_attr(notif, "title", default="?"),
+            e,
+        )
+        return ""
+
+
 def messages(client):
     """Collecte les discussions Pronote (messagerie) et construit les agrégats widget.
 
@@ -1665,7 +1685,7 @@ def notifications(client):
                         "sujet": (notif.title),
                         "auteur": (notif.author),
                         "creation": (notif.creation_date).strftime("%d/%m"),
-                        "message": (notif.content),
+                        "message": _information_content(notif),
                         "categorie": (notif.category),
                         "lu": (notif.read),
                     }

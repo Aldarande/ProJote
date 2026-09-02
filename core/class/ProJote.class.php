@@ -123,12 +123,44 @@ class ProJote extends eqLogic
       return $return;
     }
 
-    exec(escapeshellarg($venvPython) . ' -c "import pronotepy" 2>/dev/null', $output, $rc);
+    // On vérifie non seulement que pronotepy est importable, mais aussi qu'il
+    // satisfait le plancher de version de requirements.txt. Sans ce contrôle, un
+    // venv resté en 2.14.x (installé avant la mise à jour du plugin) était
+    // rapporté « OK » alors que toute connexion échoue sur les serveurs PRONOTE
+    // 2026 (KeyError: 'onload'), sans que Jeedom ne propose de réinstaller.
+    exec(escapeshellarg($venvPython) . ' -c "import pronotepy; print(pronotepy.__version__)" 2>/dev/null', $output, $rc);
     if ($rc !== 0) {
+      $return['state'] = 'nok';
+      return $return;
+    }
+
+    $installed = trim(implode('', $output));
+    $required = self::requiredPronotepyVersion();
+    if ($required !== null && $installed !== '' && version_compare($installed, $required, '<')) {
+      log::add(__CLASS__, 'warning', 'pronotepy ' . $installed . ' installé, ' . $required . ' minimum requis : réinstallation des dépendances nécessaire.');
       $return['state'] = 'nok';
     }
 
     return $return;
+  }
+
+  /**
+   * Version minimale de pronotepy exigée, lue dans resources/requirements.txt
+   * (source de vérité unique, partagée avec post-install.sh).
+   *
+   * @return string|null la version minimale, ou null si elle n'a pas pu être lue.
+   */
+  private static function requiredPronotepyVersion()
+  {
+    $requirements = dirname(__FILE__) . '/../../resources/requirements.txt';
+    if (!is_readable($requirements)) {
+      return null;
+    }
+    $content = file_get_contents($requirements);
+    if ($content === false || !preg_match('/^\s*pronotepy\s*>=\s*([0-9][0-9a-zA-Z.\-]*)/m', $content, $matches)) {
+      return null;
+    }
+    return $matches[1];
   }
 
   /**

@@ -170,6 +170,9 @@ try {
       // On renvoie ces données au JavaScript (frontend) qui va les utiliser pour
       // mettre à jour l'affichage de la page de configuration.
       ajax::success($data);
+    } elseif ($return_var === 6) {
+      // Code 6 = page de connexion Pronote non reconnue par pronotepy (trop ancien).
+      ajax::error('La bibliothèque pronotepy installée est trop ancienne pour ce serveur Pronote. Allez dans la configuration du plugin et cliquez sur « Installer les dépendances », puis réessayez.');
     } else {
       // Le script a échoué. On renvoie un message d'erreur au JavaScript.
       // L'utilisateur verra une notification d'erreur.
@@ -298,6 +301,9 @@ try {
     } elseif ($return_var === 5) {
       // Code 5 = Pronote a refusé le jeton : QR Code expiré (10 minutes) ou déjà utilisé.
       ajax::error('Le QR Code a expiré ou a déjà été utilisé (il n\'est valide que 10 minutes et à usage unique). Générez-en un nouveau dans l\'application Pronote.');
+    } elseif ($return_var === 6) {
+      // Code 6 = page de connexion Pronote non reconnue par pronotepy (trop ancien).
+      ajax::error('La bibliothèque pronotepy installée est trop ancienne pour ce serveur Pronote. Allez dans la configuration du plugin et cliquez sur « Installer les dépendances », puis réessayez.');
     } else {
       ajax::error('Erreur lors de l\'exécution du script Python. Vérifiez les logs pour plus de détails.');
     }
