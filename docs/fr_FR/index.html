@@ -688,6 +688,10 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
         <thead><tr><th>Type</th><th>Description</th></tr></thead>
         <tbody>
             <tr>
+                <td><span class="badge badge-new">Nouveauté</span></td>
+                <td><strong>Jeton de secours — réparation automatique de la connexion</strong> — le dernier jeton émis par PRONOTE est désormais enregistré sur disque à chaque authentification (fichier <code>token_secours.json</code> du dossier de l'équipement, lisible par son seul propriétaire, écriture atomique). Si la connexion échoue avec le jeton stocké en base — cycle interrompu avant l'enregistrement, écriture échouée — le démon retente automatiquement avec celui du disque, sans rien demander à l'utilisateur. Mesures faites sur une instance 2026.2.5 pour choisir ce mécanisme : le jeton change à chaque authentification, un jeton déjà consommé est refusé (un historique en cascade ne servirait donc à rien), et une session applicative ne peut pas émettre un second QR Code (un appareil de secours est donc impossible depuis le démon). Ne pas perdre le dernier jeton est le seul filet réalisable.</td>
+            </tr>
+            <tr>
                 <td><span class="badge badge-fix">Correctif</span></td>
                 <td><strong>« Regénérez le QR Code » à chaque cycle</strong> — le jeton de connexion était invalidé par le démon lui-même. PRONOTE fait tourner le <code>jetonConnexionAppliMobile</code> à <em>chaque</em> authentification, et pronotepy se ré-authentifie à chaque requête : un cycle de collecte en compte une quarantaine. Or le plugin exportait le jeton juste après la connexion, soit avec une quarantaine de rotations de retard ; la connexion suivante était donc refusée et réclamait un nouveau QR Code. L'export a lieu désormais en tout dernier, une fois toutes les requêtes terminées. Deux cycles consécutifs s'enchaînent maintenant sans nouvelle validation.</td>
             </tr>
