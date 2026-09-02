@@ -65,6 +65,8 @@ try:
 
     pronote_compat.apply()
 
+    import token_secours
+
     # Monkey patch : Correction à la volée pour gérer l'absence de noteMax/noteMin/estBonus
     _original_grade_init = pronotepy.dataClasses.Grade.__init__
 
@@ -142,6 +144,12 @@ _worker_thread = None  # Thread worker unique (démarré au premier message)
 # Watchdog : si le worker bloque plus de N secondes sur un équipement, WARNING
 _WORKER_TIMEOUT = 120  # secondes
 _worker_eq_id = None  # équipement actuellement traité
+
+
+def _equipement_en_cours():
+    """Identifiant de l'équipement en cours de traitement (pour token_secours)."""
+    with _worker_state_lock:
+        return _worker_eq_id
 _worker_eq_start = None  # horodatage de début du traitement en cours
 _worker_state_lock = threading.Lock()
 
@@ -2794,6 +2802,53 @@ def process_message(message):
                     e,
                 )
                 client = None
+            # Le jeton transmis par Jeedom est refusé : avant d'exiger un
+            # nouveau QR Code, on retente avec le dernier jeton rangé sur disque
+            # par token_secours. Il est plus récent que celui de la base si le
+            # cycle précédent s'est interrompu avant l'écriture, ou si cette
+            # écriture a échoué. PRONOTE n'acceptant que le tout dernier jeton
+            # émis, c'est la seule réparation possible sans l'utilisateur.
+            if client is None or not client.logged_in:
+                _eq_id = message.get("CmdId", "")
+                _secours = token_secours.charger(_data_dir, _eq_id)
+                if _secours and _secours.get("password") != message.get("TokenPassword"):
+                    logging.warning(
+                        "Jeton refusé par Pronote : nouvelle tentative avec le jeton "
+                        "de secours enregistré sur disque."
+                    )
+                    try:
+                        _url = _secours.get("pronote_url", "")
+                        _classe = (
+                            pronotepy.ParentClient
+                            if "parent.html" in _url
+                            else pronotepy.Client
+                        )
+                        client = _classe.token_login(
+                            pronote_url=_url,
+                            username=_secours["username"],
+                            password=_secours["password"],
+                            client_identifier=_secours.get("client_identifier"),
+                            uuid=_secours.get(
+                                "uuid", message.get("TokenUuid", "ProJote")
+                            ),
+                        )
+                        if (
+                            client.logged_in
+                            and message.get("enfant")
+                            and _classe is pronotepy.ParentClient
+                        ):
+                            client.set_child(message["enfant"])
+                        if client.logged_in:
+                            logging.info(
+                                "Connexion rétablie avec le jeton de secours. Le jeton "
+                                "à jour redescendra vers Jeedom en fin de cycle."
+                            )
+                    except Exception as e:
+                        logging.error(
+                            "Le jeton de secours a été refusé lui aussi : %s", e
+                        )
+                        client = None
+
             ### 05/01/2025 : A revalider si je dois doubler
             # A supprimer car doublon avec ligne 1155
             # credentials = client.export_credentials()
@@ -3189,6 +3244,12 @@ def _run_daemon():
     _cycle = int(_cycle)
 
     jeedom_utils.set_log_level(_log_level)
+
+    # Filet de sécurité sur le jeton : PRONOTE le renouvelle à chaque
+    # authentification et refuse tout jeton antérieur. On le range sur disque
+    # dès qu'il change, pour pouvoir réparer la connexion sans redemander un
+    # QR Code à l'utilisateur si la base contient une valeur périmée.
+    token_secours.installer(_data_dir, _equipement_en_cours)
 
     # Filtre les messages DEBUG verbeux de PronotePy (champs optionnels absents)
     class _PronotepyNoiseFilter(logging.Filter):
