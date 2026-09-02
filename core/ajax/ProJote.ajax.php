@@ -300,7 +300,9 @@ try {
       ajax::error('Le contenu du QR Code est illisible. Recollez la capture d\'écran d\'origine (non recadrée au plus juste, non redimensionnée).');
     } elseif ($return_var === 5) {
       // Code 5 = Pronote a refusé le jeton : QR Code expiré (10 minutes) ou déjà utilisé.
-      ajax::error('Le QR Code a expiré ou a déjà été utilisé (il n\'est valide que 10 minutes et à usage unique). Générez-en un nouveau dans l\'application Pronote.');
+      // Le code PIN, lui, a forcément été accepté (le contenu du QR a pu être déchiffré) :
+      // on le précise pour éviter que l'utilisateur n'aille chercher du côté du PIN.
+      ajax::error('Votre code PIN est correct, mais le QR Code a expiré ou a déjà été utilisé (il n\'est valide que 10 minutes et à usage unique). Générez-en un nouveau dans l\'application Pronote et validez-le dans la foulée.');
     } elseif ($return_var === 6) {
       // Code 6 = page de connexion Pronote non reconnue par pronotepy (trop ancien).
       ajax::error('La bibliothèque pronotepy installée est trop ancienne pour ce serveur Pronote. Allez dans la configuration du plugin et cliquez sur « Installer les dépendances », puis réessayez.');
