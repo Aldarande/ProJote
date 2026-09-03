@@ -1373,6 +1373,121 @@ def _save_seen_index(data_dir, eq_id, index):
         logging.error("Impossible d'écrire seen_index.json (eq %s) : %s", eq_id, e)
 
 
+def _parametres_generaux(client):
+    """Bloc « General » des paramètres publiés par Pronote à la connexion.
+
+    Il est récupéré une fois pour toutes au login (``FonctionParametres``) :
+    le lire ne coûte aucune requête supplémentaire.
+    """
+    try:
+        options = getattr(client, "func_options", None) or {}
+        bloc = options.get("dataSec") or options.get("donneesSec") or {}
+        return (bloc.get("data") or {}).get("General") or {}
+    except Exception as e:
+        logging.debug("Paramètres généraux illisibles : %s", e)
+        return {}
+
+
+def _vacances(client):
+    """Vacances scolaires et jours fériés publiés par Pronote.
+
+    Ils figurent dans ``listeJoursFeries`` des paramètres généraux, récupérés à
+    la connexion : aucune requête supplémentaire. Malgré son nom, cette liste
+    mélange les jours fériés (« Armistice 1918 ») et les périodes de vacances
+    (« Vacances de la Toussaint »). Une entrée porte ``L`` (libellé), ``N``
+    (identifiant), ``dateDebut`` et ``dateFin`` — relevé sur PRONOTE 2026.2.5 ;
+    ``date`` est accepté en second recours, les versions antérieures ayant pu
+    nommer ce champ autrement.
+
+    Retourne la liste triée par date, chaque élément valant
+    ``{"nom", "debut", "fin"}`` au format jj/mm/aaaa.
+    """
+    general = _parametres_generaux(client)
+    brut = general.get("listeJoursFeries")
+    if isinstance(brut, dict):
+        brut = brut.get("V")
+    if not isinstance(brut, list) or not brut:
+        return []
+
+    if isinstance(brut[0], dict):
+        logging.debug("Vacances : clés d'une entrée = %s", sorted(brut[0].keys()))
+
+    def _date(entree, *cles):
+        for cle in cles:
+            valeur = entree.get(cle)
+            if isinstance(valeur, dict):
+                valeur = valeur.get("V")
+            if valeur:
+                try:
+                    return pronotepy.dataClasses.Util.datetime_parse(valeur)
+                except Exception:
+                    continue
+        return None
+
+    vacances = []
+    for entree in brut:
+        if not isinstance(entree, dict):
+            continue
+        fin = _date(entree, "dateFin", "date")
+        debut = _date(entree, "dateDebut", "date") or fin
+        if not fin:
+            continue
+        vacances.append(
+            {
+                "nom": entree.get("L", "") or "",
+                "debut": debut.strftime("%d/%m/%Y") if debut else "",
+                "fin": fin.strftime("%d/%m/%Y"),
+                "_fin": fin,
+            }
+        )
+    vacances.sort(key=lambda v: v["_fin"])
+    for v in vacances:
+        del v["_fin"]
+    return vacances
+
+
+def _bornes_annee_scolaire(client):
+    """Premier et dernier jour de l'année scolaire, tels que Pronote les publie.
+
+    Journalise au passage ce que le serveur expose sur les jours fériés et les
+    vacances : pronotepy n'en donne aucune représentation, et leur présence
+    varie d'un établissement à l'autre.
+    """
+    general = _parametres_generaux(client)
+    if not general:
+        return None, None
+
+    def _lire(cle):
+        valeur = general.get(cle)
+        if isinstance(valeur, dict):
+            valeur = valeur.get("V")
+        if not valeur:
+            return None
+        try:
+            return pronotepy.dataClasses.Util.datetime_parse(valeur)
+        except Exception:
+            return None
+
+    interessants = sorted(
+        cle
+        for cle in general
+        if any(m in cle.lower() for m in ("ferie", "vacance", "conge", "fermeture"))
+    )
+    if interessants:
+        for cle in interessants:
+            valeur = general.get(cle)
+            if isinstance(valeur, dict):
+                valeur = valeur.get("V", valeur)
+            taille = len(valeur) if isinstance(valeur, (list, dict)) else valeur
+            logging.debug("Calendrier publié par Pronote : %s = %s entrée(s)", cle, taille)
+    else:
+        logging.debug(
+            "Pronote ne publie ni jours fériés ni vacances dans ses paramètres généraux."
+        )
+
+    return _lire("PremiereDate"), _lire("DerniereDate")
+
+
 def _periodes_couvrantes(periods):
     """Sous-ensemble minimal de périodes couvrant la même plage de dates.
 
@@ -1458,6 +1573,8 @@ def periodes(client):
         "periode_courante": "",
         "periode_debut": "",
         "periode_fin": "",
+        "annee_debut": "",
+        "annee_fin": "",
         "periodes": [],
     }
 
@@ -1513,6 +1630,45 @@ def periodes(client):
                 and getattr(period, "id", None) == id_courante,
             }
         )
+
+    # Bornes de l'année scolaire. Pronote les publie dans les paramètres
+    # généraux récupérés à la connexion (aucune requête supplémentaire) ; à
+    # défaut, la période la plus large fait référence — « Année continue »
+    # couvre par construction toute l'année.
+    debut_annee, fin_annee = _bornes_annee_scolaire(client)
+    if debut_annee is None or fin_annee is None:
+        plus_large = None
+        for period in all_periods:
+            debut = getattr(period, "start", None)
+            fin = getattr(period, "end", None)
+            if not debut or not fin or fin < debut:
+                continue
+            if plus_large is None or (fin - debut) > (plus_large[1] - plus_large[0]):
+                plus_large = (debut, fin)
+        if plus_large:
+            debut_annee, fin_annee = plus_large
+    data["annee_debut"] = _format_date(debut_annee)
+    data["annee_fin"] = _format_date(fin_annee)
+
+    # Vacances et jours fériés : la liste complète, plus la prochaine échéance
+    # à venir (celle dont la fin n'est pas encore passée).
+    data["vacances"] = _vacances(client)
+    aujourdhui = datetime.date.today().strftime("%Y%m%d")
+
+    def _tri(valeur):
+        jour, mois, annee = valeur.split("/")
+        return annee + mois + jour
+
+    for v in data["vacances"]:
+        if v["fin"] and _tri(v["fin"]) >= aujourdhui:
+            data["vacances_nom"] = v["nom"]
+            data["vacances_debut"] = v["debut"]
+            data["vacances_fin"] = v["fin"]
+            break
+    else:
+        data["vacances_nom"] = ""
+        data["vacances_debut"] = ""
+        data["vacances_fin"] = ""
 
     if courante is not None:
         data["periode_courante"] = getattr(courante, "name", "") or ""
