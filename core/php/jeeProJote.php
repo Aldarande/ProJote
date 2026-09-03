@@ -180,6 +180,11 @@ try {
         'periode_courante' => 'periode_courante',
         'periode_debut'    => 'periode_debut',
         'periode_fin'      => 'periode_fin',
+        'annee_debut'      => 'annee_debut',
+        'annee_fin'        => 'annee_fin',
+        'vacances_nom'     => 'vacances_nom',
+        'vacances_debut'   => 'vacances_debut',
+        'vacances_fin'     => 'vacances_fin',
     );
     foreach ($periodeCmds as $cle => $logicalId) {
         $valeur = isset($result['Periodes'][$cle]) ? $result['Periodes'][$cle] : '';

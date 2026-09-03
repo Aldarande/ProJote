@@ -557,6 +557,13 @@ class ProJote extends eqLogic
       "periode_courante"      => array('Période en cours',                                 'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
       "periode_debut"         => array('Début de la période',                              'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
       "periode_fin"           => array('Fin de la période',                                'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
+      // Bornes de l'année scolaire (englobe toutes les périodes).
+      "annee_debut"           => array("Début de l'année scolaire",                        'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
+      "annee_fin"             => array("Fin de l'année scolaire",                          'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
+      // Prochaines vacances ou prochain jour férié (Pronote les publie ensemble).
+      "vacances_nom"          => array('Prochaines vacances',                              'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
+      "vacances_debut"        => array('Début des prochaines vacances',                    'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
+      "vacances_fin"          => array('Fin des prochaines vacances',                      'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
       "Picture"               => array('Photo de profil',                                  'info',   'string',  "",      0, 1, "GENERIC_PICTURE", 'ProJote::picture',     'picture'),
       "URL_Ical"              => array('URL Ical',                                         'info',   'string',  "",      0, 1, "GENERIC_URL",     'core::badge',          'core::badge'),
       "Nb_absences"           => array("Nombre d'absence",                                 'info',   'numeric', "",      1, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),

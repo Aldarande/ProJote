@@ -28,10 +28,12 @@ ANNEE = _periode("A", "Année continue", (2026, 9, 1), (2027, 7, 4))
 class _Client:
     """Client Pronote factice : périodes fixes, current_period paramétrable."""
 
-    def __init__(self, periods, current=None, current_raise=False):
+    def __init__(self, periods, current=None, current_raise=False, general=None):
         self.periods = periods
         self._current = current
         self._current_raise = current_raise
+        # Paramètres publiés par Pronote à la connexion (bloc « General »).
+        self.func_options = {"dataSec": {"data": {"General": general or {}}}}
 
     @property
     def current_period(self):
@@ -71,6 +73,49 @@ class TestPeriodeCourante:
             "fin": "22/11/2026",
             "en_cours": True,
         }
+
+
+class TestAnneeScolaire:
+    """Bornes de l'année scolaire, exposées en plus de la période en cours."""
+
+    def test_lues_dans_les_parametres_pronote(self, daemon, monkeypatch):
+        """Pronote les publie au login : aucune requête supplémentaire."""
+        monkeypatch.setattr(
+            daemon.pronotepy.dataClasses.Util,
+            "datetime_parse",
+            lambda v: datetime.datetime.strptime(v, "%d/%m/%Y %H:%M:%S"),
+            raising=False,
+        )
+        client = _Client(
+            [TRIMESTRE_1],
+            current=TRIMESTRE_1,
+            general={
+                "PremiereDate": {"_T": 7, "V": "01/09/2026 00:00:00"},
+                "DerniereDate": {"_T": 7, "V": "04/07/2027 00:00:00"},
+            },
+        )
+
+        data = daemon.periodes(client)
+
+        assert data["annee_debut"] == "01/09/2026"
+        assert data["annee_fin"] == "04/07/2027"
+
+    def test_repli_sur_la_periode_la_plus_large(self, daemon):
+        """Sans paramètres exploitables, « Année continue » fait référence."""
+        client = _Client([TRIMESTRE_1, TRIMESTRE_2, ANNEE], current=TRIMESTRE_1)
+
+        data = daemon.periodes(client)
+
+        assert data["annee_debut"] == "01/09/2026"
+        assert data["annee_fin"] == "04/07/2027"
+
+    def test_aucune_donnee_exploitable(self, daemon):
+        client = _Client([], current=None)
+
+        data = daemon.periodes(client)
+
+        assert data["annee_debut"] == ""
+        assert data["annee_fin"] == ""
 
 
 class TestRepliParDates:
