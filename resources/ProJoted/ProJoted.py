@@ -1373,6 +1373,46 @@ def _save_seen_index(data_dir, eq_id, index):
         logging.error("Impossible d'écrire seen_index.json (eq %s) : %s", eq_id, e)
 
 
+# Absences, retards et punitions passent tous par l'onglet « Présence » (19).
+# Certains comptes le voient déclaré accessible par Pronote — il figure bien dans
+# authorized_onglets — mais la requête est refusée (« Accès refusé »). pronotepy
+# répond à ce refus par une ré-authentification complète avant de rejouer, qui
+# échoue à son tour : trois collectes, trois authentifications, et aucune donnée.
+#
+# On retient donc le refus le temps du cycle en cours : la première collecte
+# essaie, les deux suivantes s'abstiennent. La mémoire est remise à zéro à chaque
+# cycle, si bien qu'un droit accordé entre-temps est pris en compte immédiatement.
+_presence_refusee = set()
+
+
+def _refus_de_presence(exception):
+    """Pronote refuse-t-il l'accès à l'onglet Présence ?
+
+    Le refus initial est « Accès refusé » ; après la ré-authentification que
+    pronotepy déclenche, le rejeu échoue sur « La page a expiré ». Les deux
+    signatures traduisent la même impasse.
+    """
+    message = str(exception).lower()
+    return "accès refusé" in message or "acces refuse" in message or (
+        "page a expiré" in message
+    )
+
+
+def _presence_deja_refusee(eq_id):
+    return str(eq_id) in _presence_refusee
+
+
+def _noter_refus_presence(eq_id, quoi, exception):
+    _presence_refusee.add(str(eq_id))
+    logging.warning(
+        "Onglet Présence refusé par Pronote (%s) : %s. Les autres collectes qui en "
+        "dépendent sont ignorées pour ce cycle — chacune coûterait une "
+        "ré-authentification pour rien.",
+        quoi,
+        exception,
+    )
+
+
 def _parametres_generaux(client):
     """Bloc « General » des paramètres publiés par Pronote à la connexion.
 
@@ -2045,12 +2085,23 @@ def retards(client):
             logging.error(f"Erreur lors de l'accès aux périodes (retards) : {e}")
             return {"retard": [], "dernier_retard": [], "nb_retard": 0, "error": str(e)}
 
+        eq_id = _equipement_en_cours()
+        if _presence_deja_refusee(eq_id):
+            logging.debug(
+                "Collecte des retards ignorée : l'onglet Présence a déjà été refusé "
+                "sur ce cycle."
+            )
+            return data
+
         all_retards_map = {}
         for period in _periodes_couvrantes(all_periods):
             try:
                 for d in period.delays or []:
                     all_retards_map[d.id] = d
             except Exception as e:
+                if _refus_de_presence(e):
+                    _noter_refus_presence(eq_id, "retards", e)
+                    break
                 logging.warning(
                     f"Impossible de lire les retards de la période {getattr(period, 'name', '?')} : {e}"
                 )
@@ -2097,12 +2148,23 @@ def absences(client):
                 "error": str(e),
             }
 
+        eq_id = _equipement_en_cours()
+        if _presence_deja_refusee(eq_id):
+            logging.debug(
+                "Collecte des absences ignorée : l'onglet Présence a déjà été refusé "
+                "sur ce cycle."
+            )
+            return data
+
         all_absences_map = {}
         for period in _periodes_couvrantes(all_periods):
             try:
                 for a in period.absences or []:
                     all_absences_map[a.id] = a
             except Exception as e:
+                if _refus_de_presence(e):
+                    _noter_refus_presence(eq_id, "absences", e)
+                    break
                 logging.warning(
                     f"Impossible de lire les absences de la période {getattr(period, 'name', '?')} : {e}"
                 )
@@ -2150,12 +2212,23 @@ def punitions(client):
                 "error": str(e),
             }
 
+        eq_id = _equipement_en_cours()
+        if _presence_deja_refusee(eq_id):
+            logging.debug(
+                "Collecte des punitions ignorée : l'onglet Présence a déjà été refusé "
+                "sur ce cycle."
+            )
+            return data
+
         all_punitions_map = {}
         for period in _periodes_couvrantes(all_periods):
             try:
                 for p in period.punishments or []:
                     all_punitions_map[p.id] = p
             except Exception as e:
+                if _refus_de_presence(e):
+                    _noter_refus_presence(eq_id, "punitions", e)
+                    break
                 logging.warning(
                     f"Impossible de lire les punitions de la période {getattr(period, 'name', '?')} : {e}"
                 )
@@ -3089,6 +3162,10 @@ def process_message(message):
             # credentials = client.export_credentials()
             if client is not None and client.logged_in:
                 tokenconnected = "true"
+                logging.debug(
+                    "Onglets autorisés par Pronote pour ce compte : %s",
+                    getattr(client.communication, "authorized_onglets", None),
+                )
                 # Réinitialiser le compteur d'échecs en cas de connexion réussie
                 eqLogicId = message.get("CmdId", "")
                 with _failed_attempts_lock:
@@ -3301,6 +3378,8 @@ def _worker_loop():
         with _worker_state_lock:
             _worker_eq_id = eq_id
             _worker_eq_start = time.time()
+        # Nouveau cycle : on réessaie l'onglet Présence, un droit a pu être accordé.
+        _presence_refusee.discard(str(eq_id))
         logging.info(
             "=== Début traitement équipement %s (file restante : %d) ===",
             eq_id,
