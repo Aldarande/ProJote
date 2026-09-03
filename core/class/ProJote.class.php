@@ -123,12 +123,44 @@ class ProJote extends eqLogic
       return $return;
     }
 
-    exec(escapeshellarg($venvPython) . ' -c "import pronotepy" 2>/dev/null', $output, $rc);
+    // On vérifie non seulement que pronotepy est importable, mais aussi qu'il
+    // satisfait le plancher de version de requirements.txt. Sans ce contrôle, un
+    // venv resté en 2.14.x (installé avant la mise à jour du plugin) était
+    // rapporté « OK » alors que toute connexion échoue sur les serveurs PRONOTE
+    // 2026 (KeyError: 'onload'), sans que Jeedom ne propose de réinstaller.
+    exec(escapeshellarg($venvPython) . ' -c "import pronotepy; print(pronotepy.__version__)" 2>/dev/null', $output, $rc);
     if ($rc !== 0) {
+      $return['state'] = 'nok';
+      return $return;
+    }
+
+    $installed = trim(implode('', $output));
+    $required = self::requiredPronotepyVersion();
+    if ($required !== null && $installed !== '' && version_compare($installed, $required, '<')) {
+      log::add(__CLASS__, 'warning', 'pronotepy ' . $installed . ' installé, ' . $required . ' minimum requis : réinstallation des dépendances nécessaire.');
       $return['state'] = 'nok';
     }
 
     return $return;
+  }
+
+  /**
+   * Version minimale de pronotepy exigée, lue dans resources/requirements.txt
+   * (source de vérité unique, partagée avec post-install.sh).
+   *
+   * @return string|null la version minimale, ou null si elle n'a pas pu être lue.
+   */
+  private static function requiredPronotepyVersion()
+  {
+    $requirements = dirname(__FILE__) . '/../../resources/requirements.txt';
+    if (!is_readable($requirements)) {
+      return null;
+    }
+    $content = file_get_contents($requirements);
+    if ($content === false || !preg_match('/^\s*pronotepy\s*>=\s*([0-9][0-9a-zA-Z.\-]*)/m', $content, $matches)) {
+      return null;
+    }
+    return $matches[1];
   }
 
   /**
@@ -521,6 +553,17 @@ class ProJote extends eqLogic
       "Nom_Eleve"             => array("Nom de l'éleve",                                   'info',   'string',  "",      0, 1, "GENERIC_NAME ",   'core::badge',          'core::badge'),
       "Nom_Classe"            => array('Nom de la classe',                                 'info',   'string',  "",      0, 1, "GENERIC_NAME ",   'core::badge',          'core::badge'),
       "Etablissement"         => array('Etablissement',                                    'info',   'string',  "",      0, 1, "GENERIC_NAME ",   'core::badge',          'core::badge'),
+      // Période Pronote en cours (trimestre / semestre) et ses bornes.
+      "periode_courante"      => array('Période en cours',                                 'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
+      "periode_debut"         => array('Début de la période',                              'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
+      "periode_fin"           => array('Fin de la période',                                'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
+      // Bornes de l'année scolaire (englobe toutes les périodes).
+      "annee_debut"           => array("Début de l'année scolaire",                        'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
+      "annee_fin"             => array("Fin de l'année scolaire",                          'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
+      // Prochaines vacances ou prochain jour férié (Pronote les publie ensemble).
+      "vacances_nom"          => array('Prochaines vacances',                              'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
+      "vacances_debut"        => array('Début des prochaines vacances',                    'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
+      "vacances_fin"          => array('Fin des prochaines vacances',                      'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
       "Picture"               => array('Photo de profil',                                  'info',   'string',  "",      0, 1, "GENERIC_PICTURE", 'ProJote::picture',     'picture'),
       "URL_Ical"              => array('URL Ical',                                         'info',   'string',  "",      0, 1, "GENERIC_URL",     'core::badge',          'core::badge'),
       "Nb_absences"           => array("Nombre d'absence",                                 'info',   'numeric', "",      1, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),

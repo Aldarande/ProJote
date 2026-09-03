@@ -58,6 +58,15 @@ try:
     from pronotepy.ent import *
     import pronotepy.dataClasses
 
+    # Correctifs de compatibilité pronotepy (voir pronote_compat.py) :
+    # PRONOTE >= 2026.2.5 ne chiffre plus le challenge d'authentification,
+    # ce qui fait échouer TOUS les modes de connexion de pronotepy 2.15.6.
+    import pronote_compat
+
+    pronote_compat.apply()
+
+    import token_secours
+
     # Monkey patch : Correction à la volée pour gérer l'absence de noteMax/noteMin/estBonus
     _original_grade_init = pronotepy.dataClasses.Grade.__init__
 
@@ -135,6 +144,12 @@ _worker_thread = None  # Thread worker unique (démarré au premier message)
 # Watchdog : si le worker bloque plus de N secondes sur un équipement, WARNING
 _WORKER_TIMEOUT = 120  # secondes
 _worker_eq_id = None  # équipement actuellement traité
+
+
+def _equipement_en_cours():
+    """Identifiant de l'équipement en cours de traitement (pour token_secours)."""
+    with _worker_state_lock:
+        return _worker_eq_id
 _worker_eq_start = None  # horodatage de début du traitement en cours
 _worker_state_lock = threading.Lock()
 
@@ -772,6 +787,26 @@ def _safe_attr(obj, *names, default=""):
     return default
 
 
+def _information_content(notif):
+    """Contenu texte d'une information Pronote, quelle que soit la version de pronotepy.
+
+    pronotepy <= 2.14 exposait `Information.content` comme une propriété (le texte
+    était déjà chargé). Depuis 2.15, c'est une méthode : le contenu est récupéré à
+    la demande par une requête supplémentaire vers Pronote. Sans ce garde-fou, le
+    widget recevait l'objet méthode lui-même (non sérialisable en JSON).
+    """
+    try:
+        content = getattr(notif, "content", "")
+        return content() if callable(content) else content
+    except Exception as e:
+        logging.warning(
+            "Contenu de l'information « %s » non récupéré : %s",
+            _safe_attr(notif, "title", default="?"),
+            e,
+        )
+        return ""
+
+
 def messages(client):
     """Collecte les discussions Pronote (messagerie) et construit les agrégats widget.
 
@@ -1338,6 +1373,363 @@ def _save_seen_index(data_dir, eq_id, index):
         logging.error("Impossible d'écrire seen_index.json (eq %s) : %s", eq_id, e)
 
 
+# Absences, retards et punitions passent tous par l'onglet « Présence » (19).
+# Certains comptes le voient déclaré accessible par Pronote — il figure bien dans
+# authorized_onglets — mais la requête est refusée (« Accès refusé »). pronotepy
+# répond à ce refus par une ré-authentification complète avant de rejouer, qui
+# échoue à son tour : trois collectes, trois authentifications, et aucune donnée.
+#
+# On retient donc le refus le temps du cycle en cours : la première collecte
+# essaie, les deux suivantes s'abstiennent. La mémoire est remise à zéro à chaque
+# cycle, si bien qu'un droit accordé entre-temps est pris en compte immédiatement.
+_presence_refusee = set()
+
+
+def _refus_de_presence(exception):
+    """Pronote refuse-t-il l'accès à l'onglet Présence ?
+
+    Le refus initial est « Accès refusé » ; après la ré-authentification que
+    pronotepy déclenche, le rejeu échoue sur « La page a expiré ». Les deux
+    signatures traduisent la même impasse.
+    """
+    message = str(exception).lower()
+    return "accès refusé" in message or "acces refuse" in message or (
+        "page a expiré" in message
+    )
+
+
+def _presence_deja_refusee(eq_id):
+    return str(eq_id) in _presence_refusee
+
+
+def _noter_refus_presence(eq_id, quoi, exception):
+    _presence_refusee.add(str(eq_id))
+    logging.warning(
+        "Onglet Présence refusé par Pronote (%s) : %s. Les autres collectes qui en "
+        "dépendent sont ignorées pour ce cycle — chacune coûterait une "
+        "ré-authentification pour rien.",
+        quoi,
+        exception,
+    )
+
+
+def _parametres_generaux(client):
+    """Bloc « General » des paramètres publiés par Pronote à la connexion.
+
+    Il est récupéré une fois pour toutes au login (``FonctionParametres``) :
+    le lire ne coûte aucune requête supplémentaire.
+    """
+    try:
+        options = getattr(client, "func_options", None) or {}
+        bloc = options.get("dataSec") or options.get("donneesSec") or {}
+        return (bloc.get("data") or {}).get("General") or {}
+    except Exception as e:
+        logging.debug("Paramètres généraux illisibles : %s", e)
+        return {}
+
+
+def _vacances(client):
+    """Vacances scolaires et jours fériés publiés par Pronote.
+
+    Ils figurent dans ``listeJoursFeries`` des paramètres généraux, récupérés à
+    la connexion : aucune requête supplémentaire. Malgré son nom, cette liste
+    mélange les jours fériés (« Armistice 1918 ») et les périodes de vacances
+    (« Vacances de la Toussaint »). Une entrée porte ``L`` (libellé), ``N``
+    (identifiant), ``dateDebut`` et ``dateFin`` — relevé sur PRONOTE 2026.2.5 ;
+    ``date`` est accepté en second recours, les versions antérieures ayant pu
+    nommer ce champ autrement.
+
+    Retourne la liste triée par date, chaque élément valant
+    ``{"nom", "debut", "fin"}`` au format jj/mm/aaaa.
+    """
+    general = _parametres_generaux(client)
+    brut = general.get("listeJoursFeries")
+    if isinstance(brut, dict):
+        brut = brut.get("V")
+    if not isinstance(brut, list) or not brut:
+        return []
+
+    if isinstance(brut[0], dict):
+        logging.debug("Vacances : clés d'une entrée = %s", sorted(brut[0].keys()))
+
+    def _date(entree, *cles):
+        for cle in cles:
+            valeur = entree.get(cle)
+            if isinstance(valeur, dict):
+                valeur = valeur.get("V")
+            if valeur:
+                try:
+                    return pronotepy.dataClasses.Util.datetime_parse(valeur)
+                except Exception:
+                    continue
+        return None
+
+    vacances = []
+    for entree in brut:
+        if not isinstance(entree, dict):
+            continue
+        fin = _date(entree, "dateFin", "date")
+        debut = _date(entree, "dateDebut", "date") or fin
+        if not fin:
+            continue
+        vacances.append(
+            {
+                "nom": entree.get("L", "") or "",
+                "debut": debut.strftime("%d/%m/%Y") if debut else "",
+                "fin": fin.strftime("%d/%m/%Y"),
+                "_fin": fin,
+            }
+        )
+    vacances.sort(key=lambda v: v["_fin"])
+    for v in vacances:
+        del v["_fin"]
+    return vacances
+
+
+def _bornes_annee_scolaire(client):
+    """Premier et dernier jour de l'année scolaire, tels que Pronote les publie.
+
+    Journalise au passage ce que le serveur expose sur les jours fériés et les
+    vacances : pronotepy n'en donne aucune représentation, et leur présence
+    varie d'un établissement à l'autre.
+    """
+    general = _parametres_generaux(client)
+    if not general:
+        return None, None
+
+    def _lire(cle):
+        valeur = general.get(cle)
+        if isinstance(valeur, dict):
+            valeur = valeur.get("V")
+        if not valeur:
+            return None
+        try:
+            return pronotepy.dataClasses.Util.datetime_parse(valeur)
+        except Exception:
+            return None
+
+    interessants = sorted(
+        cle
+        for cle in general
+        if any(m in cle.lower() for m in ("ferie", "vacance", "conge", "fermeture"))
+    )
+    if interessants:
+        for cle in interessants:
+            valeur = general.get(cle)
+            if isinstance(valeur, dict):
+                valeur = valeur.get("V", valeur)
+            taille = len(valeur) if isinstance(valeur, (list, dict)) else valeur
+            logging.debug("Calendrier publié par Pronote : %s = %s entrée(s)", cle, taille)
+    else:
+        logging.debug(
+            "Pronote ne publie ni jours fériés ni vacances dans ses paramètres généraux."
+        )
+
+    return _lire("PremiereDate"), _lire("DerniereDate")
+
+
+def _periodes_couvrantes(periods):
+    """Sous-ensemble minimal de périodes couvrant la même plage de dates.
+
+    Pronote publie une douzaine de découpages qui se recouvrent — « Année
+    continue », « année », semestres, mi-semestres, trimestres, « DNB blanc »,
+    « Hors période »… Or les absences, retards et punitions s'interrogent par
+    plage de dates (requête ``PagePresence``) : les demander période par période
+    renvoie douze fois les mêmes enregistrements.
+
+    Le coût est loin d'être théorique. Sur les serveurs 2026, chaque
+    ``PagePresence`` échoue d'abord sur « La page a expiré », ce qui pousse
+    pronotepy à se ré-authentifier entièrement avant de rejouer la requête.
+    Mesuré sur un cycle réel : 12 périodes × 3 collectes = 36 requêtes, 72 appels
+    et 40 authentifications — chacune faisant tourner le jeton, jusqu'à la
+    suspension de l'adresse IP par Pronote.
+
+    On retient donc la période la plus large, puis uniquement celles qui
+    dépassent de la couverture déjà acquise. La plage interrogée reste
+    rigoureusement identique, mais une seule requête suffit dans le cas normal.
+    """
+    valides = []
+    for period in periods or []:
+        debut = getattr(period, "start", None)
+        fin = getattr(period, "end", None)
+        if debut and fin and fin >= debut:
+            valides.append((debut, fin, period))
+    if not valides:
+        # Aucune date exploitable : on ne sait pas raisonner, on rend tout.
+        return list(periods or [])
+
+    # Les périodes Pronote se suivent sans se chevaucher : un trimestre finit le
+    # 23 novembre et le suivant commence le 24. Sans tolérance, la fusion verrait
+    # un trou d'une journée entre deux périodes pourtant contiguës, et garderait
+    # inutilement toute période à cheval sur la jointure.
+    tolerance = datetime.timedelta(days=1)
+
+    def _couvert(debut, fin, intervalles):
+        return any(d <= debut and fin <= f for d, f in intervalles)
+
+    retenues = []
+    couverture = []
+    for debut, fin, period in sorted(valides, key=lambda v: v[1] - v[0], reverse=True):
+        if _couvert(debut, fin, couverture):
+            continue
+        retenues.append(period)
+        couverture = sorted(couverture + [(debut, fin)])
+        fusionnes = [couverture[0]]
+        for d, f in couverture[1:]:
+            dernier_d, dernier_f = fusionnes[-1]
+            if d <= dernier_f + tolerance:
+                fusionnes[-1] = (dernier_d, max(dernier_f, f))
+            else:
+                fusionnes.append((d, f))
+        couverture = fusionnes
+
+    if len(retenues) < len(valides):
+        logging.debug(
+            "Périodes : %d découpages retournés par Pronote, %d suffisent à couvrir "
+            "la même plage de dates.",
+            len(valides),
+            len(retenues),
+        )
+    return retenues
+
+
+def periodes(client):
+    """
+    Récupère la période Pronote en cours et ses dates de début / fin.
+
+    Pronote publie plusieurs découpages simultanés (trimestres, semestres,
+    « Année continue »…). `client.current_period` renvoie celui que Pronote
+    désigne lui-même par défaut pour l'onglet Notes : c'est la source la plus
+    fiable, et elle évite d'avoir à deviner. En cas d'échec (structure absente
+    sur certaines instances), on retombe sur la période qui contient la date du
+    jour, en retenant la plus courte — sans quoi un découpage englobant toute
+    l'année scolaire l'emporterait sur le trimestre réellement en cours.
+
+    Retourne les trois valeurs câblées aux commandes Jeedom
+    (periode_courante / periode_debut / periode_fin), plus la liste complète
+    des périodes de l'année à toutes fins utiles.
+    """
+    data = {
+        "periode_courante": "",
+        "periode_debut": "",
+        "periode_fin": "",
+        "annee_debut": "",
+        "annee_fin": "",
+        "periodes": [],
+    }
+
+    try:
+        all_periods = list(client.periods or [])
+    except Exception as e:
+        logging.error("Erreur lors de l'accès aux périodes : %s", e)
+        data["error"] = str(e)
+        return data
+
+    def _format_date(valeur):
+        """Formate une date Pronote comme le reste du plugin (jj/mm/aaaa)."""
+        if not valeur:
+            return ""
+        try:
+            return valeur.strftime("%d/%m/%Y")
+        except Exception:
+            return ""
+
+    courante = None
+    try:
+        courante = client.current_period
+    except Exception as e:
+        logging.debug(
+            "current_period indisponible (%s) : repli sur la date du jour.", e
+        )
+
+    if courante is None:
+        today = datetime.date.today()
+        candidates = []
+        for period in all_periods:
+            debut = getattr(period, "start", None)
+            fin = getattr(period, "end", None)
+            if not debut or not fin:
+                continue
+            try:
+                if debut.date() <= today <= fin.date():
+                    candidates.append((fin - debut, period))
+            except Exception:
+                continue
+        if candidates:
+            # La plus courte : « Trimestre 1 » plutôt que « Année continue ».
+            courante = min(candidates, key=lambda c: c[0])[1]
+
+    id_courante = getattr(courante, "id", None) if courante is not None else None
+    for period in all_periods:
+        data["periodes"].append(
+            {
+                "nom": getattr(period, "name", "") or "",
+                "debut": _format_date(getattr(period, "start", None)),
+                "fin": _format_date(getattr(period, "end", None)),
+                "en_cours": id_courante is not None
+                and getattr(period, "id", None) == id_courante,
+            }
+        )
+
+    # Bornes de l'année scolaire. Pronote les publie dans les paramètres
+    # généraux récupérés à la connexion (aucune requête supplémentaire) ; à
+    # défaut, la période la plus large fait référence — « Année continue »
+    # couvre par construction toute l'année.
+    debut_annee, fin_annee = _bornes_annee_scolaire(client)
+    if debut_annee is None or fin_annee is None:
+        plus_large = None
+        for period in all_periods:
+            debut = getattr(period, "start", None)
+            fin = getattr(period, "end", None)
+            if not debut or not fin or fin < debut:
+                continue
+            if plus_large is None or (fin - debut) > (plus_large[1] - plus_large[0]):
+                plus_large = (debut, fin)
+        if plus_large:
+            debut_annee, fin_annee = plus_large
+    data["annee_debut"] = _format_date(debut_annee)
+    data["annee_fin"] = _format_date(fin_annee)
+
+    # Vacances et jours fériés : la liste complète, plus la prochaine échéance
+    # à venir (celle dont la fin n'est pas encore passée).
+    data["vacances"] = _vacances(client)
+    aujourdhui = datetime.date.today().strftime("%Y%m%d")
+
+    def _tri(valeur):
+        jour, mois, annee = valeur.split("/")
+        return annee + mois + jour
+
+    for v in data["vacances"]:
+        if v["fin"] and _tri(v["fin"]) >= aujourdhui:
+            data["vacances_nom"] = v["nom"]
+            data["vacances_debut"] = v["debut"]
+            data["vacances_fin"] = v["fin"]
+            break
+    else:
+        data["vacances_nom"] = ""
+        data["vacances_debut"] = ""
+        data["vacances_fin"] = ""
+
+    if courante is not None:
+        data["periode_courante"] = getattr(courante, "name", "") or ""
+        data["periode_debut"] = _format_date(getattr(courante, "start", None))
+        data["periode_fin"] = _format_date(getattr(courante, "end", None))
+        logging.debug(
+            "Période en cours : %s (%s → %s)",
+            data["periode_courante"],
+            data["periode_debut"],
+            data["periode_fin"],
+        )
+    else:
+        logging.warning(
+            "Aucune période en cours identifiée parmi les %d périodes retournées "
+            "par Pronote.",
+            len(all_periods),
+        )
+
+    return data
+
+
 def notes(client):
     """
     Récupère toutes les notes de l'année scolaire (toutes périodes) et les formate en JSON.
@@ -1665,7 +2057,7 @@ def notifications(client):
                         "sujet": (notif.title),
                         "auteur": (notif.author),
                         "creation": (notif.creation_date).strftime("%d/%m"),
-                        "message": (notif.content),
+                        "message": _information_content(notif),
                         "categorie": (notif.category),
                         "lu": (notif.read),
                     }
@@ -1693,12 +2085,23 @@ def retards(client):
             logging.error(f"Erreur lors de l'accès aux périodes (retards) : {e}")
             return {"retard": [], "dernier_retard": [], "nb_retard": 0, "error": str(e)}
 
+        eq_id = _equipement_en_cours()
+        if _presence_deja_refusee(eq_id):
+            logging.debug(
+                "Collecte des retards ignorée : l'onglet Présence a déjà été refusé "
+                "sur ce cycle."
+            )
+            return data
+
         all_retards_map = {}
-        for period in all_periods:
+        for period in _periodes_couvrantes(all_periods):
             try:
                 for d in period.delays or []:
                     all_retards_map[d.id] = d
             except Exception as e:
+                if _refus_de_presence(e):
+                    _noter_refus_presence(eq_id, "retards", e)
+                    break
                 logging.warning(
                     f"Impossible de lire les retards de la période {getattr(period, 'name', '?')} : {e}"
                 )
@@ -1745,12 +2148,23 @@ def absences(client):
                 "error": str(e),
             }
 
+        eq_id = _equipement_en_cours()
+        if _presence_deja_refusee(eq_id):
+            logging.debug(
+                "Collecte des absences ignorée : l'onglet Présence a déjà été refusé "
+                "sur ce cycle."
+            )
+            return data
+
         all_absences_map = {}
-        for period in all_periods:
+        for period in _periodes_couvrantes(all_periods):
             try:
                 for a in period.absences or []:
                     all_absences_map[a.id] = a
             except Exception as e:
+                if _refus_de_presence(e):
+                    _noter_refus_presence(eq_id, "absences", e)
+                    break
                 logging.warning(
                     f"Impossible de lire les absences de la période {getattr(period, 'name', '?')} : {e}"
                 )
@@ -1798,12 +2212,23 @@ def punitions(client):
                 "error": str(e),
             }
 
+        eq_id = _equipement_en_cours()
+        if _presence_deja_refusee(eq_id):
+            logging.debug(
+                "Collecte des punitions ignorée : l'onglet Présence a déjà été refusé "
+                "sur ce cycle."
+            )
+            return data
+
         all_punitions_map = {}
-        for period in all_periods:
+        for period in _periodes_couvrantes(all_periods):
             try:
                 for p in period.punishments or []:
                     all_punitions_map[p.id] = p
             except Exception as e:
+                if _refus_de_presence(e):
+                    _noter_refus_presence(eq_id, "punitions", e)
+                    break
                 logging.warning(
                     f"Impossible de lire les punitions de la période {getattr(period, 'name', '?')} : {e}"
                 )
@@ -2639,6 +3064,9 @@ def process_message(message):
                 )
                 return
 
+            # Retenue pour distinguer un jeton refusé d'un incident passager :
+            # reste à None si Pronote refuse la connexion sans lever d'exception.
+            _erreur_connexion = None
             try:
                 if "parent.html" in message["TokenUrl"]:
                     client = pronotepy.ParentClient.token_login(
@@ -2670,12 +3098,74 @@ def process_message(message):
                     "Token invalide, regénérer le QR CODE ou re valider le compte : %s",
                     e,
                 )
+                _erreur_connexion = e
                 client = None
+            # Le jeton transmis par Jeedom est refusé : avant d'exiger un
+            # nouveau QR Code, on retente avec le dernier jeton rangé sur disque
+            # par token_secours. Il est plus récent que celui de la base si le
+            # cycle précédent s'est interrompu avant l'écriture, ou si cette
+            # écriture a échoué. PRONOTE n'acceptant que le tout dernier jeton
+            # émis, c'est la seule réparation possible sans l'utilisateur.
+            if client is None or not client.logged_in:
+                _eq_id = message.get("CmdId", "")
+                _secours = token_secours.charger(_data_dir, _eq_id)
+                if not token_secours.erreur_de_jeton(_erreur_connexion):
+                    # Incident réseau ou serveur momentanément fermé : le jeton
+                    # stocké reste valable et sera rejoué au prochain cycle.
+                    # Consommer le jeton de secours ici le gaspillerait.
+                    logging.warning(
+                        "Échec de connexion sans rapport avec le jeton (%s) : le jeton "
+                        "de secours est conservé intact.",
+                        _erreur_connexion,
+                    )
+                    _secours = None
+                if _secours and _secours.get("password") != message.get("TokenPassword"):
+                    logging.warning(
+                        "Jeton refusé par Pronote : nouvelle tentative avec le jeton "
+                        "de secours enregistré sur disque."
+                    )
+                    try:
+                        _url = _secours.get("pronote_url", "")
+                        _classe = (
+                            pronotepy.ParentClient
+                            if "parent.html" in _url
+                            else pronotepy.Client
+                        )
+                        client = _classe.token_login(
+                            pronote_url=_url,
+                            username=_secours["username"],
+                            password=_secours["password"],
+                            client_identifier=_secours.get("client_identifier"),
+                            uuid=_secours.get(
+                                "uuid", message.get("TokenUuid", "ProJote")
+                            ),
+                        )
+                        if (
+                            client.logged_in
+                            and message.get("enfant")
+                            and _classe is pronotepy.ParentClient
+                        ):
+                            client.set_child(message["enfant"])
+                        if client.logged_in:
+                            logging.info(
+                                "Connexion rétablie avec le jeton de secours. Le jeton "
+                                "à jour redescendra vers Jeedom en fin de cycle."
+                            )
+                    except Exception as e:
+                        logging.error(
+                            "Le jeton de secours a été refusé lui aussi : %s", e
+                        )
+                        client = None
+
             ### 05/01/2025 : A revalider si je dois doubler
             # A supprimer car doublon avec ligne 1155
             # credentials = client.export_credentials()
             if client is not None and client.logged_in:
                 tokenconnected = "true"
+                logging.debug(
+                    "Onglets autorisés par Pronote pour ce compte : %s",
+                    getattr(client.communication, "authorized_onglets", None),
+                )
                 # Réinitialiser le compteur d'échecs en cas de connexion réussie
                 eqLogicId = message.get("CmdId", "")
                 with _failed_attempts_lock:
@@ -2736,9 +3226,13 @@ def process_message(message):
             )
             if local_picture_path:
                 jsondata["Local_Picture"] = local_picture_path
-            # je renew le token
-            logging.info("Je renew le Token")
-            jsondata["Token"] = RenewToken(client)
+            # Le token n'est PAS exporté ici : PRONOTE le fait tourner à chaque
+            # authentification, et pronotepy se ré-authentifie à chaque requête
+            # (plusieurs dizaines de fois par cycle). Un token capturé maintenant
+            # serait périmé dès la fin de la collecte, et la connexion suivante
+            # échouerait sur « Token invalide, regénérer le QR CODE ». Il est donc
+            # exporté juste avant l'envoi à Jeedom, une fois toutes les requêtes
+            # terminées : voir plus bas, avant send_change_immediate().
             # Je valide que le fichier équipement est à jours
             # je lance la foncton qui recherche si le nom de l'enfant à changer dans l'équipement
             Checkeleve(client, message["CmdId"])
@@ -2754,6 +3248,9 @@ def process_message(message):
             jsondata["Notes"] = notes_data
             if "error" in notes_data:
                 jsondata["error"] = notes_data["error"]
+            # J'ajoute les dates de la période en cours
+            logging.info("Je récupére les dates de période")
+            jsondata["Periodes"] = periodes(client)
             # j'ajoute les menus
             logging.info("Je récupére les menus")
             jsondata["Menus"] = menus(client)
@@ -2798,6 +3295,10 @@ def process_message(message):
                 _save_seen_index(_data_dir, message["CmdId"], _new_index)
             except Exception as _e:
                 logging.error("Détection des nouveautés (deltas) échouée : %s", _e)
+            # Export du token en tout dernier, après la totalité des requêtes :
+            # c'est la seule valeur encore acceptée par PRONOTE au prochain cycle.
+            logging.info("Je renew le Token")
+            jsondata["Token"] = RenewToken(client)
             # J'envoie les données à Jeedom
             logging.debug(
                 "Projoted.py :: Données JSON à envoyer : %s", json.dumps(jsondata)
@@ -2877,6 +3378,8 @@ def _worker_loop():
         with _worker_state_lock:
             _worker_eq_id = eq_id
             _worker_eq_start = time.time()
+        # Nouveau cycle : on réessaie l'onglet Présence, un droit a pu être accordé.
+        _presence_refusee.discard(str(eq_id))
         logging.info(
             "=== Début traitement équipement %s (file restante : %d) ===",
             eq_id,
@@ -3055,6 +3558,12 @@ def _run_daemon():
     _cycle = int(_cycle)
 
     jeedom_utils.set_log_level(_log_level)
+
+    # Filet de sécurité sur le jeton : PRONOTE le renouvelle à chaque
+    # authentification et refuse tout jeton antérieur. On le range sur disque
+    # dès qu'il change, pour pouvoir réparer la connexion sans redemander un
+    # QR Code à l'utilisateur si la base contient une valeur périmée.
+    token_secours.installer(_data_dir, _equipement_en_cours)
 
     # Filtre les messages DEBUG verbeux de PronotePy (champs optionnels absents)
     class _PronotepyNoiseFilter(logging.Filter):

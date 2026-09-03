@@ -173,6 +173,26 @@ try {
     if (isset($result['Punitions']['Nb_Punitions']) && $eqLogic->getCmd(null, 'Nb_punitions')) {
         $eqLogic->checkAndUpdateCmd('Nb_punitions', $result['Punitions']['Nb_Punitions']);
     }
+    // Met à jour la période Pronote en cours et ses bornes.
+    // Une valeur vide signifie que le démon n'a pas su identifier la période :
+    // on préfère conserver la dernière valeur connue plutôt que l'effacer.
+    $periodeCmds = array(
+        'periode_courante' => 'periode_courante',
+        'periode_debut'    => 'periode_debut',
+        'periode_fin'      => 'periode_fin',
+        'annee_debut'      => 'annee_debut',
+        'annee_fin'        => 'annee_fin',
+        'vacances_nom'     => 'vacances_nom',
+        'vacances_debut'   => 'vacances_debut',
+        'vacances_fin'     => 'vacances_fin',
+    );
+    foreach ($periodeCmds as $cle => $logicalId) {
+        $valeur = isset($result['Periodes'][$cle]) ? $result['Periodes'][$cle] : '';
+        log::add('ProJote', 'debug', 'Champ reçu : ' . $logicalId . ' - Valeur reçue : ' . $valeur);
+        if ($valeur !== '' && $eqLogic->getCmd(null, $logicalId)) {
+            $eqLogic->checkAndUpdateCmd($logicalId, $valeur);
+        }
+    }
     // Met à jour le lien Ical
     if (isset($result['Ical']) && $eqLogic->getCmd(null, 'URL_Ical')) {
         $eqLogic->checkAndUpdateCmd('URL_Ical', $result['Ical']);
