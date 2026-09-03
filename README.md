@@ -1,6 +1,6 @@
 # 📚 ProJote - Plugin JEEDOM Pronote
 
-![Version](https://img.shields.io/badge/version-1.3.1-blue)
+![Version](https://img.shields.io/badge/version-1.4.1-blue)
 ![License](https://img.shields.io/badge/license-AGPL%20v3-green)
 ![Jeedom](https://img.shields.io/badge/Jeedom-4.4+-orange)
 
@@ -29,6 +29,16 @@
 - Page dédiée accessible via une icône sous le menu **Accueil** de Jeedom
 - Activation par la case *« Afficher le panneau desktop »* (Plugins → Gestion des plugins → ProJote)
 - Un onglet par élève : identité, statistiques, EDT, notes, devoirs, punitions, iCal
+
+✅ **Périodes et calendrier scolaire** *(v1.4.1+)*
+- Période en cours (trimestre ou semestre) avec ses dates de début et de fin
+- Bornes de l'année scolaire
+- Prochaines vacances ou prochain jour férié, avec leurs dates
+
+✅ **Connexion robuste** *(v1.4.1+)*
+- Compatible PRONOTE 2026.2.5 (challenge d'authentification non chiffré)
+- Jeton de secours : reconnexion réparée automatiquement, sans nouveau QR Code
+- Cycle de collecte allégé : 7 authentifications au lieu de 40
 
 ✅ **Gestion multi-comptes**
 - Support des comptes élèves

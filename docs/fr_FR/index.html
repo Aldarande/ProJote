@@ -307,7 +307,7 @@
             <tr><td>Paquet système</td><td><code>python3-venv</code> (installé automatiquement par Jeedom dans la plupart des cas)</td></tr>
             <tr><td>Compte Pronote</td><td>Compte élève ou parent actif sur le portail Pronote de l'établissement</td></tr>
             <tr><td>Réseau</td><td>Accès sortant HTTPS vers le serveur Pronote de l'établissement (et l'ENT si utilisé)</td></tr>
-            <tr><td>pronotepy</td><td>Branche 2.x (installation contrainte à <code>&gt;=2.14,&lt;3.0</code> depuis la v1.0.1)</td></tr>
+            <tr><td>pronotepy</td><td>Branche 2.x (installation contrainte à <code>&gt;=2.15.6,&lt;3.0</code> — plancher relevé pour les serveurs PRONOTE 2026)</td></tr>
         </tbody>
     </table>
 
@@ -413,6 +413,12 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
             <tr><td>EDT J+1 à J+4</td><td>info</td><td>Emploi du temps détaillé sur les 4 prochains jours scolaires</td></tr>
             <tr><td>Cours annulés (total période)</td><td>info</td><td>Nombre total de cours annulés depuis la rentrée</td></tr>
             <tr><td>Liste des devoirs / absences / retards / punitions</td><td>info</td><td>Détails formatés HTML pour le widget</td></tr>
+            <tr><td colspan="3" style="background:rgba(41,128,185,.08);font-weight:600;">— Périodes et calendrier (v1.4.1) —</td></tr>
+            <tr><td>Période en cours</td><td>info</td><td>Nom du découpage courant tel que Pronote le désigne : <code>Trimestre 1</code>, <code>Semestre 1</code>…</td></tr>
+            <tr><td>Début / Fin de la période</td><td>info</td><td>Bornes de la période en cours, au format jj/mm/aaaa.</td></tr>
+            <tr><td>Début / Fin de l'année scolaire</td><td>info</td><td>Bornes de l'année complète, telles que publiées par Pronote.</td></tr>
+            <tr><td>Prochaines vacances</td><td>info</td><td>Libellé de la prochaine interruption : <code>Vacances de la Toussaint</code>, <code>Armistice 1918</code>… Pronote mêle vacances et jours fériés dans la même liste.</td></tr>
+            <tr><td>Début / Fin des prochaines vacances</td><td>info</td><td>Dates de cette interruption. Un jour férié isolé porte la même date de début et de fin.</td></tr>
             <tr><td colspan="3" style="background:rgba(39,174,96,.08);font-weight:600;">— Menu cantine (v1.0.1) —</td></tr>
             <tr><td>menu_midi_aujourdhui</td><td>info</td><td>Texte lisible du menu de midi du jour ("Entrée · Plat · Dessert…"). Vide si pas de menu.</td></tr>
             <tr><td>menu_midi_demain</td><td>info</td><td>Idem pour le lendemain.</td></tr>
@@ -448,6 +454,21 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
         ou page de la commande). L'historisation est activée automatiquement, y compris sur les
         équipements créés avant la 1.1.0.
     </div>
+    <div class="callout callout-info">
+        <strong>Quelle période le plugin retient-il ? (v1.4.1)</strong>
+        Pronote ne publie pas une découpe de l'année mais une douzaine, qui se recouvrent :
+        <em>Année continue</em>, <em>année</em>, semestres, mi-semestres, trimestres, et parfois
+        <em>DNB blanc</em> ou <em>Hors période</em>. La commande <code>Période en cours</code> reprend
+        celle que Pronote lui-même désigne par défaut pour l'onglet Notes — c'est la référence la plus
+        fiable. Si le serveur ne la publie pas, le démon retient la période contenant la date du jour,
+        la plus courte d'abord, sans quoi <em>Année continue</em> l'emporterait sur le trimestre réel.
+        <br><br>
+        Pour les absences, retards et punitions — qui s'interrogent par plage de dates — le démon
+        n'interroge que le minimum de périodes couvrant l'année, soit une seule dans le cas courant.
+        Les résultats seraient identiques en les interrogeant toutes, mais au prix de douze fois plus
+        de requêtes.
+    </div>
+
     <div class="callout callout-info">
         <strong>Fenêtre de synchronisation</strong>
         Le cron Jeedom déclenche une collecte automatique toutes les heures, <strong>désactivé entre 22h et 4h</strong>
@@ -683,6 +704,37 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
     <!-- ── Historique ─────────────────────── -->
     <h1 id="version">Historique des versions</h1>
 
+    <h2>1.4.1 — Septembre 2026</h2>
+    <table>
+        <thead><tr><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>Compatibilité PRONOTE 2026.2.5 — challenge d'authentification non chiffré</strong> — depuis le 2 septembre 2026, ces serveurs ne chiffrent plus le « challenge » renvoyé à l'Identification. pronotepy 2.15.6 applique toujours le cycle historique <em>déchiffrer → retirer l'alea → rechiffrer</em> : la première étape échoue et <strong>toutes</strong> les connexions se soldent par <code>CryptoError: Decryption failed while trying to un pad</code> — QR Code, identifiants et jeton du démon. Symptôme caractéristique : réponse d'Identification sans champ <code>alea</code> et challenge tenant en un seul bloc AES de 16 octets. Le nouveau module <code>resources/ProJoted/pronote_compat.py</code> rétablit le comportement attendu (chiffrement direct de la chaîne brute) le temps du login uniquement, sans masquer un code PIN erroné. Voir <a href="https://github.com/bain3/pronotepy/issues/346">pronotepy #346</a> et <a href="https://github.com/bain3/pronotepy/issues/348">#348</a> ; à retirer quand pronotepy publiera son propre correctif.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>« Regénérez le QR Code » à chaque cycle</strong> — le jeton de connexion était invalidé par le démon lui-même. PRONOTE fait tourner le <code>jetonConnexionAppliMobile</code> à <em>chaque</em> authentification, et pronotepy se ré-authentifie à chaque requête : un cycle de collecte en compte une quarantaine. Or le plugin exportait le jeton juste après la connexion, soit avec une quarantaine de rotations de retard ; la connexion suivante était donc refusée et réclamait un nouveau QR Code. L'export a lieu désormais en tout dernier, une fois toutes les requêtes terminées. Deux cycles consécutifs s'enchaînent maintenant sans nouvelle validation.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-perf">Performance</span></td>
+                <td><strong>Quarante authentifications par cycle ramenées à quelques-unes</strong> — Pronote publie une douzaine de découpages qui se recouvrent (« Année continue », semestres, mi-semestres, trimestres, « DNB blanc », « Hors période »…). Absences, retards et punitions s'interrogent par plage de dates : le démon les demandait pour chacun, soit douze fois les mêmes enregistrements. Pire, chaque requête <code>PagePresence</code> échoue d'abord sur « La page a expiré » sur les serveurs 2026, ce qui pousse pronotepy à se ré-authentifier entièrement avant de rejouer. Mesuré sur un cycle réel : 36 requêtes, 72 appels et <strong>40 authentifications</strong> — chacune faisant tourner le jeton de connexion, jusqu'à la suspension de l'adresse IP par Pronote. Le démon ne retient désormais que le minimum de périodes couvrant la même plage de dates : une seule dans le cas courant. S'ajoute à cela un garde-fou sur l'onglet « Présence », par lequel passent absences, retards et punitions : quand Pronote le refuse — droit absent, page pas encore initialisée en début d'année, ou simplement aucune absence enregistrée — les deux collectes suivantes s'abstiennent au lieu de payer chacune une ré-authentification pour rien. Le refus n'est retenu que le temps du cycle, si bien qu'une page devenue disponible est reprise dès la collecte suivante. Enfin, une requête visant un onglet non accessible ne déclenche plus de reconnexion : se reconnecter ne donne aucun droit supplémentaire. <strong>Résultat mesuré : 40 authentifications par cycle ramenées à 5, et une durée de collecte passée de 35 à 13 secondes.</strong></td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-new">Nouveauté</span></td>
+                <td><strong>Jeton de secours — réparation automatique de la connexion</strong> — le dernier jeton émis par PRONOTE est désormais enregistré sur disque à chaque authentification (fichier <code>token_secours.json</code> du dossier de l'équipement, lisible par son seul propriétaire, écriture atomique). Si la connexion échoue avec le jeton stocké en base — cycle interrompu avant l'enregistrement, écriture échouée — le démon retente automatiquement avec celui du disque, sans rien demander à l'utilisateur. Mesures faites sur une instance 2026.2.5 pour choisir ce mécanisme : le jeton change à chaque authentification, un jeton déjà consommé est refusé (un historique en cascade ne servirait donc à rien), et une session applicative ne peut pas émettre un second QR Code (un appareil de secours est donc impossible depuis le démon). Ne pas perdre le dernier jeton est le seul filet réalisable. Le jeton de secours n'est consommé que si Pronote a réellement refusé le jeton : un incident réseau, un serveur momentanément fermé ou une suspension d'adresse IP laissent la réserve intacte, puisque le jeton stocké reste valable et sera rejoué au cycle suivant.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-new">Nouveauté</span></td>
+                <td><strong>Dates de période, année scolaire et vacances</strong> — huit commandes s'ajoutent : <code>Période en cours</code>, <code>Début</code> et <code>Fin de la période</code> ; <code>Début</code> et <code>Fin de l'année scolaire</code> (bornes publiées par Pronote, sinon la période la plus large) ; <code>Prochaines vacances</code> avec leurs dates de début et de fin. Les vacances proviennent de <code>listeJoursFeries</code>, transmise à la connexion : malgré son nom, cette liste mêle jours fériés et périodes de vacances, et sa lecture ne coûte aucune requête supplémentaire. Dates au format jj/mm/aaaa. La période retenue est celle que Pronote désigne lui-même pour l'onglet Notes (<code>current_period</code>) ; si l'instance ne la publie pas, le démon retient la période contenant la date du jour, la plus courte d'abord — sans quoi un découpage « Année continue » l'emporterait sur le trimestre réel. Les commandes manquantes sont créées automatiquement sur les équipements existants lors de la mise à jour du plugin.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>Cause réelle distinguée d'un code PIN erroné</strong> — le déchiffrement du contenu du QR Code (local, avec le PIN) et celui du challenge (serveur) lèvent la même exception dans pronotepy. Les confondre affichait « Code PIN incorrect » alors que le PIN était bon. Seul <code>QRCodeDecryptError</code> met désormais le PIN en cause (code 3) ; un échec au challenge est rapporté comme un jeton refusé (code 5).</td>
+            </tr>
+</tbody>
+    </table>
+
     <h2>1.3.1 — Juin 2026</h2>
     <table>
         <thead><tr><th>Type</th><th>Description</th></tr></thead>
@@ -690,6 +742,22 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
             <tr>
                 <td><span class="badge badge-fix">Correctif</span></td>
                 <td><strong>Validation par QR Code réparée</strong> — la connexion par QR Code échouait silencieusement (code retour 2). Le script <code>QRConnect.py</code> ne déclarait pas l'argument <code>--apikey</code> ajouté côté PHP (lot sécurité 1.2.0), ce qui faisait échouer l'analyse des arguments. L'argument est désormais accepté.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>Compatibilité serveurs PRONOTE 2026</strong> — toute connexion échouait sur <code>KeyError: 'onload'</code> : les serveurs 2026 ne publient plus l'appel <code>Start({...})</code> dans l'attribut <code>onload</code> du <code>&lt;body&gt;</code>, que pronotepy &le; 2.14.6 lisait directement. Le plancher passe à <strong>pronotepy 2.15.6</strong>. La vérification des dépendances de Jeedom contrôle désormais la version installée (et plus seulement la présence du module), afin de proposer la réinstallation.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>Onglet Informations avec pronotepy 2.15</strong> — <code>Information.content</code> est devenu une méthode (le contenu est chargé à la demande) alors que c'était une propriété en 2.14. Le démon gère les deux formes.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>Décodage de l'image du QR Code</strong> — l'image était redimensionnée en 200 × 200 px (ratio écrasé) <em>avant</em> d'être passée au décodeur. Un QR Code Pronote fait 89 modules de côté : à cette taille la grille devenait illisible et le décodage échouait sur des captures pourtant nettes. Le décodage se fait désormais sur l'image d'origine, avec plusieurs échelles de repli ; le 200 × 200 ne sert plus qu'à l'aperçu.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>Messages d'erreur du QR Code</strong> — un code PIN erroné affichait « le QR Code a expiré », ce qui poussait à régénérer un QR Code inutilement. PIN incorrect, QR Code illisible et QR Code expiré / déjà utilisé sont maintenant distingués (codes de sortie 3, 4 et 5 de <code>QRConnect.py</code>). Une connexion refusée par Pronote n'est plus rapportée comme un succès.</td>
             </tr>
             <tr>
                 <td><span class="badge badge-fix">Correctif</span></td>
@@ -1031,6 +1099,40 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
     <h2>Mon QR Code ne fonctionne pas, pourquoi ?</h2>
     <p>Chaque QR Code Pronote est à <strong>usage unique</strong>. Si la connexion a échoué ou si vous avez
     rechargé la page, retournez sur Pronote pour en générer un nouveau.</p>
+    <p>Le message affiché indique désormais l'origine exacte du problème :</p>
+    <table>
+        <thead><tr><th>Message</th><th>Cause</th></tr></thead>
+        <tbody>
+            <tr>
+                <td>Impossible de décoder le QR Code</td>
+                <td>L'image n'a pas pu être lue (capture floue, recadrée au plus juste ou fortement
+                    redimensionnée). Recollez la capture d'écran d'origine.</td>
+            </tr>
+            <tr>
+                <td>Ce QR Code n'est pas un QR Code de connexion Pronote</td>
+                <td>L'image lue contient autre chose que le trio <code>jeton / login / url</code> attendu
+                    (par exemple le QR Code d'une autre application).</td>
+            </tr>
+            <tr>
+                <td>Code PIN incorrect</td>
+                <td>Le déchiffrement du jeton a échoué : il faut saisir exactement le code à 4 chiffres
+                    choisi au moment de la génération du QR Code. Ce n'est pas un QR Code expiré.</td>
+            </tr>
+            <tr>
+                <td>Le QR Code a expiré ou a déjà été utilisé</td>
+                <td>Pronote a refusé le jeton : le QR Code n'est valide que 10 minutes et une seule fois.</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>Erreur « KeyError: 'onload' » dans les logs, que faire ?</h2>
+    <p>Les serveurs <strong>PRONOTE 2026</strong> ne publient plus l'appel <code>Start({...})</code> dans
+    l'attribut <code>onload</code> de la page de connexion. Les versions de pronotepy jusqu'à la 2.14.6
+    lisaient cet attribut et échouent donc sur toutes les connexions — QR Code comme identifiants.</p>
+    <p>Le correctif est côté bibliothèque : ProJote exige désormais <strong>pronotepy 2.15.6 minimum</strong>.
+    Allez dans la configuration du plugin et cliquez sur <strong>Installer les dépendances</strong>, puis
+    relancez la connexion. Jeedom signale maintenant de lui-même les dépendances comme « à installer »
+    lorsque la version de pronotepy présente dans le venv est trop ancienne.</p>
 
     <h2>Comment changer mes identifiants stockés ?</h2>
     <p>Modifiez les champs dans la configuration de l'équipement et cliquez sur <strong>Valider</strong> pour

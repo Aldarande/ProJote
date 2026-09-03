@@ -3,7 +3,15 @@
 # Versions relevées par gel du venv de production (python 3.11) — épinglées,
 # sauf pronotepy : borne haute <3.0 pour suivre les correctifs 2.x sans subir
 # un breaking change 3.x (décision v1.0.1).
-pronotepy>=2.14.6,<3.0
+#
+# Plancher 2.15.6 (obligatoire) : les serveurs PRONOTE 2026 ne publient plus
+# l'appel Start({...}) dans l'attribut « onload » du <body>. pronotepy <= 2.14.6
+# le lisait via body["onload"] et échoue donc sur « KeyError: 'onload' » à la
+# connexion (identifiants comme QR Code). 2.15.6 cherche Start({...}) dans toute
+# la page et envoie un User-Agent mobile pour les espaces mobile.*.html.
+# ProJoted.py gère les deux API d'Information.content (propriété en 2.14,
+# méthode en 2.15), la borne peut donc être relevée sans autre changement.
+pronotepy>=2.15.6,<3.0
 autoslot==2025.11.1
 cryptography==46.0.6
 pycryptodome==3.20.0

@@ -579,17 +579,14 @@ function sendImageToServer(code, pin) {
   });
 }
 
-function resizeImage(imageData, width, height) {
+/**
+ * Charge une image (data URL) et résout avec l'élément <img> prêt à être dessiné.
+ */
+function loadImageElement(imageData) {
   return new Promise((resolve, reject) => {
     let img = new Image();
     img.onload = function () {
-      let canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      let ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, width, height);
-      let resizedImageData = canvas.toDataURL('image/png');
-      resolve(resizedImageData);
+      resolve(img);
     };
     img.onerror = function () {
       reject(new Error('Failed to load image'));
@@ -598,12 +595,121 @@ function resizeImage(imageData, width, height) {
   });
 }
 
+/**
+ * Fabrique la vignette d'aperçu (affichage uniquement) en conservant le ratio.
+ *
+ * Important : cette vignette ne sert QU'À l'affichage. Le décodage, lui, se fait
+ * sur l'image d'origine (cf. decodeQRFromImage).
+ */
+function makeThumbnail(img, maxSize) {
+  let natW = img.naturalWidth || img.width;
+  let natH = img.naturalHeight || img.height;
+  let ratio = Math.min(maxSize / natW, maxSize / natH, 1);
+  let canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(natW * ratio));
+  canvas.height = Math.max(1, Math.round(natH * ratio));
+  let ctx = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL('image/png');
+}
+
+/**
+ * Décode le QR code à partir de l'image d'origine.
+ *
+ * Historique du bug : l'image était d'abord redimensionnée en 200x200 (ratio
+ * écrasé), et c'est cette vignette qui était passée à jsQR. Or un QR Code
+ * Pronote est dense — il contient un jeton chiffré de plusieurs centaines
+ * d'octets, soit une grille de 50 modules de côté ou plus. À 200 px, un module
+ * fait moins de 4 px, et l'écrasement du ratio (une capture n'est jamais
+ * exactement carrée) finissait de rendre la grille illisible : jsQR renvoyait
+ * null sur des captures pourtant parfaitement nettes.
+ *
+ * On décode donc l'image telle quelle, puis on retente à d'autres échelles
+ * (toujours à ratio constant) : réduction pour les photos bruitées prises à
+ * l'écran, agrandissement pour les captures trop petites.
+ */
+function decodeQRFromImage(img) {
+  let natW = img.naturalWidth || img.width;
+  let natH = img.naturalHeight || img.height;
+  if (!natW || !natH) return null;
+
+  let maxSide = 3000; // garde-fou mémoire sur les photos haute résolution
+  let scales = [1, 0.5, 2, 0.75, 1.5, 3];
+  let canvas = document.createElement('canvas');
+  let ctx = canvas.getContext('2d', { willReadFrequently: true });
+  let tried = {};
+
+  for (let i = 0; i < scales.length; i++) {
+    let w = Math.round(natW * scales[i]);
+    let h = Math.round(natH * scales[i]);
+    let over = Math.max(w, h) / maxSide;
+    if (over > 1) {
+      w = Math.round(w / over);
+      h = Math.round(h / over);
+    }
+    if (w < 1 || h < 1) continue;
+    let key = w + 'x' + h;
+    if (tried[key]) continue;
+    tried[key] = true;
+
+    canvas.width = w;
+    canvas.height = h;
+    // Pas de lissage à l'agrandissement : les modules restent francs.
+    ctx.imageSmoothingEnabled = scales[i] < 1;
+    ctx.clearRect(0, 0, w, h);
+    ctx.drawImage(img, 0, 0, w, h);
+    let pixels = ctx.getImageData(0, 0, w, h);
+    let code = jsQR(pixels.data, pixels.width, pixels.height, {
+      inversionAttempts: 'attemptBoth',
+    });
+    if (code && code.data) {
+      console.log('ProJote.js:: QR décodé à l\'échelle ' + key);
+      return code;
+    }
+  }
+  return null;
+}
+
+/**
+ * Vérifie que le contenu décodé est bien un QR Code de connexion Pronote.
+ *
+ * Le QR Code Pronote contient un JSON { jeton, login, url } où « jeton » et
+ * « login » sont des chaînes hexadécimales (chiffrées avec le code PIN).
+ * On valide ici pour afficher un message clair côté navigateur, plutôt que de
+ * laisser échouer le script Python sur un « non-hexadecimal number found ».
+ *
+ * @returns {object|null} le contenu validé, ou null si ce n'est pas un QR Pronote.
+ */
+function parsePronoteQRPayload(raw) {
+  let data;
+  try {
+    data = JSON.parse(raw);
+  } catch (e) {
+    return null;
+  }
+  if (!data || typeof data !== 'object') return null;
+
+  let keys = ['jeton', 'login', 'url'];
+  for (let i = 0; i < keys.length; i++) {
+    if (typeof data[keys[i]] !== 'string' || data[keys[i]].length === 0) return null;
+  }
+  // jeton / login sont chiffrés puis encodés en hexadécimal par Pronote.
+  if (!/^[0-9a-fA-F]+$/.test(data.jeton) || !/^[0-9a-fA-F]+$/.test(data.login)) return null;
+  if (!/^https?:\/\//i.test(data.url)) return null;
+
+  return data;
+}
+
 function displayImage(imageData) {
   let img = document.createElement('img');
   img.src = imageData;
   img.style.border = '5px solid #90EE90'; // Couleur du cadre en vert clair
   let rectangle = document.querySelector('.rectangle');
   if (rectangle) {
+    // On conserve le champ « Parcourir » : sans cela, un premier essai raté
+    // (QR illisible) supprimait le bouton et empêchait de réessayer.
+    let fileInput = rectangle.querySelector('#fileInput');
+    let fileLabel = rectangle.querySelector('label[for="fileInput"]');
     rectangle.innerHTML = '';
     // Créez un élément div pour contenir l'image et le texte
     let container = document.createElement('div');
@@ -611,6 +717,8 @@ function displayImage(imageData) {
     rectangle.appendChild(container);
     // Ajoutez l'image à l'élément div
     container.appendChild(img);
+    if (fileInput) rectangle.appendChild(fileInput);
+    if (fileLabel) rectangle.appendChild(fileLabel);
     // Cliquer sur l'aperçu permet de ressaisir le PIN et de renvoyer le dernier QR décodé.
     img.style.cursor = 'pointer';
     img.title = 'Cliquer pour ressaisir le code PIN';
@@ -625,35 +733,41 @@ function displayImage(imageData) {
 }
 
 function handleImage(imageData) {
-  resizeImage(imageData, 200, 200).then(function (resizedImageData) {
-    let img = new Image();
-    img.onload = function () {
-      // Décoder le code QR à partir de l'image
-      let canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
-      let ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0);
-      let imageData = ctx.getImageData(0, 0, img.width, img.height);
-      let code = jsQR(imageData.data, imageData.width, imageData.height);
-      // Si le code QR est décodé avec succès, afficher les données
-      if (code) {
-        console.log('Données du QR code :', code.data);
-        // Demande le code PIN à l'utilisateur uniquement si le QR est valide
-        lastQRData = code.data;
-        askPinAndSend(code.data);
-      } else {
-        console.log('Impossible de décoder le code QR');
-        $('#error-message').text('Erreur : Impossible de décoder le QRcode ');
+  $('#error-message').text('');
+  loadImageElement(imageData)
+    .then(function (img) {
+      // Aperçu d'abord : l'utilisateur voit tout de suite ce qui a été déposé.
+      displayImage(makeThumbnail(img, 200));
+
+      let code = decodeQRFromImage(img);
+      if (!code) {
+        console.log('ProJote.js:: Impossible de décoder le QR code');
+        $('#error-message').text(
+          'Erreur : impossible de décoder le QR Code. Recollez la capture d\'écran d\'origine ' +
+          '(non recadrée au plus juste, non redimensionnée) ou fournissez une image plus nette.'
+        );
+        return;
       }
-      displayImage(resizedImageData);
-    };
-    img.onerror = function () {
-      alert('Erreur lors du chargement de l\'image.');
-      document.querySelector('.rectangle').innerHTML = '';
-    };
-    img.src = resizedImageData;
-  });
+
+      let payload = parsePronoteQRPayload(code.data);
+      if (!payload) {
+        console.log('ProJote.js:: QR décodé mais ce n\'est pas un QR de connexion Pronote');
+        $('#error-message').text(
+          'Erreur : ce QR Code n\'est pas un QR Code de connexion Pronote. ' +
+          'Générez-le depuis l\'application mobile Pronote (Menu → Ajouter un compte → Générer un QR Code).'
+        );
+        return;
+      }
+
+      // Ne pas logger code.data : contient le jeton et le login (credentials).
+      console.log('ProJote.js:: QR Code Pronote décodé (' + code.data.length + ' caractères)');
+      lastQRData = code.data;
+      askPinAndSend(code.data);
+    })
+    .catch(function (err) {
+      console.error('ProJote.js:: ', err);
+      $('#error-message').text('Erreur lors du chargement de l\'image.');
+    });
 }
 
 /********************************************************* 
