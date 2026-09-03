@@ -710,6 +710,10 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
         <tbody>
             <tr>
                 <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>Installation des dépendances impossible sous Debian bullseye</strong> — <code>requirements.txt</code> épinglait <code>requests==2.33.0</code>, version qui exige python 3.10. Les Jeedom sur Debian bullseye — python 3.9, cas courant sur Raspberry Pi — voyaient l'installation échouer sur <em>« Could not find a version that satisfies the requirement requests==2.33.0 »</em>, et restaient sans démon. La version est désormais choisie par marqueur d'environnement : 2.33.0 à partir de python 3.10, 2.32.5 en deçà. Les sept autres épingles ont été vérifiées compatibles 3.9.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
                 <td><strong>Compatibilité PRONOTE 2026.2.5 — challenge d'authentification non chiffré</strong> — depuis le 2 septembre 2026, ces serveurs ne chiffrent plus le « challenge » renvoyé à l'Identification. pronotepy 2.15.6 applique toujours le cycle historique <em>déchiffrer → retirer l'alea → rechiffrer</em> : la première étape échoue et <strong>toutes</strong> les connexions se soldent par <code>CryptoError: Decryption failed while trying to un pad</code> — QR Code, identifiants et jeton du démon. Symptôme caractéristique : réponse d'Identification sans champ <code>alea</code> et challenge tenant en un seul bloc AES de 16 octets. Le nouveau module <code>resources/ProJoted/pronote_compat.py</code> rétablit le comportement attendu (chiffrement direct de la chaîne brute) le temps du login uniquement, sans masquer un code PIN erroné. Voir <a href="https://github.com/bain3/pronotepy/issues/346">pronotepy #346</a> et <a href="https://github.com/bain3/pronotepy/issues/348">#348</a> ; à retirer quand pronotepy publiera son propre correctif.</td>
             </tr>
             <tr>
