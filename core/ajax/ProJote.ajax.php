@@ -88,6 +88,17 @@ try {
 
     log::add('ProJote', 'debug', 'Ajax::Début de la validation des identifiants pour eqLogic ' . $eqLogicId);
 
+    // Fenêtre de pause « IP suspendue » : tant qu'elle court, toute nouvelle
+    // tentative de connexion prolongerait le blocage côté Pronote.
+    $suspension = ProJote::ipSuspensionRemaining();
+    if ($suspension > 0) {
+      $reprise = date('H:i', time() + $suspension);
+      log::add('ProJote', 'warning', 'Ajax:: Validation refusée : adresse IP suspendue par Pronote jusqu\'à ' . $reprise . '.');
+      ajax::error('Pronote a temporairement suspendu l\'adresse IP de votre Jeedom (trop de connexions). '
+        . 'Patientez jusqu\'à ' . $reprise . ' avant de relancer une validation : chaque tentative prolonge le blocage.');
+      return;
+    }
+
     // Étape 1 : Construire le chemin vers l'interpréteur Python et le script à exécuter.
     // On utilise des chemins relatifs pour que cela fonctionne sur toutes les installations.
     $resourcePath = realpath(dirname(__FILE__) . '/../../resources');
@@ -170,6 +181,15 @@ try {
       // On renvoie ces données au JavaScript (frontend) qui va les utiliser pour
       // mettre à jour l'affichage de la page de configuration.
       ajax::success($data);
+    } elseif ($return_var === 4) {
+      // Code 4 = Pronote a suspendu l'adresse IP de cette installation (cf.
+      // pronote_errors.py). Les identifiants sont valides : on ouvre une fenêtre
+      // de pause et on invite l'utilisateur à patienter plutôt qu'à réessayer,
+      // chaque tentative supplémentaire prolongeant le blocage.
+      $until = ProJote::declareIpSuspension(0, 'Validation du compte (eqLogic ' . $eqLogicId . ')');
+      ajax::error('Pronote a temporairement suspendu l\'adresse IP de votre Jeedom (trop de connexions). '
+        . 'Aucune nouvelle tentative ne sera envoyée avant ' . date('H:i', $until)
+        . '. Patientez jusqu\'à cette heure avant de revalider le compte.');
     } else {
       // Le script a échoué. On renvoie un message d'erreur au JavaScript.
       // L'utilisateur verra une notification d'erreur.
@@ -208,6 +228,17 @@ try {
     $url = $data['url'];
 
     log::add('ProJote', 'debug', 'Ajax::Infos QR Code reçues pour eqid : ' . $eqLogicId);
+
+    // Fenêtre de pause « IP suspendue » : tant qu'elle court, toute nouvelle
+    // tentative de connexion prolongerait le blocage côté Pronote.
+    $suspension = ProJote::ipSuspensionRemaining();
+    if ($suspension > 0) {
+      $reprise = date('H:i', time() + $suspension);
+      log::add('ProJote', 'warning', 'Ajax:: Validation refusée : adresse IP suspendue par Pronote jusqu\'à ' . $reprise . '.');
+      ajax::error('Pronote a temporairement suspendu l\'adresse IP de votre Jeedom (trop de connexions). '
+        . 'Patientez jusqu\'à ' . $reprise . ' avant de relancer une validation : chaque tentative prolonge le blocage.');
+      return;
+    }
 
     // Le reste du processus est très similaire à la validation par login/mot de passe,
     // mais en utilisant un script Python différent : QRConnect.py
@@ -267,6 +298,15 @@ try {
 
       // Envoi des données au frontend
       ajax::success($data); // Note: L'ancien code envoyait $output, mais $data est plus correct et cohérent.
+    } elseif ($return_var === 4) {
+      // Code 4 = Pronote a suspendu l'adresse IP de cette installation (cf.
+      // pronote_errors.py). Les identifiants sont valides : on ouvre une fenêtre
+      // de pause et on invite l'utilisateur à patienter plutôt qu'à réessayer,
+      // chaque tentative supplémentaire prolongeant le blocage.
+      $until = ProJote::declareIpSuspension(0, 'Validation du compte (eqLogic ' . $eqLogicId . ')');
+      ajax::error('Pronote a temporairement suspendu l\'adresse IP de votre Jeedom (trop de connexions). '
+        . 'Aucune nouvelle tentative ne sera envoyée avant ' . date('H:i', $until)
+        . '. Patientez jusqu\'à cette heure avant de revalider le compte.');
     } elseif ($return_var === 3) {
       // Code 3 = QR code expiré ou illisible (cf. QRConnect.py). C'est le cas le
       // plus fréquent : le QR code Pronote n'est valide que 10 minutes.

@@ -26,11 +26,21 @@ Arguments attendus en ligne de commande :
   --Loglevel  : Niveau de verbosité des logs (debug, info, warning, error)
 """
 
+# Importés hors du bloc try : le gestionnaire d'erreurs final s'en sert pour
+# choisir le code de sortie, y compris si l'import de pronotepy échoue.
+import sys
+import traceback
+
+from pronote_errors import (
+    IP_SUSPENSION_EXIT_CODE,
+    is_ip_suspension_error,
+    ip_suspension_reason,
+)
+
 try:
     # TO DO :: add log to plugin for troubleshoote
     import pronotepy
     from pronotepy.ent import *
-    import sys
     import json
     import logging
     logging.basicConfig(
@@ -621,4 +631,13 @@ try:
             )
 
 except Exception as e:
-    line_number = e.__traceback__.tb_lineno
+    line_number = e.__traceback__.tb_lineno if e.__traceback__ else "?"
+    print(f"LoginConnect.py ERREUR (ligne {line_number}): {e}", flush=True)
+    print(traceback.format_exc(), flush=True)
+    # Code de sortie dédié (4) quand Pronote a suspendu l'adresse IP de la box
+    # (trop de connexions). Les identifiants, eux, sont valides : le PHP ouvre
+    # une fenêtre de pause au lieu d'inviter l'utilisateur à recommencer.
+    if is_ip_suspension_error(e):
+        print(f"LoginConnect.py :: {ip_suspension_reason(e)}", flush=True)
+        sys.exit(IP_SUSPENSION_EXIT_CODE)
+    sys.exit(1)

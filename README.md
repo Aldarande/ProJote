@@ -1,6 +1,6 @@
 # 📚 ProJote - Plugin JEEDOM Pronote
 
-![Version](https://img.shields.io/badge/version-1.3.1-blue)
+![Version](https://img.shields.io/badge/version-1.4.0-blue)
 ![License](https://img.shields.io/badge/license-AGPL%20v3-green)
 ![Jeedom](https://img.shields.io/badge/Jeedom-4.4+-orange)
 
