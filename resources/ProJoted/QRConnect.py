@@ -27,9 +27,18 @@ Arguments attendus en ligne de commande :
   --Uuid     : UUID unique de l'équipement (identifiant de session Pronote)
   --Loglevel : Niveau de verbosité des logs
 """
+# Importés hors du bloc try : le gestionnaire d'erreurs final s'en sert pour
+# choisir le code de sortie, y compris si l'import de pronotepy échoue.
+import sys
+
+from pronote_errors import (
+    IP_SUSPENSION_EXIT_CODE,
+    is_ip_suspension_error,
+    ip_suspension_reason,
+)
+
 try:
     import pronotepy
-    import sys
     import json
     import argparse
     import logging
@@ -182,6 +191,12 @@ except Exception as e:
     tb_lineno = e.__traceback__.tb_lineno if e.__traceback__ else '?'
     print(f"QRConnect.py ERREUR (ligne {tb_lineno}): {e}", flush=True)
     print(traceback.format_exc(), flush=True)
+    # Code de sortie dédié (4) quand Pronote a suspendu l'adresse IP de la box
+    # (trop de connexions). Le QR code, lui, est valide : réessayer tout de suite
+    # ne ferait que prolonger le blocage. Le PHP ouvre une fenêtre de pause.
+    if is_ip_suspension_error(e):
+        print(f"QRConnect.py :: {ip_suspension_reason(e)}", flush=True)
+        sys.exit(IP_SUSPENSION_EXIT_CODE)
     # Code de sortie dédié (3) quand le QR code est expiré ou illisible, afin que
     # le PHP affiche un message clair : le QR n'est valide que 10 minutes.
     exc_name = type(e).__name__

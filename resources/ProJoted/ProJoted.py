@@ -99,6 +99,9 @@ try:
 
     from LoginConnect import writedataPronotepy
 
+    # Détection des suspensions d'IP par Pronote (module local, stdlib uniquement).
+    from pronote_errors import is_ip_suspension_error, ip_suspension_reason
+
     # Chiffrement du password
     import hashlib
     from Crypto.Cipher import AES
@@ -209,6 +212,165 @@ def send_jeedom_message(message, message_type="error"):
     except Exception as e:
         logging.warning(f"Erreur lors de l'envoi du message Jeedom: {e}")
         return False
+
+
+# ── Suspension temporaire de l'adresse IP par Pronote ────────────────────────
+# Pronote limite le nombre de connexions par adresse IP. Au-delà, il suspend
+# l'IP : pronotepy lève « Your IP address is suspended. » ou l'erreur 25
+# (« Exceeded max authorization requests »). Continuer à interroger Pronote
+# pendant ce blocage ne fait que le prolonger.
+#
+# On ouvre donc une FENÊTRE DE PAUSE GLOBALE (et non par équipement) : l'IP est
+# commune à toute la box, un seul compte suspendu suspend tous les autres. Tant
+# que la fenêtre court, le démon ne contacte plus Pronote du tout.
+#
+# La durée double à chaque nouvelle suspension (30 min → 1 h → 2 h…, plafond
+# 6 h), puis repart à la durée de base après 24 h sans incident. La fenêtre est
+# persistée sur disque : sans cela, un redémarrage du démon relancerait les
+# requêtes immédiatement et prolongerait la suspension.
+_IP_SUSPENSION_BASE_DELAY = 1800  # 30 min pour la 1re suspension
+_IP_SUSPENSION_MAX_DELAY = 21600  # plafond : 6 h
+_IP_SUSPENSION_LEVEL_RESET = 86400  # 24 h sans suspension → retour à 30 min
+
+_ip_suspension_lock = threading.Lock()
+# until : fin de la fenêtre (epoch) — level : nombre de suspensions consécutives
+# last  : horodatage de la dernière suspension (sert au retour au niveau 1)
+_ip_suspension = {"until": 0.0, "level": 0, "last": 0.0}
+
+
+def _ip_suspension_file():
+    """Chemin du fichier de persistance de la fenêtre de pause."""
+    return os.path.join(_data_dir, "ip_suspension.json")
+
+
+def _save_ip_suspension():
+    """Écrit la fenêtre courante sur disque. À appeler sous _ip_suspension_lock."""
+    try:
+        path = _ip_suspension_file()
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as f:
+            json.dump(_ip_suspension, f)
+    except Exception as e:
+        logging.warning("Écriture de l'état de suspension d'IP impossible : %s", e)
+
+
+def load_ip_suspension():
+    """Recharge la fenêtre de pause depuis le disque au démarrage du démon."""
+    try:
+        with open(_ip_suspension_file(), "r") as f:
+            data = json.load(f)
+        with _ip_suspension_lock:
+            _ip_suspension["until"] = float(data.get("until", 0) or 0)
+            _ip_suspension["level"] = int(data.get("level", 0) or 0)
+            _ip_suspension["last"] = float(data.get("last", 0) or 0)
+            remaining = _ip_suspension["until"] - time.time()
+        if remaining > 0:
+            logging.warning(
+                "Suspension d'IP Pronote toujours active au démarrage du démon : "
+                "aucune requête ne sera envoyée avant %s (%d min).",
+                datetime.datetime.fromtimestamp(
+                    time.time() + remaining
+                ).strftime("%H:%M"),
+                int(remaining // 60) + 1,
+            )
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        logging.warning("Lecture de l'état de suspension d'IP impossible : %s", e)
+
+
+def ip_suspension_remaining():
+    """Secondes restantes avant la fin de la fenêtre de pause (0 si aucune)."""
+    with _ip_suspension_lock:
+        remaining = _ip_suspension["until"] - time.time()
+    return int(remaining) if remaining > 0 else 0
+
+
+def notify_ip_suspension(eqLogicId, until, delay, level, exc=None):
+    """Informe Jeedom de la fenêtre de pause.
+
+    Le PHP (jeeProJote.php) enregistre la fenêtre, alimente le centre de
+    messages et met à jour la commande « Statut_Connexion ».
+    """
+    if not eqLogicId:
+        return
+    try:
+        jeedom_com.send_change_immediate(
+            {
+                "CmdId": eqLogicId,
+                "connection_status": "ip_suspended",
+                "error": ip_suspension_reason(exc),
+                "ip_suspended_until": int(until),
+                "ip_suspended_delay": int(delay),
+                "ip_suspended_level": int(level),
+            }
+        )
+    except Exception as e:
+        logging.warning(
+            "Notification de suspension d'IP non transmise à Jeedom : %s", e
+        )
+
+
+def trigger_ip_suspension(eqLogicId="", exc=None):
+    """Ouvre la fenêtre de pause après une suspension d'IP détectée.
+
+    Si une fenêtre est déjà ouverte (un second équipement tombe sur la même
+    suspension), on ne ré-escalade pas la durée : on se contente de rappeler
+    l'échéance en cours à Jeedom.
+
+    Args:
+        eqLogicId: équipement à l'origine de la détection (pour la notification)
+        exc: exception pronotepy d'origine
+
+    Returns:
+        int: durée restante de la fenêtre, en secondes.
+    """
+    now = time.time()
+    with _ip_suspension_lock:
+        already_open = _ip_suspension["until"] > now
+        if not already_open:
+            # 24 h sans suspension → on repart de la durée de base.
+            if now - _ip_suspension["last"] > _IP_SUSPENSION_LEVEL_RESET:
+                _ip_suspension["level"] = 0
+            _ip_suspension["level"] += 1
+            delay = min(
+                _IP_SUSPENSION_BASE_DELAY * (2 ** (_ip_suspension["level"] - 1)),
+                _IP_SUSPENSION_MAX_DELAY,
+            )
+            _ip_suspension["until"] = now + delay
+            _ip_suspension["last"] = now
+            _save_ip_suspension()
+        until = _ip_suspension["until"]
+        level = _ip_suspension["level"]
+        delay = int(until - now)
+
+    if not already_open:
+        logging.error(
+            "%s. Toutes les requêtes Pronote sont suspendues pendant %d min "
+            "(reprise à %s) pour laisser le blocage se lever.",
+            ip_suspension_reason(exc),
+            delay // 60,
+            datetime.datetime.fromtimestamp(until).strftime("%H:%M"),
+        )
+    notify_ip_suspension(eqLogicId, until, delay, level, exc)
+    return delay
+
+
+def clear_ip_suspension():
+    """Referme la fenêtre de pause après une connexion réussie.
+
+    Returns:
+        bool: True si une fenêtre était ouverte et vient d'être refermée.
+    """
+    with _ip_suspension_lock:
+        if not _ip_suspension["until"]:
+            return False
+        _ip_suspension["until"] = 0.0
+        _save_ip_suspension()
+    logging.info(
+        "Connexion à Pronote rétablie : fin de la pause pour suspension d'IP."
+    )
+    return True
 
 
 def my_decrypt(data, passphrase=None):
@@ -2593,6 +2755,24 @@ def process_message(message):
                 }
             )
             return
+
+        # Fenêtre de pause : Pronote a suspendu l'IP de la box, on ne tente rien.
+        # Insister pendant la suspension ne ferait que la prolonger.
+        remaining = ip_suspension_remaining()
+        if remaining > 0:
+            with _ip_suspension_lock:
+                until = _ip_suspension["until"]
+                level = _ip_suspension["level"]
+            logging.warning(
+                "Équipement %s : mise à jour ignorée, l'adresse IP est suspendue "
+                "par Pronote. Reprise prévue à %s (dans %d min).",
+                eq_id,
+                datetime.datetime.fromtimestamp(until).strftime("%H:%M"),
+                remaining // 60 + 1,
+            )
+            notify_ip_suspension(eq_id, until, remaining, level)
+            return
+
         # ========================================================
         #   1 : On se connecte avec le Token réçu par défault
         # ========================================================
@@ -2666,6 +2846,11 @@ def process_message(message):
                         uuid=message.get("TokenUuid", "ProJote"),
                     )
             except Exception as e:
+                # Suspension d'IP : le token n'est pas en cause, on ne doit ni
+                # incrémenter le circuit breaker ni conseiller de rescanner le QR.
+                if is_ip_suspension_error(e):
+                    trigger_ip_suspension(eqLogicId=eqLogicId, exc=e)
+                    return
                 logging.error(
                     "Token invalide, regénérer le QR CODE ou re valider le compte : %s",
                     e,
@@ -2676,6 +2861,8 @@ def process_message(message):
             # credentials = client.export_credentials()
             if client is not None and client.logged_in:
                 tokenconnected = "true"
+                # Pronote répond de nouveau : on referme la fenêtre de pause.
+                clear_ip_suspension()
                 # Réinitialiser le compteur d'échecs en cas de connexion réussie
                 eqLogicId = message.get("CmdId", "")
                 with _failed_attempts_lock:
@@ -2816,6 +3003,11 @@ def process_message(message):
             )
             return False
     except Exception as e:
+        # La suspension peut aussi tomber en cours de récupération des données
+        # (chaque onglet Pronote déclenche une requête).
+        if is_ip_suspension_error(e):
+            trigger_ip_suspension(eqLogicId=message.get("CmdId", ""), exc=e)
+            return
         line_number = e.__traceback__.tb_lineno if e.__traceback__ else "unknown"
         error_msg = f"Erreur d'éxécution du daemon : ligne {line_number} - {str(e)}"
         logging.error(error_msg)
@@ -3075,6 +3267,11 @@ def _run_daemon():
     # Initialiser les variables globales pour les messages Jeedom
     _callback_url = _callback
     _apikey_global = _apikey
+
+    # Restaure une éventuelle fenêtre de pause « IP suspendue » laissée par une
+    # exécution précédente : sans cela, un redémarrage du démon repartirait
+    # aussitôt en requêtes et prolongerait la suspension.
+    load_ip_suspension()
 
     signal.signal(signal.SIGINT, handler)
     signal.signal(signal.SIGTERM, handler)

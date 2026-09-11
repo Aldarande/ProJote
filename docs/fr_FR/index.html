@@ -683,6 +683,21 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
     <!-- ── Historique ─────────────────────── -->
     <h1 id="version">Historique des versions</h1>
 
+    <h2>1.4.0 — Septembre 2026</h2>
+    <table>
+        <thead><tr><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><span class="badge badge-new">Nouveau</span></td>
+                <td><strong>Gestion des suspensions d'adresse IP</strong> — quand Pronote suspend temporairement l'adresse IP de la box (trop de connexions), ProJote ouvre désormais une <strong>fenêtre de pause</strong> : plus aucune requête n'est envoyée pendant 30 minutes (durée doublée à chaque récidive, plafond 6 h), le temps que le blocage se lève. Un message explicite est publié dans le <strong>centre de messages Jeedom</strong> et la commande <code>Statut_Connexion</code> indique l'heure de reprise. La pause est globale au plugin (l'adresse IP est commune à tous les équipements) et survit à un redémarrage du démon.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>Échecs de validation par identifiants silencieux</strong> — <code>LoginConnect.py</code> interceptait les erreurs sans rien journaliser ni renvoyer de code d'erreur : l'interface annonçait une réussite alors que la connexion avait échoué. L'erreur est maintenant tracée dans les logs et remontée à l'interface.</td>
+            </tr>
+        </tbody>
+    </table>
+
     <h2>1.3.1 — Juin 2026</h2>
     <table>
         <thead><tr><th>Type</th><th>Description</th></tr></thead>
@@ -1032,6 +1047,16 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
     <p>Chaque QR Code Pronote est à <strong>usage unique</strong>. Si la connexion a échoué ou si vous avez
     rechargé la page, retournez sur Pronote pour en générer un nouveau.</p>
 
+    <h2>ProJote m'indique que mon adresse IP est suspendue <span class="badge badge-new">v1.4.0</span></h2>
+    <p>Pronote limite le nombre de connexions par adresse IP. Au-delà, il <strong>suspend temporairement</strong>
+    l'adresse de votre box : toutes les tentatives sont alors refusées, quel que soit le compte utilisé.</p>
+    <p>ProJote le détecte et met automatiquement toutes ses requêtes en pause (30 minutes par défaut, doublées à
+    chaque récidive), pour laisser le blocage se lever. Un message vous l'indique dans le centre de messages, avec
+    l'heure de reprise.</p>
+    <p><strong>La seule chose à faire est d'attendre.</strong> Relancer une validation de compte ou un
+    rafraîchissement pendant la pause prolongerait la suspension : c'est pourquoi ProJote refuse ces actions
+    jusqu'à l'heure indiquée. Dès qu'une connexion réussit, la pause est levée et le message disparaît.</p>
+
     <h2>Comment changer mes identifiants stockés ?</h2>
     <p>Modifiez les champs dans la configuration de l'équipement et cliquez sur <strong>Valider</strong> pour
     re-générer un nouveau token. Les anciens identifiants sont immédiatement remplacés.</p>
@@ -1113,6 +1138,15 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
     <table>
         <thead><tr><th>Message / Symptôme</th><th>Solution</th></tr></thead>
         <tbody>
+            <tr>
+                <td><code>[IP SUSPENDUE]</code> dans les logs / « Votre adresse IP est suspendue »</td>
+                <td>
+                    Pronote a temporairement bloqué l'adresse IP de votre box (trop de connexions).
+                    ProJote met automatiquement ses requêtes en pause et affiche l'heure de reprise dans
+                    le centre de messages. <strong>Attendez cette heure</strong> : chaque nouvelle tentative
+                    prolonge le blocage. Voir la <a href="#faq">FAQ</a>.
+                </td>
+            </tr>
             <tr>
                 <td>Le démon ne démarre pas</td>
                 <td>
