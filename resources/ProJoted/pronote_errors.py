@@ -26,7 +26,9 @@ bien par le démon (``ProJoted.py``) que par les scripts de validation de compte
 # Code de sortie renvoyé par LoginConnect.py / QRConnect.py quand la connexion
 # a échoué parce que Pronote a suspendu l'adresse IP. Le PHP (ProJote.ajax.php)
 # s'en sert pour afficher un message explicite plutôt qu'une erreur générique.
-IP_SUSPENSION_EXIT_CODE = 4
+# Valeur 7 : les codes 3 à 6 sont déjà pris par les diagnostics du QR Code et
+# des dépendances (cf. l'en-tête de QRConnect.py).
+IP_SUSPENSION_EXIT_CODE = 7
 
 # Codes d'erreur Pronote considérés comme une limitation de débit.
 # 25 = « Exceeded max authorization requests. Please wait before retrying... »

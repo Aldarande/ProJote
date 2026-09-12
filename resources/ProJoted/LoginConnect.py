@@ -26,10 +26,10 @@ Arguments attendus en ligne de commande :
   --Loglevel  : Niveau de verbosité des logs (debug, info, warning, error)
 """
 
-# Importés hors du bloc try : le gestionnaire d'erreurs final s'en sert pour
-# choisir le code de sortie, y compris si l'import de pronotepy échoue.
+# Importés hors du bloc try : sys sert dès la configuration du logging, et le
+# gestionnaire d'erreurs final s'appuie sur pronote_errors pour choisir le code
+# de sortie — y compris si l'import de pronotepy échoue.
 import sys
-import traceback
 
 from pronote_errors import (
     IP_SUSPENSION_EXIT_CODE,
@@ -60,6 +60,13 @@ try:
     import base64
     import binascii
     from Crypto.Cipher import AES
+
+    # Correctifs de compatibilité pronotepy (voir pronote_compat.py) :
+    # PRONOTE >= 2026.2.5 ne chiffre plus le challenge d'authentification,
+    # ce qui fait échouer TOUS les modes de connexion de pronotepy 2.15.6.
+    import pronote_compat
+
+    pronote_compat.apply()
 
     try:
         from jeedom.jeedom import *
@@ -631,13 +638,44 @@ try:
             )
 
 except Exception as e:
+    # Ce gestionnaire ne journalisait rien et ne changeait pas le code de sortie :
+    # toute erreur de connexion (identifiants ou serveur) terminait le script en
+    # code 0, et ProJote.ajax.php annonçait alors une validation réussie alors
+    # qu'aucun token n'avait été écrit. Les logs ne contenaient rien non plus.
+    # Réimportés ici : si l'import de pronotepy (première ligne du try) a échoué,
+    # sys et logging ne sont pas encore définis dans ce gestionnaire.
+    import sys
+    import logging
+    import traceback
+
     line_number = e.__traceback__.tb_lineno if e.__traceback__ else "?"
+    logging.error("LoginConnect.py :: Erreur (ligne %s) : %s", line_number, e)
     print(f"LoginConnect.py ERREUR (ligne {line_number}): {e}", flush=True)
     print(traceback.format_exc(), flush=True)
-    # Code de sortie dédié (4) quand Pronote a suspendu l'adresse IP de la box
-    # (trop de connexions). Les identifiants, eux, sont valides : le PHP ouvre
-    # une fenêtre de pause au lieu d'inviter l'utilisateur à recommencer.
-    if is_ip_suspension_error(e):
-        print(f"LoginConnect.py :: {ip_suspension_reason(e)}", flush=True)
-        sys.exit(IP_SUSPENSION_EXIT_CODE)
-    sys.exit(1)
+
+    # Importé par ProJoted.py / QRConnect.py : on journalise sans tuer l'appelant.
+    if __name__ == "__main__":
+        exc_name = type(e).__name__
+        msg = str(e).lower()
+        # Code de sortie dédié (7) quand Pronote a suspendu l'adresse IP de la box
+        # (trop de connexions). Les identifiants, eux, sont valides : le PHP ouvre
+        # une fenêtre de pause au lieu d'inviter l'utilisateur à recommencer.
+        if is_ip_suspension_error(e):
+            logging.error(ip_suspension_reason(e))
+            print(f"LoginConnect.py :: {ip_suspension_reason(e)}", flush=True)
+            sys.exit(IP_SUSPENSION_EXIT_CODE)
+        # Page de connexion Pronote non reconnue par pronotepy — cf. QRConnect.py :
+        # les serveurs PRONOTE 2026 ne publient plus Start({...}) dans l'attribut
+        # « onload » du <body>, que pronotepy <= 2.14.6 lisait directement.
+        if (
+            (exc_name == "KeyError" and "onload" in msg)
+            or "page html is different than expected" in msg
+            or "unable to connect to pronote" in msg
+        ):
+            logging.error(
+                "La page de connexion Pronote n'est pas reconnue par pronotepy. "
+                "Mettez à jour les dépendances du plugin : Configuration du plugin → "
+                "« Installer les dépendances » (pronotepy 2.15.6 minimum)."
+            )
+            sys.exit(6)
+        sys.exit(1)
