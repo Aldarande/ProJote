@@ -1,6 +1,6 @@
 # 📚 ProJote - Plugin JEEDOM Pronote
 
-![Version](https://img.shields.io/badge/version-1.4.3-blue)
+![Version](https://img.shields.io/badge/version-1.4.4-blue)
 ![License](https://img.shields.io/badge/license-AGPL%20v3-green)
 ![Jeedom](https://img.shields.io/badge/Jeedom-4.4+-orange)
 
@@ -58,7 +58,7 @@
 
 ✅ **Automatisation**
 - Synchronisation périodique configurable
-- Cron toutes les heures (horaire d'école)
+- Cron toutes les heures, suspendu de 20h à 7h (droit à la déconnexion)
 - Commandes d'actualisation manuelles
 - Webhooks pour intégrations externes
 
