@@ -704,6 +704,17 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
     <!-- ── Historique ─────────────────────── -->
     <h1 id="version">Historique des versions</h1>
 
+    <h2>1.4.3 — Septembre 2026</h2>
+    <table>
+        <thead><tr><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><span class="badge badge-new">Nouveauté</span></td>
+                <td><strong>Suspension détectée aussi en cours de collecte</strong> — une suspension ne survient pas seulement à la connexion : le quota peut être atteint au milieu d'un cycle. Or chaque collecteur (emploi du temps, notes, absences…) rattrape ses erreurs pour qu'un onglet en panne n'interrompe pas les autres, et pronotepy répond à toute requête refusée en rouvrant une session — ce qui commence par un appel à la page de connexion, justement celle qui annonce la suspension. Le blocage était donc avalé douze fois de suite, au prix d'une vingtaine de requêtes émises pendant la suspension, avant que le cycle ne se termine en annonçant « Connecté » avec des données vides. Un garde posé sur l'unique point de passage réseau de pronotepy interrompt désormais le cycle à la première requête refusée : deux requêtes au lieu d'une vingtaine, la fenêtre de pause s'ouvre immédiatement, et Jeedom conserve les valeurs du cycle précédent au lieu d'être écrasé.</td>
+            </tr>
+        </tbody>
+    </table>
+
     <h2>1.4.2 — Septembre 2026</h2>
     <table>
         <thead><tr><th>Type</th><th>Description</th></tr></thead>
@@ -1160,9 +1171,11 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
     <h2>ProJote m'indique que mon adresse IP est suspendue <span class="badge badge-new">v1.4.2</span></h2>
     <p>Pronote limite le nombre de connexions par adresse IP. Au-delà, il <strong>suspend temporairement</strong>
     l'adresse de votre box : toutes les tentatives sont alors refusées, quel que soit le compte utilisé.</p>
-    <p>ProJote le détecte et met automatiquement toutes ses requêtes en pause (30 minutes par défaut, doublées à
-    chaque récidive), pour laisser le blocage se lever. Un message vous l'indique dans le centre de messages, avec
-    l'heure de reprise.</p>
+    <p>ProJote le détecte — à la connexion comme au milieu d'une récupération de données — et met automatiquement
+    toutes ses requêtes en pause (30 minutes par défaut, doublées à chaque récidive), pour laisser le blocage se
+    lever. Un message vous l'indique dans le centre de messages, avec l'heure de reprise. Le cycle en cours
+    s'interrompt immédiatement et les informations déjà affichées dans Jeedom sont conservées telles quelles :
+    elles datent simplement de la dernière synchronisation réussie.</p>
     <p><strong>La seule chose à faire est d'attendre.</strong> Relancer une validation de compte ou un
     rafraîchissement pendant la pause prolongerait la suspension : c'est pourquoi ProJote refuse ces actions
     jusqu'à l'heure indiquée. Dès qu'une connexion réussit, la pause est levée et le message disparaît.</p>

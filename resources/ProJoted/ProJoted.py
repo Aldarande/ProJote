@@ -109,7 +109,11 @@ try:
     from LoginConnect import writedataPronotepy
 
     # Détection des suspensions d'IP par Pronote (module local, stdlib uniquement).
-    from pronote_errors import is_ip_suspension_error, ip_suspension_reason
+    from pronote_errors import (
+        SuspensionIP,
+        ip_suspension_reason,
+        is_ip_suspension_error,
+    )
 
     # Chiffrement du password
     import hashlib
@@ -369,6 +373,80 @@ def trigger_ip_suspension(eqLogicId="", exc=None):
         )
     notify_ip_suspension(eqLogicId, until, delay, level, exc)
     return delay
+
+
+_garde_suspension_installee = False
+
+
+def _installer_garde_suspension():
+    """Empêche pronotepy de se ré-authentifier en boucle sur une IP suspendue.
+
+    Toute erreur Pronote qui n'est pas ``ExpiredObject`` pousse pronotepy à
+    jeter la session et à en rouvrir une (``ClientBase.post`` →  ``refresh()``),
+    ce qui commence par un GET de la page de connexion — précisément la requête
+    qui renvoie la page « adresse IP suspendue ». L'exception remonte ensuite au
+    collecteur, qui l'avale, et le collecteur suivant recommence : une vingtaine
+    de requêtes émises pendant le blocage qu'on cherche justement à laisser
+    retomber.
+
+    Le garde transforme cette erreur en ``SuspensionIP``, qui hérite de
+    ``BaseException`` et traverse donc les ``except Exception`` des collecteurs
+    jusqu'à ``process_message``. Le cycle s'arrête au premier échec au lieu de
+    parcourir les douze collecteurs.
+
+    ``post()`` est le seul chemin vers le réseau une fois la session ouverte
+    (``dataClasses`` l'appelle vingt-six fois), d'où ce point d'accroche unique.
+    ``ParentClient`` redéfinit la méthode — sans le garde anti-récursion de
+    ``ClientBase``, d'ailleurs — et doit donc être traité à part.
+
+    Idempotent et silencieux en cas d'échec : comme ``pronote_compat.apply()``,
+    ce correctif s'appuie sur des détails internes de pronotepy. Si une version
+    future les déplace, on veut le comportement d'origine, pas un démon qui
+    refuse de démarrer.
+    """
+    global _garde_suspension_installee
+    if _garde_suspension_installee:
+        return
+
+    def _garder(post_origine):
+        def post(self, *args, **kwargs):
+            try:
+                return post_origine(self, *args, **kwargs)
+            except SuspensionIP:
+                raise
+            except BaseException as e:
+                if is_ip_suspension_error(e):
+                    logging.error(
+                        "%s. Cycle interrompu immédiatement : poursuivre les "
+                        "collectes rallongerait la suspension.",
+                        ip_suspension_reason(e),
+                    )
+                    raise SuspensionIP(ip_suspension_reason(e)) from e
+                raise
+
+        post.__doc__ = getattr(post_origine, "__doc__", None)
+        post._projote_garde_suspension = True
+        return post
+
+    try:
+        cibles = [pronotepy.ClientBase]
+        # ParentClient redéfinit post() : l'hériter ne suffit pas.
+        if pronotepy.ParentClient.post is not pronotepy.ClientBase.post:
+            cibles.append(pronotepy.ParentClient)
+        for classe in cibles:
+            if not getattr(classe.post, "_projote_garde_suspension", False):
+                classe.post = _garder(classe.post)
+    except Exception as e:
+        logging.warning(
+            "Garde « suspension d'IP » non installé (%s: %s) : un blocage en "
+            "cours de cycle sera détecté au cycle suivant seulement.",
+            type(e).__name__,
+            e,
+        )
+        return
+
+    _garde_suspension_installee = True
+    logging.debug("Garde « suspension d'IP » installé sur pronotepy.post.")
 
 
 def clear_ip_suspension():
@@ -3508,9 +3586,17 @@ def process_message(message):
                 }
             )
             return False
+    except SuspensionIP as e:
+        # Levée par le garde posé sur pronotepy.post : une suspension est apparue
+        # en cours de cycle. Elle a traversé les except Exception des collecteurs,
+        # le cycle s'est donc arrêté à la première requête refusée. On n'envoie
+        # pas le jsondata partiel : Jeedom conserve ses valeurs précédentes au
+        # lieu d'être écrasé par des données vides.
+        trigger_ip_suspension(eqLogicId=message.get("CmdId", ""), exc=e)
+        return
     except Exception as e:
-        # La suspension peut aussi tomber en cours de récupération des données
-        # (chaque onglet Pronote déclenche une requête).
+        # Filet pour les chemins qui ne passent pas par post() — la connexion
+        # initiale, par exemple, où la suspension est vue dans initialise().
         if is_ip_suspension_error(e):
             trigger_ip_suspension(eqLogicId=message.get("CmdId", ""), exc=e)
             return
@@ -3786,6 +3872,7 @@ def _run_daemon():
     # exécution précédente : sans cela, un redémarrage du démon repartirait
     # aussitôt en requêtes et prolongerait la suspension.
     load_ip_suspension()
+    _installer_garde_suspension()
 
     signal.signal(signal.SIGINT, handler)
     signal.signal(signal.SIGTERM, handler)

@@ -10,6 +10,7 @@ Deux volets :
 import json
 import os
 import time
+import types
 
 import pronote_errors
 import pytest
@@ -262,3 +263,132 @@ class TestProcessMessage:
         # Token réellement invalide : pas de pause, mais un échec comptabilisé.
         assert daemon.ip_suspension_remaining() == 0
         assert daemon.failed_attempts["9"]["count"] == 1
+
+
+# ── Garde posé sur pronotepy.post ────────────────────────────────────────────
+class TestSuspensionIP:
+    def test_traverse_les_except_exception(self):
+        """C'est toute la raison d'être de l'héritage BaseException."""
+        avale = False
+        try:
+            try:
+                raise pronote_errors.SuspensionIP("suspendue")
+            except Exception:  # noqa: BLE001 - reproduit le filet des collecteurs
+                avale = True
+        except pronote_errors.SuspensionIP:
+            pass
+        assert avale is False
+
+    def test_n_est_pas_une_exception_ordinaire(self):
+        assert issubclass(pronote_errors.SuspensionIP, BaseException)
+        assert not issubclass(pronote_errors.SuspensionIP, Exception)
+
+
+class _FauxClientBase:
+    """Reproduit ClientBase.post : lève ce qu'on lui demande."""
+
+    a_lever = None
+    appels = 0
+
+    def post(self, function_name, onglet=None, data=None):
+        type(self).appels += 1
+        if type(self).a_lever is not None:
+            raise type(self).a_lever
+        return {"ok": function_name}
+
+
+class _FauxParentClient(_FauxClientBase):
+    def post(self, function_name, onglet=None, data=None):  # override, comme pronotepy
+        return _FauxClientBase.post(self, function_name, onglet, data)
+
+
+@pytest.fixture
+def garde(daemon, monkeypatch):
+    """Installe le garde sur des classes factices, puis remet tout en place."""
+    faux = types.SimpleNamespace(
+        ClientBase=_FauxClientBase, ParentClient=_FauxParentClient
+    )
+    monkeypatch.setattr(daemon, "pronotepy", faux, raising=False)
+    monkeypatch.setattr(daemon, "_garde_suspension_installee", False, raising=False)
+    post_base, post_parent = _FauxClientBase.post, _FauxParentClient.post
+    _FauxClientBase.a_lever = None
+    _FauxClientBase.appels = 0
+    yield daemon
+    _FauxClientBase.post, _FauxParentClient.post = post_base, post_parent
+    _FauxClientBase.a_lever = None
+    daemon._garde_suspension_installee = False
+
+
+class TestGardeSuspension:
+    def test_suspension_convertie(self, garde):
+        garde._installer_garde_suspension()
+        _FauxClientBase.a_lever = _FakePronoteError("Your IP address is suspended.")
+        with pytest.raises(pronote_errors.SuspensionIP):
+            _FauxClientBase().post("PageEmploiDuTemps")
+
+    def test_compte_parent_couvert(self, garde):
+        garde._installer_garde_suspension()
+        _FauxClientBase.a_lever = _FakePronoteError("Unknown error", code=25)
+        with pytest.raises(pronote_errors.SuspensionIP):
+            _FauxParentClient().post("PagePresence")
+
+    def test_autres_erreurs_inchangees(self, garde):
+        garde._installer_garde_suspension()
+        _FauxClientBase.a_lever = ValueError("panne d'onglet")
+        with pytest.raises(ValueError):
+            _FauxClientBase().post("PageNotes")
+
+    def test_appel_normal_transparent(self, garde):
+        garde._installer_garde_suspension()
+        assert _FauxClientBase().post("PageNotes") == {"ok": "PageNotes"}
+
+    def test_idempotent(self, garde):
+        garde._installer_garde_suspension()
+        pose = _FauxClientBase.post
+        garde._garde_suspension_installee = False  # force un second passage
+        garde._installer_garde_suspension()
+        assert _FauxClientBase.post is pose, "le garde ne doit pas s'empiler"
+
+    def test_installation_silencieuse_si_pronotepy_change(self, garde, monkeypatch):
+        # Si une version future de pronotepy déplace post(), le démon démarre
+        # quand même — sans le garde.
+        monkeypatch.setattr(garde, "pronotepy", types.SimpleNamespace(), raising=False)
+        garde._installer_garde_suspension()
+        assert garde._garde_suspension_installee is False
+
+
+class TestCollecteInterrompue:
+    def test_collecteur_ne_peut_pas_avaler_la_suspension(self, daemon_env, monkeypatch):
+        """Le cas réel : la suspension tombe pendant la collecte."""
+        daemon, recorder = daemon_env
+
+        class _Client:
+            @staticmethod
+            def token_login(**kwargs):
+                return types.SimpleNamespace(
+                    logged_in=True,
+                    info=types.SimpleNamespace(name="Élève", class_name="3A"),
+                    communication=types.SimpleNamespace(authorized_onglets=[]),
+                )
+
+        def _edt_qui_avale(client):
+            # Reproduit fidèlement le filet d'un collecteur.
+            try:
+                raise pronote_errors.SuspensionIP("suspendue")
+            except Exception:  # noqa: BLE001
+                return {"error": "avalé"}
+
+        monkeypatch.setattr(daemon.pronotepy, "Client", _Client, raising=False)
+        monkeypatch.setattr(daemon, "Checkeleve", lambda *a, **k: None)
+        monkeypatch.setattr(daemon, "identites", lambda *a, **k: {})
+        monkeypatch.setattr(daemon, "download_photo", lambda *a, **k: None)
+        monkeypatch.setattr(daemon, "Emploidutemps", _edt_qui_avale)
+
+        daemon.process_message(_message("11"))
+
+        assert daemon.ip_suspension_remaining() > 0, (
+            "la suspension doit ouvrir la fenêtre malgré le except Exception du collecteur"
+        )
+        statuts = [p.get("connection_status") for p in recorder.sent]
+        assert "connected" not in statuts, "aucune donnée partielle ne doit partir"
+        assert statuts[-1] == "ip_suspended"
