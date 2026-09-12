@@ -438,9 +438,14 @@ class ProJote extends eqLogic
 
     $heure = date('G'); // Heure actuelle (0-23)
 
-    // Pronote est souvent indisponible la nuit. Inutile de faire des requêtes.
-    if ($heure >= 22 || $heure < 4) {
-      log::add(__CLASS__, 'debug', "Cron_hourly : Il est $heure heure, période de non-activité. Aucune mise à jour lancée.");
+    // Droit à la déconnexion : aucune collecte entre 20h et 7h. La vie scolaire
+    // s'arrête le soir, et une note ou une punition récupérée à 23h ne sert qu'à
+    // déclencher une notification au mauvais moment. Accessoirement, Pronote est
+    // souvent indisponible la nuit.
+    // La commande « Rafraîchir » reste utilisable à toute heure : c'est une
+    // action volontaire de l'utilisateur, pas une sollicitation automatique.
+    if ($heure >= 20 || $heure < 7) {
+      log::add(__CLASS__, 'debug', "Cron_hourly : Il est $heure heure, période de déconnexion (20h-7h). Aucune mise à jour lancée.");
       return;
     }
 

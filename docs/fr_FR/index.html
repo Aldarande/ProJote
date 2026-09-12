@@ -391,7 +391,7 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
 
     <!-- ── Utilisation ────────────────────── -->
     <h1 id="utilisation">Commandes disponibles</h1>
-    <p>Une fois connecté, le démon synchronise les données Pronote <strong>toutes les heures</strong> (désactivé de 22h à 4h).
+    <p>Une fois connecté, le démon synchronise les données Pronote <strong>toutes les heures</strong> (désactivé de 20h à 7h).
     Vous pouvez forcer une actualisation avec la commande <em>Rafraîchir</em>.</p>
 
     <table>
@@ -471,8 +471,10 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
 
     <div class="callout callout-info">
         <strong>Fenêtre de synchronisation</strong>
-        Le cron Jeedom déclenche une collecte automatique toutes les heures, <strong>désactivé entre 22h et 4h</strong>
-        pour ne pas solliciter Pronote la nuit. La commande <em>Rafraîchir</em> reste utilisable à toute heure.
+        Le cron Jeedom déclenche une collecte automatique toutes les heures, <strong>désactivé entre 20h et 7h</strong>
+        au titre du droit à la déconnexion : la vie scolaire s'arrête le soir, et une note récupérée à 23h ne sert
+        qu'à déclencher une notification au mauvais moment. La commande <em>Rafraîchir</em> reste utilisable à toute
+        heure — c'est une action volontaire, pas une sollicitation automatique.
     </div>
 
     <div class="callout callout-warning">
@@ -703,6 +705,17 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
 
     <!-- ── Historique ─────────────────────── -->
     <h1 id="version">Historique des versions</h1>
+
+    <h2>1.4.4 — Septembre 2026</h2>
+    <table>
+        <thead><tr><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>Fenêtre de déconnexion élargie à 20h–7h</strong> — la collecte automatique s'arrêtait de 22h à 4h, une plage choisie sur la seule disponibilité des serveurs Pronote. Elle couvre désormais <strong>20h à 7h</strong>, au titre du droit à la déconnexion : la vie scolaire s'arrête le soir, et une note ou une punition récupérée à 23h ne sert qu'à déclencher une notification au mauvais moment. La commande <em>Rafraîchir</em> et le clic sur l'avatar du widget restent utilisables à toute heure — ce sont des actions volontaires, pas des sollicitations automatiques.</td>
+            </tr>
+        </tbody>
+    </table>
 
     <h2>1.4.3 — Septembre 2026</h2>
     <table>
@@ -1120,12 +1133,12 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
     de l'établissement est effectuée — aucune télémétrie, aucun appel vers un serveur tiers.</p>
 
     <h2>À quelle fréquence les données sont-elles synchronisées ?</h2>
-    <p>Toutes les heures par défaut, automatiquement désactivé entre 22h et 4h via le cron Jeedom.
+    <p>Toutes les heures par défaut, automatiquement désactivé entre 20h et 7h via le cron Jeedom (droit à la déconnexion).
     Vous pouvez forcer une synchronisation manuelle avec la commande <em>Rafraîchir</em> de l'équipement,
     ou en cliquant sur la photo/avatar dans le widget — cela fonctionne à toute heure, y compris la nuit.</p>
     <div class="callout callout-info">
         <strong>Fenêtre nocturne et rafraîchissement manuel</strong>
-        La plage 22h–4h désactive uniquement les synchronisations <em>automatiques</em> planifiées.
+        La plage 20h–7h désactive uniquement les synchronisations <em>automatiques</em> planifiées.
         Un rafraîchissement manuel (bouton <em>Rafraîchir</em> ou clic sur l'avatar du widget) est toujours
         exécuté immédiatement, quelle que soit l'heure.
     </div>
