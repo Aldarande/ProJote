@@ -706,6 +706,17 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
     <!-- ── Historique ─────────────────────── -->
     <h1 id="version">Historique des versions</h1>
 
+    <h2>1.4.5 — Septembre 2026</h2>
+    <table>
+        <thead><tr><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>Liste de devoirs vide : la cause est désormais journalisée</strong> — trois situations très différentes produisaient la même liste vide, sans rien permettre de les distinguer dans les logs : Pronote ne renvoie aucun devoir, il en renvoie mais à des dates qui ne correspondent ni à aujourd'hui ni au prochain jour, ou la requête échoue. Le démon journalise maintenant la plage demandée et les semaines scolaires correspondantes, le nombre de devoirs reçus avec leurs échéances, le jour effectivement retenu comme « prochain jour avec devoirs », et — en cas d'échec — le type de l'exception et sa trace complète. Une liste vide sur 120 jours déclenche en outre un avertissement invitant à vérifier que l'onglet « Cahier de textes » figure bien parmi les onglets autorisés par Pronote pour ce compte.</td>
+            </tr>
+        </tbody>
+    </table>
+
     <h2>1.4.4 — Septembre 2026</h2>
     <table>
         <thead><tr><th>Type</th><th>Description</th></tr></thead>
@@ -1274,6 +1285,18 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
     <table>
         <thead><tr><th>Message / Symptôme</th><th>Solution</th></tr></thead>
         <tbody>
+            <tr>
+                <td>La liste des devoirs reste vide</td>
+                <td>
+                    Passez le log ProJote en <strong>Debug</strong> et relancez une synchronisation
+                    (bouton <em>Rafraîchir</em>), puis cherchez les lignes commençant par <code>Devoirs :</code>.
+                    Elles indiquent la plage demandée, le nombre de devoirs reçus et leurs échéances.
+                    Aucun devoir reçu sur 120 jours alors que le cahier de textes de Pronote n'est pas vide
+                    signale en général un onglet « Cahier de textes » non accessible à ce compte : la ligne
+                    <code>Onglets autorisés par Pronote pour ce compte</code>, journalisée à la connexion,
+                    doit contenir l'onglet 88.
+                </td>
+            </tr>
             <tr>
                 <td><code>[IP SUSPENDUE]</code> dans les logs / « Votre adresse IP est suspendue »</td>
                 <td>
