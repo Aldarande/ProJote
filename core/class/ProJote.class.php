@@ -326,6 +326,98 @@ class ProJote extends eqLogic
     if (!is_dir($path)) mkdir($path);
     return $path;
   }
+
+  // --- SUSPENSION TEMPORAIRE DE L'ADRESSE IP PAR PRONOTE ---
+  // Pronote limite le nombre de connexions par adresse IP. Au-delà, il suspend
+  // l'IP : toute requête reçoit alors une page d'avertissement au lieu de la page
+  // de connexion. Comme l'IP est celle de la box entière, la pause est GLOBALE au
+  // plugin (tous les équipements) et non propre à un enfant. Tant que la fenêtre
+  // court, aucune requête n'est envoyée au démon : insister prolongerait le blocage.
+
+  /** Clé de configuration stockant la fin de la fenêtre de pause (timestamp). */
+  const IP_SUSPENSION_CONFIG_KEY = 'ip_suspended_until';
+
+  /** logicalId du message dans le centre de messages (évite les doublons). */
+  const IP_SUSPENSION_MESSAGE_ID = 'ip_suspended';
+
+  /** Durée de pause par défaut quand le démon n'en fournit pas (30 min). */
+  const IP_SUSPENSION_DEFAULT_DELAY = 1800;
+
+  /**
+   * Secondes restantes avant la fin de la fenêtre de pause.
+   *
+   * @return int 0 si aucune suspension n'est en cours.
+   */
+  public static function ipSuspensionRemaining()
+  {
+    $until = (int) config::byKey(self::IP_SUSPENSION_CONFIG_KEY, __CLASS__, 0);
+    $remaining = $until - time();
+    return ($remaining > 0) ? $remaining : 0;
+  }
+
+  /**
+   * Ouvre (ou prolonge) la fenêtre de pause suite à une suspension d'IP.
+   *
+   * Alimente le centre de messages Jeedom et journalise l'incident. Le message
+   * porte un logicalId : il est mis à jour au lieu d'être dupliqué à chaque cycle.
+   *
+   * @param int    $until   Timestamp de fin fourni par le démon (0 = durée par défaut).
+   * @param string $context Équipement ou action à l'origine de la détection (log).
+   * @return int Timestamp de fin retenu.
+   */
+  public static function declareIpSuspension($until = 0, $context = '')
+  {
+    $until = (int) $until;
+    if ($until <= time()) {
+      $until = time() + self::IP_SUSPENSION_DEFAULT_DELAY;
+    }
+    // Ne jamais raccourcir une fenêtre déjà ouverte plus longue.
+    $current = (int) config::byKey(self::IP_SUSPENSION_CONFIG_KEY, __CLASS__, 0);
+    if ($current > $until) {
+      $until = $current;
+    }
+    config::save(self::IP_SUSPENSION_CONFIG_KEY, $until, __CLASS__);
+
+    $heure = date('H:i', $until);
+    $minutes = (int) ceil(($until - time()) / 60);
+
+    log::add(__CLASS__, 'warning', '[IP SUSPENDUE] ' . ($context != '' ? $context . ' — ' : '')
+      . 'Pronote a suspendu l\'adresse IP de cette installation. Mise en pause de '
+      . $minutes . ' min, reprise à ' . $heure . '.');
+
+    message::add(
+      __CLASS__,
+      'Pronote a temporairement suspendu l\'adresse IP de votre Jeedom (trop de connexions en peu de temps). '
+        . 'Toutes les mises à jour ProJote sont en pause jusqu\'à ' . $heure . ' pour laisser le blocage se lever. '
+        . 'Évitez de relancer une validation de compte avant cette heure.',
+      '',
+      self::IP_SUSPENSION_MESSAGE_ID
+    );
+
+    return $until;
+  }
+
+  /**
+   * Referme la fenêtre de pause (appelée dès qu'une connexion réussit).
+   *
+   * @return bool true si une fenêtre était ouverte.
+   */
+  public static function clearIpSuspension()
+  {
+    if ((int) config::byKey(self::IP_SUSPENSION_CONFIG_KEY, __CLASS__, 0) === 0) {
+      return false;
+    }
+    config::save(self::IP_SUSPENSION_CONFIG_KEY, 0, __CLASS__);
+    if (method_exists('message', 'byPluginLogicalId')) {
+      $msg = message::byPluginLogicalId(__CLASS__, self::IP_SUSPENSION_MESSAGE_ID);
+      if (is_object($msg)) {
+        $msg->remove();
+      }
+    }
+    log::add(__CLASS__, 'info', 'Connexion à Pronote rétablie : fin de la pause pour suspension d\'IP.');
+    return true;
+  }
+
   /**
    * Tâche planifiée (cron) exécutée toutes les heures par Jeedom.
    *
@@ -335,11 +427,25 @@ class ProJote extends eqLogic
    */
   public static function cronHourly()
   {
+    // Fenêtre de pause : l'adresse IP de la box est suspendue par Pronote.
+    // Aucun équipement n'est interrogé tant qu'elle n'est pas écoulée.
+    $suspension = self::ipSuspensionRemaining();
+    if ($suspension > 0) {
+      log::add(__CLASS__, 'info', 'Cron_hourly : adresse IP suspendue par Pronote, mise à jour reportée à '
+        . date('H:i', time() + $suspension) . '.');
+      return;
+    }
+
     $heure = date('G'); // Heure actuelle (0-23)
 
-    // Pronote est souvent indisponible la nuit. Inutile de faire des requêtes.
-    if ($heure >= 22 || $heure < 4) {
-      log::add(__CLASS__, 'debug', "Cron_hourly : Il est $heure heure, période de non-activité. Aucune mise à jour lancée.");
+    // Droit à la déconnexion : aucune collecte entre 20h et 7h. La vie scolaire
+    // s'arrête le soir, et une note ou une punition récupérée à 23h ne sert qu'à
+    // déclencher une notification au mauvais moment. Accessoirement, Pronote est
+    // souvent indisponible la nuit.
+    // La commande « Rafraîchir » reste utilisable à toute heure : c'est une
+    // action volontaire de l'utilisateur, pas une sollicitation automatique.
+    if ($heure >= 20 || $heure < 7) {
+      log::add(__CLASS__, 'debug', "Cron_hourly : Il est $heure heure, période de déconnexion (20h-7h). Aucune mise à jour lancée.");
       return;
     }
 
@@ -930,6 +1036,17 @@ class ProJote extends eqLogic
    */
   public function UpdateInfoPronote($command = "Test")
   {
+    // Fenêtre de pause « IP suspendue » : on n'envoie rien au démon. Le garde est
+    // aussi présent côté démon, mais l'appliquer ici évite le trajet inutile et
+    // couvre les appels manuels (bouton Rafraîchir, scénarios).
+    $suspension = self::ipSuspensionRemaining();
+    if ($suspension > 0) {
+      log::add(__CLASS__, 'info', 'Mise à jour ignorée pour ' . $this->getHumanName()
+        . ' (contexte: ' . $command . ') : adresse IP suspendue par Pronote, reprise à '
+        . date('H:i', time() + $suspension) . '.');
+      return;
+    }
+
     // Rassembler toutes les informations de configuration nécessaires
     $params = array(
       'command'     => $command,

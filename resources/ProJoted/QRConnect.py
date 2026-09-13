@@ -36,10 +36,21 @@ Codes de sortie (interprétés par ProJote.ajax.php pour afficher un message cla
       (inclut l'échec de déchiffrement du challenge d'authentification :
        le PIN est bon, c'est le jeton du QR qui n'est plus valable)
   6 : page de connexion Pronote non reconnue → pronotepy trop ancien
+  7 : adresse IP suspendue par Pronote (trop de connexions) → attendre la fin
+      de la fenêtre de pause ouverte par le plugin
 """
+# Importés hors du bloc try : le gestionnaire d'erreurs final s'en sert pour
+# choisir le code de sortie, y compris si l'import de pronotepy échoue.
+import sys
+
+from pronote_errors import (
+    IP_SUSPENSION_EXIT_CODE,
+    is_ip_suspension_error,
+    ip_suspension_reason,
+)
+
 try:
     import pronotepy
-    import sys
     import json
     import argparse
     import logging
@@ -275,6 +286,7 @@ except Exception as e:
     #   4 → contenu du QR Code invalide (mal décodé, champs manquants)
     #   5 → Pronote refuse le jeton   → QR Code expiré ou déjà utilisé
     #   6 → page de connexion non reconnue → pronotepy trop ancien
+    #   7 → adresse IP suspendue par Pronote → attendre la fin de la pause
     #   1 → autre erreur
     #
     # Attention : « Decryption failed while trying to un pad » recouvre DEUX cas
@@ -286,6 +298,13 @@ except Exception as e:
     # était bon (cas vécu le 2 septembre 2026, QR régénéré depuis plus de 10 min).
     exc_name = type(e).__name__
     msg = str(e).lower()
+    # Pronote a suspendu l'adresse IP de la box (trop de connexions). Le QR Code,
+    # lui, est valide : réessayer tout de suite ne ferait que prolonger le
+    # blocage, le PHP ouvre donc une fenêtre de pause sur ce code.
+    if is_ip_suspension_error(e):
+        logging.error(ip_suspension_reason(e))
+        print(f"QRConnect.py :: {ip_suspension_reason(e)}", flush=True)
+        sys.exit(IP_SUSPENSION_EXIT_CODE)
     # Seul le déchiffrement LOCAL du QR Code (QRCodeDecryptError) met le PIN en
     # cause. Une CryptoError « nue » provient du challenge d'authentification :
     # le PIN était bon, c'est le jeton qui est refusé (QR expiré / déjà utilisé).

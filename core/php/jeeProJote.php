@@ -17,7 +17,8 @@
  *
  * Ce fichier reçoit un JSON structuré contenant :
  *  - CmdId             : ID de l'équipement Jeedom à mettre à jour
- *  - connection_status : 'connected', 'disconnected' ou 'error'
+ *  - connection_status : 'connected', 'disconnected', 'error' ou 'ip_suspended'
+ *  - ip_suspended_until : fin de la fenêtre de pause (timestamp) si IP suspendue
  *  - ConnectionDate    : Date/heure de la dernière connexion réussie
  *  - Eleve             : Infos élève (Nom_Eleve, Nom_Classe, Etablissement)
  *  - Emploi_du_temps   : Emploi du temps du jour et du prochain jour
@@ -70,6 +71,23 @@ try {
     // ===== GESTION DU STATUT DE CONNEXION =====
     $connection_status = isset($result['connection_status']) ? $result['connection_status'] : 'unknown';
 
+    // ===== SUSPENSION TEMPORAIRE DE L'ADRESSE IP =====
+    // Pronote a suspendu l'IP de la box (trop de connexions). Le démon a ouvert une
+    // fenêtre de pause et nous transmet son échéance : on l'enregistre côté Jeedom
+    // pour que le cron et le bouton « Rafraîchir » se taisent eux aussi, et on
+    // prévient l'utilisateur dans le centre de messages.
+    if ($connection_status === 'ip_suspended') {
+        $until = isset($result['ip_suspended_until']) ? (int) $result['ip_suspended_until'] : 0;
+        $until = ProJote::declareIpSuspension($until, $eqLogic->getHumanName());
+
+        if ($eqLogic->getCmd(null, 'Statut_Connexion')) {
+            $eqLogic->checkAndUpdateCmd('Statut_Connexion', 'IP suspendue — reprise à ' . date('H:i', $until));
+        }
+
+        // Fin du traitement - données non traitées
+        die();
+    }
+
     if ($connection_status === 'disconnected' || $connection_status === 'error') {
         $error_message = isset($result['error']) ? $result['error'] : 'Raison non spécifiée';
 
@@ -114,8 +132,13 @@ try {
     }
 
     // Cycle connecté : on rafraîchit la cmd "Statut_Connexion" en positif.
-    if ($connection_status === 'connected' && $eqLogic->getCmd(null, 'Statut_Connexion')) {
-        $eqLogic->checkAndUpdateCmd('Statut_Connexion', 'Connecté');
+    if ($connection_status === 'connected') {
+        // Pronote répond de nouveau : on referme une éventuelle fenêtre de pause
+        // et on retire le message d'alerte du centre de messages.
+        ProJote::clearIpSuspension();
+        if ($eqLogic->getCmd(null, 'Statut_Connexion')) {
+            $eqLogic->checkAndUpdateCmd('Statut_Connexion', 'Connecté');
+        }
     }
 
     // Vérifie si des informations d'élève sont présentes
