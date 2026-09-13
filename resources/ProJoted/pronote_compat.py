@@ -193,3 +193,128 @@ def _install() -> None:
         return _original_post(self, function_name, onglet, data)
 
     clients.ClientBase.post = _post_sans_reauth_inutile
+
+    # ── Compte parent : enfant perdu après réinitialisation de session ────
+    # Client.refresh() rejoue toute la connexion quand PRONOTE renvoie « La page
+    # a expiré ». ParentClient ne la surcharge pas, alors que la reconnexion
+    # défait tout ce que ParentClient avait mis en place :
+    #
+    #   - parametres_utilisateur["…"]["ressource"] redevient la ressource du
+    #     PARENT, alors que set_child l'avait remplacée par celle de l'enfant ;
+    #   - self.children n'est pas reconstruit et self._selected_child continue
+    #     de désigner l'objet de la session morte.
+    #
+    # Or les identifiants de ressource PRONOTE (« 46#… ») sont propres à une
+    # session : relevés sur deux connexions successives du même compte, ils
+    # diffèrent. ParentClient.post signant chaque requête avec
+    # « membre: {N: _selected_child.id} », toutes les requêtes qui suivent une
+    # réinitialisation portent un identifiant périmé et PRONOTE répond « La page
+    # a expiré », en boucle. Symptômes relevés sur un compte parent 2026 :
+    # devoirs vides (« Unknown error from pronote: 20 »), et évaluations en
+    # KeyError 'listeOngletsPourPeriodes' — cette clé n'existant que sur la
+    # ressource d'un enfant, jamais sur celle du parent.
+    #
+    # On reconstruit donc la liste des enfants depuis la session fraîche, puis
+    # on re-sélectionne le même enfant PAR SON NOM, seul identifiant stable
+    # d'une session à l'autre.
+    #
+    # Correctif posé à part : il vise d'autres classes que les deux précédents,
+    # et son absence ne doit pas priver la connexion du correctif « challenge ».
+    if not hasattr(clients, "Client") or not hasattr(clients, "ParentClient"):
+        logging.warning(
+            "pronote_compat :: correctif « enfant après réinitialisation » non "
+            "installé : pronotepy n'expose pas Client/ParentClient."
+        )
+        return
+
+    _original_refresh = clients.Client.refresh
+
+    def _refresh_avec_enfant(self):
+        precedent = getattr(self, "_selected_child", None)
+        nom = getattr(precedent, "name", None)
+
+        _original_refresh(self)
+
+        if not isinstance(self, clients.ParentClient):
+            return
+        try:
+            from pronotepy import dataClasses
+
+            self.children = [
+                dataClasses.ClientInfo(self, c)
+                for c in self.parametres_utilisateur["dataSec"]["data"]["ressource"][
+                    "listeRessources"
+                ]
+            ]
+            if self.children:
+                self.set_child(nom if nom else self.children[0])
+                logging.debug(
+                    "pronote_compat :: enfant « %s » re-sélectionné après "
+                    "réinitialisation de session.",
+                    getattr(self._selected_child, "name", "?"),
+                )
+        except Exception as e:
+            # Ne jamais faire échouer la reconnexion elle-même : sans cette
+            # reprise, on retombe simplement sur le comportement d'origine.
+            logging.warning(
+                "pronote_compat :: enfant non re-sélectionné après "
+                "réinitialisation (%s: %s).",
+                type(e).__name__,
+                e,
+            )
+
+    clients.Client.refresh = _refresh_avec_enfant
+
+    # ── Compte parent : ParentClient.post contourne les deux garde-fous ───
+    # ParentClient.post ne délègue pas à ClientBase.post : il redescend
+    # directement vers _Communication.post. Le garde-fou « onglet non
+    # accessible » posé plus haut ne le protège donc pas, et sur un compte
+    # parent chaque appel visant un onglet non accordé (la messagerie, ici :
+    # l'onglet 131 est absent des onglets autorisés) part sur le réseau, échoue,
+    # et déclenche un refresh() — soit une authentification complète, donc une
+    # rotation du jeton, à chaque cycle. C'est précisément la dépense que les
+    # correctifs de performance précédents cherchaient à supprimer.
+    #
+    # Second défaut, dans la reprise elle-même : « post_data » est construit
+    # AVANT le refresh, avec l'identifiant de l'enfant de la session courante.
+    # Après réinitialisation cet identifiant est périmé (ils changent à chaque
+    # session), et la requête rejouée ne peut donc que se faire refuser. On la
+    # reconstruit après le refresh.
+    def _post_parent_protege(self, function_name, onglet=None, data=None):
+        autorises = getattr(
+            getattr(self, "communication", None), "authorized_onglets", None
+        )
+        if onglet is not None and autorises and onglet not in autorises:
+            raise PronoteAPIError(
+                "Onglet %s non accessible pour ce compte (%s)"
+                % (onglet, function_name)
+            )
+
+        def _payload():
+            post_data = {}
+            if onglet:
+                post_data["Signature"] = {
+                    "onglet": onglet,
+                    "membre": {"N": self._selected_child.id, "G": 4},
+                }
+            if data:
+                post_data["data"] = data
+            return post_data
+
+        try:
+            return self.communication.post(function_name, _payload())
+        except PronoteAPIError as e:
+            if type(e).__name__ == "ExpiredObject":
+                raise
+            logging.debug(
+                "pronote_compat :: %s refusé (%s) — réinitialisation puis "
+                "rejeu avec l'identifiant d'enfant à jour.",
+                function_name,
+                getattr(e, "pronote_error_code", None),
+            )
+            self.refresh()
+            # _payload() est ré-évalué ici : il lit le _selected_child
+            # reconstruit par le refresh corrigé ci-dessus.
+            return self.communication.post(function_name, _payload())
+
+    clients.ParentClient.post = _post_parent_protege

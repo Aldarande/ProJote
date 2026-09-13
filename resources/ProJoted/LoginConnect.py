@@ -44,6 +44,7 @@ try:
     import datetime
     import requests
     import argparse
+    import traceback
 
     # Chiffrement
     import hashlib
@@ -432,42 +433,58 @@ try:
                 data["Classe"] = client._selected_child.class_name
                 data["Etablissement"] = client._selected_child.establishment
                 # data["Raw_Parent"] = client._selected_child.raw_resource
-                data["Picture"] = client._selected_child.profile_picture.url
             else:
                 data["Eleve"] = client.info.name
                 data["Class_Name"] = client.info.class_name
                 data["Establishment"] = client.info.establishment
                 data["Parent"] = "0"
-                data["Picture"] = client.info.profile_picture.url
                 data["Classe"] = client.info.class_name
                 data["Etablissement"] = client.info.establishment
-                # Recherche de l'image et téléchargement
-                # Télécharger l'image localement
-            image_filepath = os.path.join(f"{dossier}/{eqid}", "profile_picture.jpg")
-            pronote_session = getattr(
-                getattr(client, "communication", None), "session", None
-            )
-            if client._selected_child:
-                if download_image(
-                    client._selected_child.profile_picture.url,
-                    image_filepath,
-                    pronote_session,
-                ):
-                    data["Local_Picture"] = f"{dossier}/{eqid}/profile_picture.jpg"
-            elif download_image(
-                client.info.profile_picture.url,
-                image_filepath,
-                pronote_session,
-            ):
-                data["Local_Picture"] = f"{dossier}/{eqid}/profile_picture.jpg"
+
+            # ── Photo de profil (optionnelle) ────────────────────────────────
+            # profile_picture vaut None quand le compte n'a pas de photo : c'est
+            # un cas normal côté PRONOTE. Il ne doit JAMAIS faire échouer
+            # l'écriture du fichier, sinon le token de reconnexion est perdu et
+            # la connexion échoue alors même qu'elle a réussi.
+            profil = client._selected_child if client._selected_child else client.info
+            try:
+                photo = profil.profile_picture
+            except Exception as e:
+                logging.warning("Photo de profil indisponible : %s", e)
+                photo = None
+
+            if photo is None:
+                logging.info(
+                    "Pas de photo de profil sur ce compte PRONOTE, étape ignorée."
+                )
             else:
-                logging.error("Erreur lors du téléchargement de l'image")
+                data["Picture"] = photo.url
+                image_filepath = os.path.join(
+                    f"{dossier}/{eqid}", "profile_picture.jpg"
+                )
+                pronote_session = getattr(
+                    getattr(client, "communication", None), "session", None
+                )
+                if download_image(photo.url, image_filepath, pronote_session):
+                    data["Local_Picture"] = f"{dossier}/{eqid}/profile_picture.jpg"
+                else:
+                    logging.warning(
+                        "Photo de profil non téléchargée, les initiales seront utilisées."
+                    )
             # Écrire les données au format JSON dans un fichier
             with open(chemin_fichier, "w") as fichier:
                 json.dump(data, fichier, indent=4)
         except Exception as e:
             line_number = e.__traceback__.tb_lineno
-            logging.error("Ecriture du fichier échoué : lig.%s - %s", line_number, e)
+            # Le traceback complet est indispensable : sans lui, un échec ici
+            # n'expose qu'un numéro de ligne, alors qu'il empêche la sauvegarde
+            # du token et donc toute reconnexion ultérieure.
+            logging.error(
+                "Ecriture du fichier échoué : lig.%s - %s\n%s",
+                line_number,
+                e,
+                traceback.format_exc(),
+            )
 
     if __name__ == "__main__":
         # ─────────────────────────────────────────────────────────────────────

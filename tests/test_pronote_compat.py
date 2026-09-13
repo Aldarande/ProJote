@@ -45,7 +45,13 @@ def faux_pronotepy(monkeypatch):
         def aes_decrypt(self, data):
             raise CryptoError("Decryption failed while trying to un pad.")
 
-    journal = {"appels": 0, "vu_pendant_login": None, "posts": []}
+    journal = {
+        "appels": 0,
+        "vu_pendant_login": None,
+        "posts": [],
+        "reseau": [],
+        "onglets_autorises": [88],
+    }
 
     class ClientBase:
         def post(self, function_name, onglet=None, data=None):
@@ -58,8 +64,105 @@ def faux_pronotepy(monkeypatch):
             journal["vu_pendant_login"] = Encryption.aes_decrypt
             return True
 
+    # Les identifiants de ressource PRONOTE changent à chaque session : le faux
+    # serveur en émet donc de nouveaux à chaque réinitialisation, comme le vrai.
+    journal["sessions"] = 0
+
+    class Communication:
+        """Faux serveur : refuse un onglet non accordé, et refuse aussi tout
+        membre issu d'une session périmée — comme PRONOTE (« La page a expiré »).
+        """
+
+        authorized_onglets = journal["onglets_autorises"]
+
+        def post(self, function_name, post_data):
+            journal["reseau"].append((function_name, post_data))
+            signature = post_data.get("Signature")
+            if signature:
+                if signature["onglet"] not in journal["onglets_autorises"]:
+                    raise PronoteAPIError("onglet refusé")
+                if not signature["membre"]["N"].endswith(f"-s{journal['sessions']}"):
+                    raise PronoteAPIError("La page a expiré")
+            return {"ok": True}
+
+    class ClientInfo:
+        def __init__(self, client, json_):
+            self.raw_resource = json_
+            self.id = json_["N"]
+
+        @property
+        def name(self):
+            return self.raw_resource["L"]
+
+    class Client(ClientBase):
+        def refresh(self):
+            """Réplique du refresh d'origine : nouvelle session, ressource du
+            parent restaurée, ni children ni _selected_child reconstruits."""
+            self._nouvelle_session()
+
+        def _nouvelle_session(self):
+            journal["sessions"] += 1
+            s = journal["sessions"]
+            self.parametres_utilisateur = {
+                "dataSec": {
+                    "data": {
+                        "ressource": {
+                            "N": f"46#parent-s{s}",
+                            "L": "PARENT",
+                            "listeRessources": [
+                                {"N": f"46#enfant-a-s{s}", "L": "ENFANT Un"},
+                                {"N": f"46#enfant-b-s{s}", "L": "ENFANT Deux"},
+                            ],
+                        }
+                    }
+                }
+            }
+
+    class ParentClient(Client):
+        # Réplique du ParentClient d'origine : post() ne délègue pas à
+        # ClientBase.post, il redescend directement vers la communication.
+        def post(self, function_name, onglet=None, data=None):
+            post_data = {}
+            if onglet:
+                post_data["Signature"] = {
+                    "onglet": onglet,
+                    "membre": {"N": self._selected_child.id, "G": 4},
+                }
+            if data:
+                post_data["data"] = data
+            journal["posts"].append((function_name, onglet))
+            return self.communication.post(function_name, post_data)
+
+        def __init__(self):
+            # Le vrai ParentClient ne passe pas par refresh() à la construction :
+            # il ouvre sa session puis sélectionne le premier enfant.
+            self.communication = Communication()
+            self._nouvelle_session()
+            self.children = [
+                ClientInfo(self, c)
+                for c in self.parametres_utilisateur["dataSec"]["data"]["ressource"][
+                    "listeRessources"
+                ]
+            ]
+            self.set_child(self.children[0])
+
+        def set_child(self, child):
+            if not isinstance(child, ClientInfo):
+                trouve = [c for c in self.children if c.name == child]
+                if not trouve:
+                    raise ValueError(f"enfant introuvable : {child}")
+                child = trouve[0]
+            self._selected_child = child
+            self.parametres_utilisateur["dataSec"]["data"]["ressource"] = (
+                child.raw_resource
+            )
+
     clients = types.ModuleType("pronotepy.clients")
     clients.ClientBase = ClientBase
+    clients.Client = Client
+    clients.ParentClient = ParentClient
+    data_classes = types.ModuleType("pronotepy.dataClasses")
+    data_classes.ClientInfo = ClientInfo
     exceptions = types.ModuleType("pronotepy.exceptions")
     exceptions.CryptoError = CryptoError
     exceptions.PronoteAPIError = PronoteAPIError
@@ -70,11 +173,13 @@ def faux_pronotepy(monkeypatch):
     paquet.clients = clients
     paquet.exceptions = exceptions
     paquet.pronoteAPI = api
+    paquet.dataClasses = data_classes
 
     monkeypatch.setitem(sys.modules, "pronotepy", paquet)
     monkeypatch.setitem(sys.modules, "pronotepy.clients", clients)
     monkeypatch.setitem(sys.modules, "pronotepy.exceptions", exceptions)
     monkeypatch.setitem(sys.modules, "pronotepy.pronoteAPI", api)
+    monkeypatch.setitem(sys.modules, "pronotepy.dataClasses", data_classes)
 
     import pronote_compat
 
@@ -84,17 +189,24 @@ def faux_pronotepy(monkeypatch):
     original_login = ClientBase._login
     original_post = ClientBase.post
     original_decrypt = Encryption.aes_decrypt
+    original_refresh = Client.refresh
+    original_post_parent = ParentClient.post
     yield types.SimpleNamespace(
         module=pronote_compat,
         Encryption=Encryption,
         ClientBase=ClientBase,
         CryptoError=CryptoError,
         PronoteAPIError=PronoteAPIError,
+        Client=Client,
+        ParentClient=ParentClient,
+        ClientInfo=ClientInfo,
         journal=journal,
     )
     ClientBase._login = original_login
     ClientBase.post = original_post
     Encryption.aes_decrypt = original_decrypt
+    Client.refresh = original_refresh
+    ParentClient.post = original_post_parent
 
 
 class TestChallengeNonChiffre:
@@ -229,3 +341,114 @@ class TestOngletsNonAccessibles:
         faux_pronotepy.journal["posts"].clear()
 
         assert client.post("FonctionParametres", 7, {}) == {"ok": True}
+
+
+class TestEnfantApresReinitialisation:
+    """Compte parent : `refresh()` doit conserver l'enfant sélectionné.
+
+    Sans le correctif, la reconnexion déclenchée par « La page a expiré »
+    restaure la ressource du parent et laisse `_selected_child` pointer sur
+    l'objet de la session morte. Les identifiants de ressource étant propres à
+    une session, toutes les requêtes suivantes portent un identifiant périmé et
+    PRONOTE refuse : devoirs vides, évaluations en KeyError.
+    """
+
+    def test_sans_correctif_l_enfant_est_perdu(self, faux_pronotepy):
+        """Témoin : le comportement d'origine perd bien l'enfant."""
+        parent = faux_pronotepy.ParentClient()
+        avant = parent._selected_child.id
+
+        parent.refresh()  # correctif non installé
+
+        assert parent._selected_child.id == avant, "le faux client doit figer l'id"
+        ressource = parent.parametres_utilisateur["dataSec"]["data"]["ressource"]
+        assert ressource["L"] == "PARENT", "la ressource redevient celle du parent"
+
+    def test_l_enfant_est_re_selectionne(self, faux_pronotepy):
+        faux_pronotepy.module.apply()
+        parent = faux_pronotepy.ParentClient()
+        parent.set_child("ENFANT Deux")
+        id_avant = parent._selected_child.id
+
+        parent.refresh()
+
+        assert parent._selected_child.name == "ENFANT Deux", "même enfant"
+        assert parent._selected_child.id != id_avant, "identifiant de la session neuve"
+        ressource = parent.parametres_utilisateur["dataSec"]["data"]["ressource"]
+        assert ressource["L"] == "ENFANT Deux"
+        assert ressource["N"] == parent._selected_child.id
+
+    def test_les_enfants_sont_reconstruits(self, faux_pronotepy):
+        faux_pronotepy.module.apply()
+        parent = faux_pronotepy.ParentClient()
+        ids_avant = {c.id for c in parent.children}
+
+        parent.refresh()
+
+        ids_apres = {c.id for c in parent.children}
+        assert not (ids_avant & ids_apres), "aucun identifiant de session morte"
+        assert {c.name for c in parent.children} == {"ENFANT Un", "ENFANT Deux"}
+
+    def test_un_compte_eleve_n_est_pas_touche(self, faux_pronotepy):
+        """Le correctif ne doit rien changer pour un client non parent."""
+        faux_pronotepy.module.apply()
+        eleve = faux_pronotepy.Client()
+
+        eleve.refresh()
+
+        assert not hasattr(eleve, "children")
+        assert not hasattr(eleve, "_selected_child")
+
+
+class TestPostParent:
+    """`ParentClient.post` court-circuite ClientBase.post : les garde-fous du
+    plugin doivent aussi être posés sur lui.
+
+    Sans quoi, sur un compte parent, chaque appel visant un onglet non accordé
+    (la messagerie sur beaucoup d'établissements) part sur le réseau, échoue et
+    déclenche une authentification complète — donc une rotation du jeton — à
+    chaque cycle du démon.
+    """
+
+    def test_un_onglet_non_accorde_ne_touche_pas_le_reseau(self, faux_pronotepy):
+        faux_pronotepy.module.apply()
+        parent = faux_pronotepy.ParentClient()
+        faux_pronotepy.journal["reseau"].clear()
+        sessions_avant = faux_pronotepy.journal["sessions"]
+
+        with pytest.raises(faux_pronotepy.PronoteAPIError):
+            parent.post("ListeMessagerie", 131)
+
+        assert faux_pronotepy.journal["reseau"] == [], "aucune requête ne doit partir"
+        assert faux_pronotepy.journal["sessions"] == sessions_avant, (
+            "aucune ré-authentification ne doit être déclenchée"
+        )
+
+    def test_un_onglet_accorde_passe(self, faux_pronotepy):
+        faux_pronotepy.module.apply()
+        parent = faux_pronotepy.ParentClient()
+
+        assert parent.post("PageCahierDeTexte", 88) == {"ok": True}
+
+    def test_le_rejeu_utilise_l_enfant_de_la_nouvelle_session(self, faux_pronotepy):
+        """Après un refus, la requête rejouée doit porter l'identifiant frais.
+
+        pronotepy construit sa charge utile avant le refresh et la rejoue telle
+        quelle : l'identifiant d'enfant y est celui de la session morte, donc le
+        rejeu ne peut qu'échouer à son tour.
+        """
+        faux_pronotepy.module.apply()
+        parent = faux_pronotepy.ParentClient()
+        # Le faux serveur refuse tout membre d'une session antérieure : on
+        # périme la session courante sans prévenir le client.
+        parent._nouvelle_session()
+        parent.set_child(parent.children[0])  # enfant de la session périmée
+        faux_pronotepy.journal["sessions"] += 1
+        faux_pronotepy.journal["reseau"].clear()
+
+        resultat = parent.post("PageCahierDeTexte", 88)
+
+        assert resultat == {"ok": True}
+        dernier = faux_pronotepy.journal["reseau"][-1][1]
+        attendu = f"-s{faux_pronotepy.journal['sessions']}"
+        assert dernier["Signature"]["membre"]["N"].endswith(attendu)
