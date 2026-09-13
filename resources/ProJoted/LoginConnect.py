@@ -26,11 +26,21 @@ Arguments attendus en ligne de commande :
   --Loglevel  : Niveau de verbosité des logs (debug, info, warning, error)
 """
 
+# Importés hors du bloc try : sys sert dès la configuration du logging, et le
+# gestionnaire d'erreurs final s'appuie sur pronote_errors pour choisir le code
+# de sortie — y compris si l'import de pronotepy échoue.
+import sys
+
+from pronote_errors import (
+    IP_SUSPENSION_EXIT_CODE,
+    is_ip_suspension_error,
+    ip_suspension_reason,
+)
+
 try:
     # TO DO :: add log to plugin for troubleshoote
     import pronotepy
     from pronotepy.ent import *
-    import sys
     import json
     import logging
     logging.basicConfig(
@@ -664,6 +674,13 @@ except Exception as e:
     if __name__ == "__main__":
         exc_name = type(e).__name__
         msg = str(e).lower()
+        # Code de sortie dédié (7) quand Pronote a suspendu l'adresse IP de la box
+        # (trop de connexions). Les identifiants, eux, sont valides : le PHP ouvre
+        # une fenêtre de pause au lieu d'inviter l'utilisateur à recommencer.
+        if is_ip_suspension_error(e):
+            logging.error(ip_suspension_reason(e))
+            print(f"LoginConnect.py :: {ip_suspension_reason(e)}", flush=True)
+            sys.exit(IP_SUSPENSION_EXIT_CODE)
         # Page de connexion Pronote non reconnue par pronotepy — cf. QRConnect.py :
         # les serveurs PRONOTE 2026 ne publient plus Start({...}) dans l'attribut
         # « onload » du <body>, que pronotepy <= 2.14.6 lisait directement.
