@@ -432,6 +432,35 @@
 
     .pjw-#id# .tab-pane.active {
         display: block;
+        /* Sans plafond, la tuile s'étire à la hauteur de son onglet le plus
+           chargé et bouscule la mise en page du dashboard. Depuis que la liste
+           des devoirs couvre la semaine, elle en compte couramment une dizaine.
+           Hauteur en em : elle suit la taille de police choisie par
+           l'utilisateur dans les paramètres du widget. */
+        max-height: 22em;
+        overflow-y: auto;
+        overflow-x: hidden;
+        /* Ascenseur discret, pour ne pas manger la largeur utile ni jurer avec
+           les thèmes sombres. */
+        scrollbar-width: thin;
+        scrollbar-color: rgba(var(--contrast-color), .25) transparent;
+    }
+
+    .pjw-#id# .tab-pane.active::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .pjw-#id# .tab-pane.active::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .pjw-#id# .tab-pane.active::-webkit-scrollbar-thumb {
+        background: rgba(var(--contrast-color), .25);
+        border-radius: 3px;
+    }
+
+    .pjw-#id# .tab-pane.active::-webkit-scrollbar-thumb:hover {
+        background: rgba(var(--contrast-color), .4);
     }
 
     /* ── Items devoirs ───────────────────────────────────── */
