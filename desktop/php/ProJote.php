@@ -504,6 +504,22 @@ sendVarToJS('eqLogicId', $eqLogic);
 								</div>
 							</div>
 
+							<!-- Fenetre couverte par la liste des devoirs -->
+							<div class="form-group" style="margin-bottom:4px;">
+								<label class="col-sm-6 control-label" style="font-size:12px;">{{Devoirs affiches}}
+									<sup><i class="fas fa-question-circle tooltips" title="{{Nombre de jours a venir couverts par la liste des devoirs. Sur un seul jour, la liste est vide les week-ends.}}"></i></sup>
+								</label>
+								<div class="col-sm-6">
+									<select class="eqLogicAttr form-control input-sm" data-l1key="configuration" data-l2key="devoirs_jours">
+										<option value="1">{{Aujourd'hui seulement}}</option>
+										<option value="3">{{3 prochains jours}}</option>
+										<option value="7" selected>{{7 prochains jours}}</option>
+										<option value="14">{{14 prochains jours}}</option>
+										<option value="30">{{30 prochains jours}}</option>
+									</select>
+								</div>
+							</div>
+
 							<div id="pjw-manual-photo-status" style="font-size:11px;margin-top:8px;padding:0 15px;clear:both;"></div>
 						</fieldset>
 					</form>
