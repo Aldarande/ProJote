@@ -12,8 +12,6 @@ initialisée, ou simplement aucune absence à ce jour — et un droit accordé
 entre-temps doit être pris en compte dès le cycle suivant.
 """
 
-import types
-
 import pytest
 
 
