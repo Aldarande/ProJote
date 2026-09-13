@@ -1975,7 +1975,26 @@ def process_homework(homework_list, data, key):
     return Devoir, Devoirfait, Devoirnonfait
 
 
-def devoirs(client):
+DEVOIRS_FENETRE_DEFAUT = 7
+DEVOIRS_FENETRE_MAX = 120
+
+
+def _fenetre_devoirs(message):
+    """Nombre de jours couverts par la liste des devoirs, jour même compris.
+
+    Réglable par équipement (configuration « devoirs_jours ») ; toute valeur
+    absente, non numérique ou hors bornes retombe sur la valeur par défaut.
+    """
+    try:
+        valeur = int(message.get("DevoirsJours") or DEVOIRS_FENETRE_DEFAUT)
+    except (TypeError, ValueError, AttributeError):
+        return DEVOIRS_FENETRE_DEFAUT
+    if 1 <= valeur <= DEVOIRS_FENETRE_MAX:
+        return valeur
+    return DEVOIRS_FENETRE_DEFAUT
+
+
+def devoirs(client, fenetre_jours=DEVOIRS_FENETRE_DEFAUT):
     try:
         data = {"devoir": [], "devoir_Demain": []}
 
@@ -1997,9 +2016,20 @@ def devoirs(client):
             time.sleep(5)
             return data
 
-        # Filtrer les devoirs pour aujourd'hui
         today = datetime.date.today()
-        homework_today = [hw for hw in all_homework if hw.date == today]
+
+        # « devoir » couvre les jours à venir, pas la seule échéance du jour.
+        # L'ancienne définition — hw.date == today — vidait la liste tous les
+        # week-ends et tous les soirs sans devoir à rendre le lendemain, alors
+        # que Pronote en fournit 120 jours d'avance : le compteur affichait 0
+        # devoir pendant que « devoirs demain » en annonçait un.
+        # fenetre_jours compte les jours couverts en partant d'aujourd'hui :
+        # 1 = le jour même seulement, 7 = la semaine à venir jour compris.
+        fin_fenetre = today + datetime.timedelta(days=max(0, fenetre_jours - 1))
+        homework_today = sorted(
+            (hw for hw in all_homework if today <= hw.date <= fin_fenetre),
+            key=lambda hw: hw.date,
+        )
 
         # Filtrer les devoirs pour le prochain jour d'école
         delta = 1
@@ -3271,7 +3301,7 @@ def process_message(message):
             jsondata["Punitions"] = punitions(client)
             # J'ajoute les devoirs
             logging.info("Je récupére les devoirs")
-            jsondata["Devoirs"] = devoirs(client)
+            jsondata["Devoirs"] = devoirs(client, _fenetre_devoirs(message))
             # J'ajoutes des évaluations -- à finir
             logging.info("Je récupére les évaluations")
             jsondata["Competences"] = evaluations(client)

@@ -946,6 +946,8 @@ class ProJote extends eqLogic
       'TokenPassword' => $this->getConfiguration('Token_password'),
       'TokenUrl'    => html_entity_decode($this->getConfiguration('Token_pronote_url', '')),
       'TokenUuid'   => $this->getConfiguration('uuid', 'ProJote'),
+      // Nombre de jours couverts par la liste des devoirs (7 par défaut).
+      'DevoirsJours' => $this->getConfiguration('devoirs_jours', 7),
       'Log'         => log::convertLogLevel(log::getLogLevel(__CLASS__)),
     );
     // Envoi des paramètres au démon via la méthode générique.

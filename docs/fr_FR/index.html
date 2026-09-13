@@ -710,6 +710,10 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
         <tbody>
             <tr>
                 <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>Liste des devoirs vide les week-ends</strong> — la commande <code>Liste des devoirs</code> ne retenait que les devoirs dont l'échéance tombait le jour même. Elle était donc vide tous les week-ends et tous les soirs sans travail à rendre le lendemain, alors que Pronote fournit 120 jours d'avance : le compteur affichait 0 devoir pendant que <em>Devoirs demain</em> en annonçait un. La liste couvre désormais les jours à venir, triés par échéance, sur une fenêtre réglable par équipement — <strong>7 jours par défaut</strong>, de « aujourd'hui seulement » à 30 jours (Équipement → <em>Devoirs affichés</em>). Mesuré sur l'instance de développement un dimanche : 0 devoir avant, 9 après.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
                 <td><strong>Installation des dépendances impossible sous Debian bullseye</strong> — <code>requirements.txt</code> épinglait <code>requests==2.33.0</code>, version qui exige python 3.10. Les Jeedom sur Debian bullseye — python 3.9, cas courant sur Raspberry Pi — voyaient l'installation échouer sur <em>« Could not find a version that satisfies the requirement requests==2.33.0 »</em>, et restaient sans démon. La version est désormais choisie par marqueur d'environnement : 2.33.0 à partir de python 3.10, 2.32.5 en deçà. Les sept autres épingles ont été vérifiées compatibles 3.9.</td>
             </tr>
             <tr>
