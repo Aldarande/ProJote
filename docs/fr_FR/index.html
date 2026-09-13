@@ -712,6 +712,10 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
         <tbody>
             <tr>
                 <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>Liste des devoirs vide les week-ends</strong> — la commande <code>Liste des devoirs</code> ne retenait que les devoirs dont l'échéance tombait le jour même. Elle était donc vide tous les week-ends et tous les soirs sans travail à rendre le lendemain, alors que Pronote fournit 120 jours d'avance : le compteur affichait 0 devoir pendant que <em>Devoirs demain</em> en annonçait un. La liste couvre désormais les jours à venir, triés par échéance, sur une fenêtre réglable par équipement — <strong>7 jours par défaut</strong>, de « aujourd'hui seulement » à 30 jours (Équipement → <em>Devoirs affichés</em>). Mesuré sur l'instance de développement un dimanche : 0 devoir avant, 9 après.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
                 <td><strong>Liste de devoirs vide : la cause est désormais journalisée</strong> — trois situations très différentes produisaient la même liste vide, sans rien permettre de les distinguer dans les logs : Pronote ne renvoie aucun devoir, il en renvoie mais à des dates qui ne correspondent ni à aujourd'hui ni au prochain jour, ou la requête échoue. Le démon journalise maintenant la plage demandée et les semaines scolaires correspondantes, le nombre de devoirs reçus avec leurs échéances, le jour effectivement retenu comme « prochain jour avec devoirs », et — en cas d'échec — le type de l'exception et sa trace complète. Une liste vide sur 120 jours déclenche en outre un avertissement invitant à vérifier que l'onglet « Cahier de textes » figure bien parmi les onglets autorisés par Pronote pour ce compte.</td>
             </tr>
         </tbody>
@@ -758,10 +762,6 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
     <table>
         <thead><tr><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-            <tr>
-                <td><span class="badge badge-fix">Correctif</span></td>
-                <td><strong>Liste des devoirs vide les week-ends</strong> — la commande <code>Liste des devoirs</code> ne retenait que les devoirs dont l'échéance tombait le jour même. Elle était donc vide tous les week-ends et tous les soirs sans travail à rendre le lendemain, alors que Pronote fournit 120 jours d'avance : le compteur affichait 0 devoir pendant que <em>Devoirs demain</em> en annonçait un. La liste couvre désormais les jours à venir, triés par échéance, sur une fenêtre réglable par équipement — <strong>7 jours par défaut</strong>, de « aujourd'hui seulement » à 30 jours (Équipement → <em>Devoirs affichés</em>). Mesuré sur l'instance de développement un dimanche : 0 devoir avant, 9 après.</td>
-            </tr>
             <tr>
                 <td><span class="badge badge-fix">Correctif</span></td>
                 <td><strong>Installation des dépendances impossible sous Debian bullseye</strong> — <code>requirements.txt</code> épinglait <code>requests==2.33.0</code>, version qui exige python 3.10. Les Jeedom sur Debian bullseye — python 3.9, cas courant sur Raspberry Pi — voyaient l'installation échouer sur <em>« Could not find a version that satisfies the requirement requests==2.33.0 »</em>, et restaient sans démon. La version est désormais choisie par marqueur d'environnement : 2.33.0 à partir de python 3.10, 2.32.5 en deçà. Les sept autres épingles ont été vérifiées compatibles 3.9.</td>
