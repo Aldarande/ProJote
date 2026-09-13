@@ -2219,14 +2219,37 @@ def devoirs(client):
     try:
         data = {"devoir": [], "devoir_Demain": []}
 
-        # Supposons que cette méthode récupère tous les devoirs pour une période donnée
-        all_homework = client.homework(
-            date_from=datetime.date.today(),
-            date_to=datetime.date.today() + datetime.timedelta(days=120),
+        # Fenêtre glissante de 120 jours. Pronote raisonne en semaines : pronotepy
+        # convertit ces dates en numéros de semaine scolaire (get_week) et demande
+        # la plage correspondante à PageCahierDeTexte (onglet 88).
+        date_debut = datetime.date.today()
+        date_fin = date_debut + datetime.timedelta(days=120)
+        try:
+            semaines = "%s..%s" % (client.get_week(date_debut), client.get_week(date_fin))
+        except Exception:  # get_week dépend des paramètres publiés à la connexion
+            semaines = "?"
+        logging.debug(
+            "Devoirs : demande du %s au %s (semaines %s).",
+            date_debut.strftime("%d/%m/%Y"),
+            date_fin.strftime("%d/%m/%Y"),
+            semaines,
         )
 
+        all_homework = client.homework(date_from=date_debut, date_to=date_fin)
+
         if not all_homework:
-            logging.info("Aucun devoir trouvé pour la période spécifiée.")
+            # Pronote a répondu, mais sans aucun devoir sur 120 jours. Soit le
+            # cahier de textes est vide, soit l'onglet n'est pas accessible à ce
+            # compte — auquel cas l'onglet 88 manque dans la liste journalisée à
+            # la connexion (« Onglets autorisés par Pronote pour ce compte »).
+            logging.warning(
+                "Aucun devoir trouvé sur la période du %s au %s (semaines %s). "
+                "Si le cahier de textes n'est pas vide côté Pronote, vérifiez que "
+                "l'onglet 88 figure dans les onglets autorisés journalisés à la connexion.",
+                date_debut.strftime("%d/%m/%Y"),
+                date_fin.strftime("%d/%m/%Y"),
+                semaines,
+            )
             for key in ["devoir", "devoir_Demain"]:
                 data[f"Nb_{key}"] = 0
                 data[f"Nb_{key}_F"] = 0
@@ -2240,6 +2263,16 @@ def devoirs(client):
         # Filtrer les devoirs pour aujourd'hui
         today = datetime.date.today()
         homework_today = [hw for hw in all_homework if hw.date == today]
+
+        # Les dates reçues : c'est ce qui distingue « Pronote n'a rien renvoyé »
+        # de « les devoirs existent mais pas aux dates attendues ».
+        if logging.getLogger().isEnabledFor(logging.DEBUG):
+            recu = sorted({hw.date for hw in all_homework if hw.date})
+            logging.debug(
+                "Devoirs : %d reçu(s), échéances %s.",
+                len(all_homework),
+                ", ".join(d.strftime("%d/%m") for d in recu) or "aucune",
+            )
 
         # Filtrer les devoirs pour le prochain jour d'école
         delta = 1
@@ -2255,9 +2288,18 @@ def devoirs(client):
         process_homework(homework_today, data, "devoir")
         # Traiter les devoirs pour le prochain jour d'école
         if next_school_day:
+            logging.debug(
+                "Devoirs : prochain jour avec devoirs = %s (J+%d), %d devoir(s).",
+                (today + datetime.timedelta(days=delta)).strftime("%d/%m/%Y"),
+                delta,
+                len(next_school_day),
+            )
             process_homework(next_school_day, data, "devoir_Demain")
         else:
-            logging.info("Aucun devoir trouvé pour le prochain jour d'école.")
+            logging.info(
+                "Aucun devoir trouvé pour le prochain jour d'école (sur %d devoir(s) reçu(s)).",
+                len(all_homework),
+            )
 
         # ── Détection des évaluations / DS à venir ─────────────────────────
         # Pattern heuristique sur l'ensemble des devoirs collectés.
@@ -2269,12 +2311,14 @@ def devoirs(client):
 
         return data
     except Exception as e:
-        line_number = e.__traceback__.tb_lineno
+        line_number = e.__traceback__.tb_lineno if e.__traceback__ else "?"
         logging.error(
-            "Une erreur est retournée sur le traitement des devoirs-ligne: %s; %s",
+            "Récupération des devoirs échouée (ligne %s) — %s: %s",
             line_number,
+            type(e).__name__,
             e,
         )
+        logging.debug("Devoirs — trace complète : %s", traceback.format_exc())
         time.sleep(5)
         return data
 
