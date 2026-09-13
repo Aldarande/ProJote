@@ -475,6 +475,32 @@
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        /* Élément flex depuis l'ajout de l'échéance : sans min-width nul, la
+           largeur minimale du contenu l'emporte et la matière déborde au lieu
+           d'être tronquée, poussant la date hors de la tuile. */
+        min-width: 0;
+        flex: 1 1 auto;
+    }
+
+    .pjw-#id# .dv-subject-row {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 6px;
+    }
+
+    .pjw-#id# .dv-echeance {
+        font-size: 0.78em;
+        font-weight: 600;
+        opacity: .55;
+        white-space: nowrap;
+        flex: 0 0 auto;
+    }
+
+    /* Échéance dépassée : seul cas où la date mérite d'attirer l'œil. */
+    .pjw-#id# .dv-echeance.dv-retard {
+        color: #E74C3C;
+        opacity: .9;
     }
 
     .pjw-#id# .dv-desc {
@@ -1597,12 +1623,41 @@
             if (!dvEl) return;
             if (!VIS.devoirs) { var pane = el('dv' + ID); if (pane) pane.style.display = 'none'; return; }
 
+            /* Échéance en toutes lettres, calculée au rendu et non à la collecte :
+               un widget resté ouvert la nuit ne doit pas annoncer « Aujourd'hui »
+               pour le travail de la veille. Sans date_iso — widget_json produit
+               par une version antérieure — on retombe sur le jj/mm de la collecte. */
+            var PJ_JOURS = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+            function echeance(dv) {
+                var iso = dv.date_iso;
+                if (!iso) return { texte: dv.date || '', retard: false };
+                var p = String(iso).split('-');
+                if (p.length !== 3) return { texte: dv.date || '', retard: false };
+                var d = new Date(+p[0], +p[1] - 1, +p[2]);
+                if (isNaN(d.getTime())) return { texte: dv.date || '', retard: false };
+                var today = new Date();
+                today.setHours(0, 0, 0, 0);
+                var jours = Math.round((d.getTime() - today.getTime()) / 86400000);
+                var jj = ('0' + d.getDate()).slice(-2);
+                var mm = ('0' + (d.getMonth() + 1)).slice(-2);
+                if (jours < 0) return { texte: 'En retard · ' + jj + '/' + mm, retard: true };
+                if (jours === 0) return { texte: "Aujourd'hui", retard: false };
+                if (jours === 1) return { texte: 'Demain', retard: false };
+                /* Au-delà d'une semaine, le seul nom du jour redeviendrait ambigu. */
+                if (jours <= 6) return { texte: PJ_JOURS[d.getDay()], retard: false };
+                return { texte: PJ_JOURS[d.getDay()].slice(0, 3) + '. ' + jj + '/' + mm, retard: false };
+            }
+
             function devoirHtml(list) {
                 return list.map(function (dv) {
                     var done = !!dv.done;
                     var color = dv.color || subjectColor(dv.title);
                     var tooltip = escAttr((dv.title || '') + (dv.description ? ' — ' + dv.description : ''));
                     var subject = (done ? '✓ ' : '') + esc(dv.title || '–');
+                    var ech = echeance(dv);
+                    var echHtml = ech.texte
+                        ? '<span class="dv-echeance' + (ech.retard ? ' dv-retard' : '') + '">' + esc(ech.texte) + '</span>'
+                        : '';
                     var filesHtml = '';
                     if (dv.fichiers && dv.fichiers.length) {
                         filesHtml = '<div class="dv-files">' +
@@ -1617,7 +1672,7 @@
                         '<div class="dv-item' + (done ? ' dv-done' : '') + '" title="' + tooltip + '">' +
                         '<div class="dv-bar" style="background:' + esc(color) + '"></div>' +
                         '<div class="dv-content">' +
-                        '<div class="dv-subject">' + subject + '</div>' +
+                        '<div class="dv-subject-row"><div class="dv-subject">' + subject + '</div>' + echHtml + '</div>' +
                         (dv.description ? '<div class="dv-desc">' + esc(dv.description) + '</div>' : '') +
                         filesHtml +
                         '</div>' +
@@ -1626,12 +1681,17 @@
                 }).join('');
             }
 
-            var auj = (d.devoirs || []);
-            var dem = (d.devoirs_demain || []);
-            var html = '';
-            if (auj.length) html += '<div class="dv-section-title">Aujourd\'hui</div>' + devoirHtml(auj);
-            if (dem.length) html += '<div class="dv-section-title">Demain</div>' + devoirHtml(dem);
-            dvEl.innerHTML = html || '<div class="p-empty">Aucun devoir</div>';
+            /* Une seule liste : « devoirs » couvre désormais la fenêtre configurée
+               (7 jours par défaut) et contient donc déjà le travail de demain.
+               Garder les deux sections afficherait deux fois les mêmes devoirs.
+               Repli sur « devoirs_demain » quand la fenêtre est réglée sur le seul
+               jour même : la liste principale est alors vide hors jour de classe,
+               alors que du travail attend pour le prochain jour. */
+            var liste = (d.devoirs || []);
+            if (!liste.length) liste = (d.devoirs_demain || []);
+            dvEl.innerHTML = liste.length
+                ? devoirHtml(liste)
+                : '<div class="p-empty">Aucun devoir</div>';
         }
 
         /* ─── MENU CANTINE (v1.0.1) ───────────────────────── */

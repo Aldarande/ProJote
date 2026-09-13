@@ -2195,6 +2195,11 @@ def process_homework(homework_list, data, key):
             {
                 "index": homework_list.index(homework),
                 "date": homework.date.strftime("%d/%m"),
+                # Date complète pour le widget : il compose l'échéance en toutes
+                # lettres (« Aujourd'hui », « Demain », « Mardi ») au moment du
+                # rendu, et non de la collecte — sans quoi un widget affiché le
+                # lendemain annoncerait encore « Aujourd'hui ».
+                "date_iso": homework.date.strftime("%Y-%m-%d"),
                 "title": title,
                 "description": description,
                 "color": homework.background_color,

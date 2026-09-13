@@ -711,6 +711,10 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
         <thead><tr><th>Type</th><th>Description</th></tr></thead>
         <tbody>
             <tr>
+                <td><span class="badge badge-new">Nouveauté</span></td>
+                <td><strong>Échéance affichée sur chaque devoir</strong> — la tuile indique désormais quand le travail est à rendre, en toutes lettres : <em>Aujourd'hui</em>, <em>Demain</em>, <em>Mardi</em>… Au-delà d'une semaine le jour redevenant ambigu, la date s'y ajoute (<em>Ven. 25/09</em>), et une échéance dépassée ressort en rouge. Le libellé est calculé à l'affichage et non à la collecte : un widget resté ouvert la nuit n'annonce plus « Aujourd'hui » pour le travail de la veille. Le widget n'affiche par ailleurs plus qu'une seule liste — la section « Demain » faisait doublon depuis que la liste principale couvre la semaine.</td>
+            </tr>
+            <tr>
                 <td><span class="badge badge-fix">Correctif</span></td>
                 <td><strong>Liste des devoirs vide les week-ends</strong> — la commande <code>Liste des devoirs</code> ne retenait que les devoirs dont l'échéance tombait le jour même. Elle était donc vide tous les week-ends et tous les soirs sans travail à rendre le lendemain, alors que Pronote fournit 120 jours d'avance : le compteur affichait 0 devoir pendant que <em>Devoirs demain</em> en annonçait un. La liste couvre désormais les jours à venir, triés par échéance, sur une fenêtre réglable par équipement — <strong>7 jours par défaut</strong>, de « aujourd'hui seulement » à 30 jours (Équipement → <em>Devoirs affichés</em>). Mesuré sur l'instance de développement un dimanche : 0 devoir avant, 9 après.</td>
             </tr>

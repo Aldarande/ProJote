@@ -96,6 +96,36 @@ class TestFenetreParDefaut:
         assert (data["Nb_devoir"], data["Nb_devoir_F"], data["Nb_devoir_NF"]) == (2, 1, 1)
 
 
+class TestDateExposeeAuWidget:
+    """Le widget compose l'échéance en toutes lettres au moment du rendu.
+
+    Il lui faut donc la date complète : le « jj/mm » historique ne permet ni de
+    situer l'année, ni de dire « Demain » sans ambiguïté.
+    """
+
+    def test_chaque_devoir_porte_sa_date_iso(self, daemon, dimanche):
+        client = _Client([_devoir(dimanche + datetime.timedelta(days=1))])
+
+        data = daemon.devoirs(client)
+
+        assert data["devoir"][0]["date_iso"] == "2026-09-14"
+
+    def test_le_format_court_reste_disponible(self, daemon, dimanche):
+        """Compatibilité : les anciens rendus s'appuient encore sur « date »."""
+        client = _Client([_devoir(dimanche + datetime.timedelta(days=1))])
+
+        data = daemon.devoirs(client)
+
+        assert data["devoir"][0]["date"] == "14/09"
+
+    def test_devoirs_demain_aussi(self, daemon, dimanche):
+        client = _Client([_devoir(dimanche + datetime.timedelta(days=1))])
+
+        data = daemon.devoirs(client)
+
+        assert data["devoir_Demain"][0]["date_iso"] == "2026-09-14"
+
+
 class TestFenetreConfigurable:
     def test_un_seul_jour_retrouve_l_ancien_comportement(self, daemon, dimanche):
         client = _Client([_devoir(dimanche + datetime.timedelta(days=1))])
