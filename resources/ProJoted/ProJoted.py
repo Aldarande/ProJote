@@ -1232,7 +1232,10 @@ _EVAL_PATTERN = _re_eval.compile(
 )
 
 
-def detect_next_evaluations(all_homework, max_keep=5):
+DS_HORIZON_JOURS = 7
+
+
+def detect_next_evaluations(all_homework, max_keep=5, horizon_jours=DS_HORIZON_JOURS):
     """Repère les devoirs qui ressemblent à un contrôle/DS et renvoie les prochains.
 
     Retourne un dict avec :
@@ -1241,6 +1244,11 @@ def detect_next_evaluations(all_homework, max_keep=5):
       - prochain_DS_dans_jours   : nb jours entre aujourd'hui et le DS (int)
       - prochains_DS_html        : HTML compact des `max_keep` prochains DS
       - prochains_DS_brut        : liste structurée
+
+    Seuls les contrôles situés dans les `horizon_jours` jours à venir sont
+    retenus. Le démon charge 120 jours de devoirs : sans cette borne, le widget
+    annonçait un contrôle à trois semaines, information sans valeur d'alerte qui
+    masquait de surcroît un éventuel contrôle plus proche annoncé plus tard.
 
     Robustesse : si all_homework est vide ou si toutes les entrées échouent
     au parsing, on retourne des valeurs neutres.
@@ -1275,6 +1283,8 @@ def detect_next_evaluations(all_homework, max_keep=5):
 
             hw_date = getattr(hw, "date", None)
             if hw_date is None or hw_date < today:
+                continue
+            if (hw_date - today).days > horizon_jours:
                 continue
 
             candidats.append(

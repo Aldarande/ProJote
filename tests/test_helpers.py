@@ -273,13 +273,58 @@ class TestDetectNextEvaluations:
 
     def test_sorted_by_date(self, daemon):
         today = datetime.date.today()
+        # Les deux dates restent dans l'horizon : ce test porte sur le tri.
         hw = [
-            _Homework("Examen final", "SVT", today + datetime.timedelta(days=10)),
+            _Homework("Examen final", "SVT", today + datetime.timedelta(days=5)),
             _Homework("Évaluation rapide", "Physique", today + datetime.timedelta(days=2)),
         ]
         out = daemon.detect_next_evaluations(hw)
         assert out["prochain_DS_matiere"] == "Physique"
         assert len(out["prochains_DS_brut"]) == 2
+
+    def test_ignores_beyond_horizon(self, daemon):
+        """Un contrôle à trois semaines n'a pas valeur d'alerte."""
+        today = datetime.date.today()
+        hw = [_Homework("Contrôle", "Français", today + datetime.timedelta(days=22))]
+
+        out = daemon.detect_next_evaluations(hw)
+
+        assert out["prochain_DS_matiere"] == ""
+        assert out["prochains_DS_brut"] == []
+
+    def test_horizon_inclusif(self, daemon):
+        """La borne elle-même est retenue : sept jours pleins."""
+        today = datetime.date.today()
+        hw = [_Homework("Contrôle", "Français", today + datetime.timedelta(days=7))]
+
+        assert daemon.detect_next_evaluations(hw)["prochain_DS_dans_jours"] == 7
+
+    def test_huitieme_jour_exclu(self, daemon):
+        today = datetime.date.today()
+        hw = [_Homework("Contrôle", "Français", today + datetime.timedelta(days=8))]
+
+        assert daemon.detect_next_evaluations(hw)["prochain_DS_matiere"] == ""
+
+    def test_le_proche_survit_au_lointain(self, daemon):
+        """Un contrôle proche ne doit pas être masqué par un plus lointain."""
+        today = datetime.date.today()
+        hw = [
+            _Homework("Contrôle", "Français", today + datetime.timedelta(days=22)),
+            _Homework("Contrôle", "Maths", today + datetime.timedelta(days=3)),
+        ]
+
+        out = daemon.detect_next_evaluations(hw)
+
+        assert out["prochain_DS_matiere"] == "Maths"
+        assert len(out["prochains_DS_brut"]) == 1
+
+    def test_horizon_ajustable(self, daemon):
+        today = datetime.date.today()
+        hw = [_Homework("Contrôle", "Français", today + datetime.timedelta(days=20))]
+
+        out = daemon.detect_next_evaluations(hw, horizon_jours=30)
+
+        assert out["prochain_DS_matiere"] == "Français"
 
     def test_max_keep(self, daemon):
         today = datetime.date.today()
