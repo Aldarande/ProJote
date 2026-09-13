@@ -272,6 +272,59 @@ try {
         $eqLogic->checkAndUpdateCmd('derniere_note', "Pas de dernière note retournée");
     }
 
+    // ── Bascule d'année scolaire : remise à zéro des notes ────────────────
+    // Le démon n'émet les champs dérivés des notes que lorsqu'il y a des notes,
+    // et les blocs ci-dessous n'écrivent que sur valeur reçue : ce garde-fou
+    // protège d'un effacement sur incident passager, mais il fait aussi
+    // survivre la moyenne de juin pendant toute la rentrée suivante.
+    //
+    // Une valeur collectée AVANT le début de l'année scolaire en cours
+    // appartient forcément à l'année précédente : on la remet à zéro. Tant que
+    // des notes existent, la valeur est rafraîchie et sa date de collecte reste
+    // dans l'année courante — la remise à zéro ne peut donc pas se déclencher
+    // sur un simple échec de collecte, ni s'appliquer deux fois.
+    $notesCmds = array(
+        'note',
+        'derniere_note',
+        'nouvelle_note',
+        'moyenne_generale',
+        'matiere_en_baisse',
+    );
+    $anneeDebut = isset($result['Periodes']['annee_debut']) ? $result['Periodes']['annee_debut'] : '';
+    if ($anneeDebut !== '') {
+        $debutAnnee = DateTime::createFromFormat('d/m/Y', $anneeDebut);
+        if ($debutAnnee instanceof DateTime) {
+            $debutAnnee->setTime(0, 0, 0);
+            foreach ($notesCmds as $logicalId) {
+                $cmd = $eqLogic->getCmd(null, $logicalId);
+                if (!is_object($cmd)) {
+                    continue;
+                }
+                $valeur   = (string) $cmd->execCmd();
+                $collecte = (string) $cmd->getCollectDate();
+                if ($valeur === '' || $collecte === '') {
+                    continue;
+                }
+                if (strtotime($collecte) >= $debutAnnee->getTimestamp()) {
+                    continue;
+                }
+                log::add('ProJote', 'info', 'Nouvelle année scolaire (débutée le ' . $anneeDebut . ') : remise à zéro de ' . $logicalId . ', dont la valeur datait du ' . $collecte . '.');
+                if ($cmd->getIsHistorized() == 1) {
+                    // checkAndUpdateCmd historiserait la valeur vide, que Jeedom
+                    // ramène à 0 sur une commande numérique : un faux point à
+                    // zéro apparaîtrait dans la courbe des moyennes. On efface
+                    // donc la valeur affichée sans produire d'événement, et
+                    // l'historique de l'an dernier reste intact.
+                    $cmd->setCache('value', '');
+                    $cmd->setCache('collectDate', '');
+                    $cmd->setCache('valueDate', '');
+                } else {
+                    $eqLogic->checkAndUpdateCmd($logicalId, '');
+                }
+            }
+        }
+    }
+
     // Moyenne générale (numérique, historisée) — n'écrit que si une valeur exploitable est calculée (F3, v1.1.0)
     if (isset($result["Notes"]["moyenne_generale"]) && $result["Notes"]["moyenne_generale"] !== "" && $eqLogic->getCmd(null, 'moyenne_generale')) {
         log::add('ProJote', 'debug', 'Champ reçu : moyenne_generale - Valeur reçue : ' . $result["Notes"]["moyenne_generale"]);
