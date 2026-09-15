@@ -242,8 +242,15 @@ sendVarToJS('eqLogicId', $eqLogic);
 								<div class="form-group">
 									<label class="col-sm-4 control-label">{{Type de compte}}<i class="fas fa-question-circle tooltips" title="{{Choisissez le type de compte : élève ou parent}}"></i></label>
 									<div class="col-sm-6">
-										<label class="radio-inline"><input type="radio" name="accountType" value="eleve" class="eqLogicAttr" data-l1key="configuration" data-l2key="accountType" checked> {{Élève}}</label>
-										<label class="radio-inline"><input type="radio" name="accountType" value="parent" class="eqLogicAttr" data-l1key="configuration" data-l2key="accountType"> {{Parent}}</label>
+										<!-- Les deux radios portaient la même paire data-l1key/data-l2key ET la
+										     classe eqLogicAttr : Jeedom les collectait alors ensemble et écrivait
+										     un TABLEAU (["0","1"]) dans configuration.accountType. La valeur
+										     n'était donc jamais relue, et les deux boutons revenaient décochés à
+										     chaque ouverture de la page. Les radios ne servent plus qu'à
+										     l'affichage ; le champ caché ci-dessous porte la valeur. -->
+										<label class="radio-inline"><input type="radio" name="accountType" value="eleve" checked> {{Élève}}</label>
+										<label class="radio-inline"><input type="radio" name="accountType" value="parent"> {{Parent}}</label>
+										<input type="hidden" class="eqLogicAttr" data-l1key="configuration" data-l2key="accountType" id="accountTypeValue">
 									</div>
 								</div>
 								<div class="form-group">
@@ -500,10 +507,10 @@ sendVarToJS('eqLogicId', $eqLogic);
 								<label class="col-sm-6 control-label" style="font-size:12px;">{{Photo a utiliser}}</label>
 								<div class="col-sm-6">
 									<select class="eqLogicAttr form-control input-sm" data-l1key="configuration" data-l2key="photo_source">
-										<option value="none" selected>{{Aucune (initiales)}}</option>
+										<option value="none">{{Aucune (initiales)}}</option>
 										<option value="pronote">{{Photo Pronote}}</option>
 										<option value="manual">{{Photo manuelle}}</option>
-										<option value="auto">{{Automatique (Pronote en priorite)}}</option>
+										<option value="auto" selected>{{Automatique (Pronote en priorite)}}</option>
 									</select>
 								</div>
 							</div>

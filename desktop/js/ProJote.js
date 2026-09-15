@@ -118,7 +118,7 @@ function loadProJoteData(eqLogicId) {
 
       // Détecter compte parent via l'URL du token
       if (data.Token_pronote_url && data.Token_pronote_url.includes('parent.html')) {
-        $('input[name="accountType"][value="parent"]').prop('checked', true);
+        $('input[name="accountType"][value="parent"]').prop('checked', true).trigger('change');
         $('.form-group.listenfant').show();
         populateEnfantList(eqLogicId, data, function(selectedEnfant) {
           // Après un "Sauvegarder", Jeedom recharge la page avec saveSuccessFull=1
@@ -128,7 +128,7 @@ function loadProJoteData(eqLogicId) {
           }
         });
       } else {
-        $('input[name="accountType"][value="eleve"]').prop('checked', true);
+        $('input[name="accountType"][value="eleve"]').prop('checked', true).trigger('change');
         $('.form-group.listenfant').hide();
       }
 
@@ -181,6 +181,25 @@ function changeEnfant(eqLogicId, selectedEnfant) {
       waitForDataUpdate(eqLogicId, selectedEnfant);
     }
   });
+}
+
+/**
+ * Coche le bouton radio correspondant au type de compte enregistré.
+ *
+ * La valeur vit dans un champ caché ; les radios ne sont que l'habillage. Une
+ * configuration antérieure au correctif peut contenir un tableau ou une chaîne
+ * vide — on ne retient donc que « eleve » et « parent », et on retombe sur
+ * l'URL, qui est une source sûre : un portail « parent.html » est un compte
+ * parent, sans ambiguïté possible.
+ */
+function syncAccountTypeRadios() {
+  let valeur = $('#accountTypeValue').val();
+  if (valeur !== 'eleve' && valeur !== 'parent') {
+    let url = $('[data-l2key="url"]').val() || '';
+    valeur = url.includes('parent.html') ? 'parent' : 'eleve';
+    $('#accountTypeValue').val(valeur);
+  }
+  $('input[name="accountType"][value="' + valeur + '"]').prop('checked', true);
 }
 
 function resetFields() {
@@ -284,13 +303,22 @@ $(document).ready(function () {
 
   // Gestion de l'affichage du champ listenfant en fonction des radio buttons accountType
   $('input[name="accountType"]').change(function () {
+    // Le champ caché est la seule valeur que Jeedom enregistre : les radios ne
+    // sont plus que l'habillage (voir le commentaire dans ProJote.php).
+    $('#accountTypeValue').val($(this).val());
     if ($(this).val() === 'parent') {
       $('.form-group.listenfant').show();
     } else {
       $('.form-group.listenfant').hide();
     }
   });
-  // Trigger initial pour afficher/masquer selon la valeur par défaut
+
+  // Restaure les radios depuis la valeur enregistrée. Sans cela, l'équipement
+  // rouvrait toujours sur « Élève », quel que soit le type réellement choisi.
+  // Les valeurs héritées sont tolérées : avant le correctif, le champ pouvait
+  // contenir un tableau ou une chaîne vide, qu'on ne doit pas interpréter.
+  syncAccountTypeRadios();
+  // Trigger initial pour afficher/masquer selon la valeur restaurée
   $('input[name="accountType"]:checked').trigger('change');
 
   // Detection automatique parent dans l'URL lors de la saisie
@@ -354,7 +382,7 @@ $('#bt_Validate').on('click', function () {
   if (Url.includes('parent.html')) {
     console.log('ProJote.js:: URL contient parent.html');
     // Si l'URL contient "parent.html", sélectionnez le radio "Parent"
-    $('input[name="accountType"][value="parent"]').prop('checked', true);
+    $('input[name="accountType"][value="parent"]').prop('checked', true).trigger('change');
     // Affiche le form-group listenfant
     $('.form-group.listenfant').show();
   }
