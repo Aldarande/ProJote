@@ -3737,9 +3737,37 @@ def process_message(message):
                             "blocked_until": 0,
                         }
             else:
-                logging.error("Connection avec le Token échouée. Regénérez le QR code.")
+                logging.error(
+                    "Tous les jetons disponibles ont été refusés pour l'équipement %s.",
+                    message.get("CmdId", ""),
+                )
                 eqLogicId = message.get("CmdId", "")
                 check_and_update_failed_attempts(eqLogicId, increment=True)
+                # Prévenir Jeedom de l'échec. Sans cet envoi, la commande
+                # Statut_Connexion restait figée sur la valeur du dernier cycle
+                # réussi — relevée à près de quatre mois sur un équipement — et
+                # le widget continuait d'afficher notes et emploi du temps
+                # périmés comme s'ils étaient du jour. Le chemin « aucun jeton »
+                # juste en dessous prévenait déjà ; celui-ci l'avait oublié.
+                # Le message part vers le widget et le centre de messages : il
+                # doit parler à l'utilisateur. Un refus d'authentification se
+                # présente sous la forme d'un KeyError sur une clé d'enveloppe
+                # (« 'dataSec' ») — inutile de le lui montrer, cela n'aide qu'à
+                # lire les logs. Tout autre détail, lui, est conservé : il peut
+                # nommer une panne réseau ou une réponse inattendue du serveur.
+                detail = "" if is_authentification_refusee(_erreur_connexion) else (
+                    str(_erreur_connexion).strip() if _erreur_connexion else ""
+                )
+                jeedom_com.send_change_immediate(
+                    {
+                        "error": (
+                            "Pronote a refusé le jeton de connexion"
+                            + (" (" + detail + ")" if detail else "")
+                        ),
+                        "CmdId": eqLogicId,
+                        "connection_status": "disconnected",
+                    }
+                )
                 return
         else:
             logging.error(
