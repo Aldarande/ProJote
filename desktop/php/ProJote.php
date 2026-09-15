@@ -266,6 +266,10 @@ sendVarToJS('eqLogicId', $eqLogic);
 										</div>
 									</div>
 								</div>
+								<!-- Zone de message propre au mode Login : #error-message appartient
+								     au bloc QR Code, masqué ici, et le refus du serveur y restait
+								     donc invisible — il ne subsistait qu'une croix rouge muette. -->
+								<div class="form-group text-center" id="login-error-message" style="color:red;font-weight:bold;text-align:center;margin:0 auto;"></div>
 							</div>
 							<div class="form-group QRCode" style="display:none;">
 								<legend>
