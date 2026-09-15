@@ -193,6 +193,15 @@ try {
       ajax::error('Pronote a temporairement suspendu l\'adresse IP de votre Jeedom (trop de connexions). '
         . 'Aucune nouvelle tentative ne sera envoyée avant ' . date('H:i', $until)
         . '. Patientez jusqu\'à cette heure avant de revalider le compte.');
+    } elseif ($return_var === 8) {
+      // Code 8 = le serveur n'a renvoyé aucun jeton d'application mobile (cf.
+      // pronote_errors.py). Les identifiants sont bons — la connexion a réussi —
+      // mais ProJote ne stocke jamais le mot de passe : sans jeton, il n'y a rien
+      // à enregistrer. On nomme le fait sans lui prêter de cause.
+      ajax::error('Vos identifiants sont corrects, mais le serveur Pronote n\'a renvoyé aucun jeton d\'application mobile. '
+        . 'ProJote ne conserve jamais votre mot de passe : il a besoin de ce jeton pour se reconnecter tout seul. '
+        . 'Inutile de ressaisir vos identifiants. Réessayez plus tard, et si cela persiste, '
+        . 'vérifiez auprès de l\'établissement que l\'application mobile Pronote est autorisée pour ce compte.');
     } else {
       // Le script a échoué. On renvoie un message d'erreur au JavaScript.
       // L'utilisateur verra une notification d'erreur.

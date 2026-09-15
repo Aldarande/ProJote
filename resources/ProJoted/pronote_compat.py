@@ -306,13 +306,34 @@ def _install() -> None:
         except PronoteAPIError as e:
             if type(e).__name__ == "ExpiredObject":
                 raise
+
+            # Garde anti-récursion, repris de ClientBase.post (« prevent refresh
+            # recursion ») que cette redéfinition avait laissé tomber.
+            #
+            # Sans lui, la réparation se mord la queue : refresh() appelle
+            # _login(), qui poste « Identification » — donc cette méthode. Si le
+            # serveur refuse cette Identification à son tour, on relance un
+            # refresh, qui repose Identification, indéfiniment. Un seul cycle a
+            # produit 415 ré-authentifications en quelques secondes le
+            # 13 septembre 2026, jusqu'à ce que PRONOTE suspende l'adresse IP —
+            # suspension dont la durée double à chaque récidive.
+            if getattr(self, "_refreshing", False):
+                raise
+
             logging.debug(
                 "pronote_compat :: %s refusé (%s) — réinitialisation puis "
                 "rejeu avec l'identifiant d'enfant à jour.",
                 function_name,
                 getattr(e, "pronote_error_code", None),
             )
-            self.refresh()
+            self._refreshing = True
+            try:
+                self.refresh()
+            finally:
+                # `finally` et non simple affectation : si refresh() lève, le
+                # drapeau resterait armé et bloquerait toute réparation future
+                # sur ce client.
+                self._refreshing = False
             # _payload() est ré-évalué ici : il lit le _selected_child
             # reconstruit par le refresh corrigé ci-dessus.
             return self.communication.post(function_name, _payload())

@@ -235,7 +235,10 @@ try {
     } else {
         $eqLogic->checkAndUpdateCmd('edt_aujourdhui_fin', "Pas de cours aujourd'hui retourné");
     }
-    if (isset($result['Emploi_du_temps']['edt_aujourdhui_cancel']) && $eqLogic->getCmd(null, 'edt_aujourdhui_cancel ')) {
+    // Espace parasite corrigé dans 'edt_aujourdhui_cancel' : getCmd() compare le
+    // logicalId à l'identique, la condition était donc toujours fausse et la
+    // branche else écrivait « 0 » quel que soit le nombre réel d'annulations.
+    if (isset($result['Emploi_du_temps']['edt_aujourdhui_cancel']) && $eqLogic->getCmd(null, 'edt_aujourdhui_cancel')) {
         $eqLogic->checkAndUpdateCmd('edt_aujourdhui_cancel', $result['Emploi_du_temps']['edt_aujourdhui_cancel']);
     } else {
         $eqLogic->checkAndUpdateCmd('edt_aujourdhui_cancel', "0");
@@ -614,7 +617,11 @@ try {
         'etablissement'         => isset($result['Eleve']['Etablissement'])                    ? $result['Eleve']['Etablissement']                    : '',
         'notes'                 => isset($result['Notes']['note'])                            ? $result['Notes']['note']                            : array(),
         'moyennes_periodes'     => isset($result['Notes']['moyennes_periodes'])               ? $result['Notes']['moyennes_periodes']               : array(),
-        'competences'           => isset($result['Competences']['evaluations'])               ? $result['Competences']['evaluations']               : array(),
+        // `evaluations()` renvoie directement la LISTE des évaluations, pas un
+        // dict qui la contiendrait : $result['Competences']['evaluations']
+        // n'était jamais défini et l'onglet Compétences du widget restait vide
+        // en permanence, alors que la commande `competences` était bien alimentée.
+        'competences'           => isset($result['Competences']) && is_array($result['Competences']) ? $result['Competences'] : array(),
         'edt_aujourdhui'        => isset($result['Emploi_du_temps']['edt_aujourdhui'])        ? $result['Emploi_du_temps']['edt_aujourdhui']        : array(),
         'edt_prochainjour'      => isset($result['Emploi_du_temps']['edt_prochainjour'])      ? $result['Emploi_du_temps']['edt_prochainjour']      : array(),
         'edt_prochainjour_date' => isset($result['Emploi_du_temps']['edt_prochainjour_date']) ? $result['Emploi_du_temps']['edt_prochainjour_date'] : '',
