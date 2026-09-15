@@ -413,7 +413,27 @@ $('#bt_Validate').on('click', function () {
  ***************************************/
 // Les function suivante gére le copier selectionner ou "drop" de l'image QRCODE
 document.querySelector('.rectangle').addEventListener('paste', function (e) {
-  let { items } = e.clipboardData;
+  // Sans preventDefault, le navigateur insère lui-même le contenu collé dans
+  // la zone — elle est en contenteditable="true", faute de quoi l'événement
+  // « paste » ne lui parviendrait pas. On voyait donc DEUX QR codes : celui
+  // que le navigateur avait déposé, à sa taille d'origine, et la vignette de
+  // 200 px construite par displayImage(). Le gestionnaire « drop » ci-dessous
+  // s'en prémunissait déjà ; celui-ci l'avait oublié.
+  //
+  // Inconditionnel, y compris pour du texte : cette zone n'accueille qu'une
+  // image de QR Code, rien ne doit pouvoir s'y écrire.
+  e.preventDefault();
+  // Le presse-papiers peut être inaccessible (navigateur ancien, contexte non
+  // sécurisé). Comme on vient de neutraliser le comportement natif, il faut le
+  // dire plutôt que de laisser un collage sans effet ni explication.
+  let items = e.clipboardData && e.clipboardData.items;
+  if (!items || !items.length) {
+    $('#error-message').text(
+      'Erreur : le presse-papiers n\'est pas accessible. Utilisez le bouton ' +
+      '« Parcourir » pour choisir l\'image du QR Code.'
+    );
+    return;
+  }
   for (let i = 0; i < items.length; i++) {
     if (items[i].type.indexOf('image') !== -1) {
       let blob = items[i].getAsFile();
