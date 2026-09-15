@@ -172,7 +172,13 @@ try {
     $manualPhotoUrl  = '/plugins/ProJote/data/' . $eqLogic->getId() . '/profile_picture_manual.jpg';
     $pronotePhotoUrl = !empty($result['Local_Picture']) ? $result['Local_Picture'] : null;
     $manualExists    = file_exists($manualPhotoFile);
-    switch ($eqLogic->getConfiguration('photo_source', 'none')) {
+    // Défaut « auto » et non « none » : ce réglage a été introduit quand la photo
+    // Pronote n'arrivait jamais, et masquer une image absente ne coûtait rien.
+    // Depuis qu'elle remonte, ce défaut cachait une photo tout juste téléchargée
+    // sans que rien ne l'explique. « auto » prend la photo Pronote et retombe
+    // sur la photo manuelle à défaut ; « none » reste disponible pour qui
+    // préfère les initiales.
+    switch ($eqLogic->getConfiguration('photo_source', 'auto')) {
         case 'pronote':
             $resolvedPhoto = $pronotePhotoUrl ?? '';
             break;
