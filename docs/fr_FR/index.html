@@ -711,6 +711,18 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
         <thead><tr><th>Type</th><th>Description</th></tr></thead>
         <tbody>
             <tr>
+                <td><span class="badge badge-new">Nouveauté</span></td>
+                <td><strong>Le widget signale qu'il affiche des données figées</strong> — quand un cycle échouait, le plugin s'arrêtait avant de réécrire les données du widget : notes, emploi du temps et devoirs restaient ceux du dernier cycle réussi, sans rien qui les distingue de données du jour. Rien ne remontait d'ailleurs l'échec — la commande <em>Statut_Connexion</em> affichait encore « Connecté » sur un équipement qui ne se connectait plus depuis deux jours, avec une date de dernier changement vieille de près de quatre mois. Un bandeau apparaît désormais en tête du widget : <strong>ambre</strong> pour une suspension d'adresse IP, qui se résorbe seule et ne demande rien, <strong>rouge</strong> pour un jeton refusé, qui appelle une action. Il indique depuis quand la collecte est interrompue.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>La page de configuration cassait au second affichage</strong> — Jeedom charge les pages de plugin sans recharger le navigateur, et réinjecte le script à chaque retour sur la page. Une variable déclarée en <code>let</code> refusait alors d'être redéclarée (<code>SyntaxError: redeclaration of let lastQRData</code>), ce qui interrompait tout le script : la page perdait l'ensemble de ses boutons — validation du compte, scan du QR Code, envoi de photo. Tout fonctionnait au premier affichage, plus rien au second, sans le moindre message à l'écran.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>Deux QR codes affichés après un collage</strong> — la zone de dépôt doit être éditable pour recevoir un collage, mais le navigateur y insérait alors l'image lui-même, à sa taille d'origine, pendant que le plugin y construisait sa vignette. Deux QR codes s'affichaient donc, dont un débordant largement du cadre prévu. Le collage ne dépose plus que la vignette ; et si le presse-papiers est inaccessible, un message renvoie vers le bouton « Parcourir » au lieu de laisser un collage sans effet.</td>
+            </tr>
+            <tr>
                 <td><span class="badge badge-fix">Correctif</span></td>
                 <td><strong>La photo de l'élève remonte enfin</strong> — le plugin la réclamait depuis des mois à <code>FichiersExternes</code> et n'obtenait que des 404, au point qu'un diagnostic livré avec le plugin concluait que Pronote ne servait plus la photo aux sessions mobiles. C'était faux, et l'erreur venait d'une porte : <code>FichiersExternes</code> ne sert que la photo des <em>autres</em> individus, professeurs et camarades. Sa propre photo accompagne la réponse <code>ParametresUtilisateur</code>, et le champ <code>photoBase64</code> n'en contient pas la charge mais un <strong>renvoi</strong> <code>{"_T":25,"V":&lt;indice&gt;}</code> vers le tableau <code>dataNonSec.fichiers</code> de cette même réponse — que pronotepy ne remonte pas. Lu comme une chaîne, ce renvoi passait pour un champ vide. Un compte parent reçoit une entrée par enfant, désignée par son propre indice. Vérifié sur deux établissements et sur le site de démonstration, compte élève comme compte parent, en connexion par identifiants comme par jeton.</td>
             </tr>
