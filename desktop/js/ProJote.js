@@ -449,7 +449,18 @@ document.querySelector('.rectangle').addEventListener('drop', function (e) {
 
 // Dernier QR décodé avec succès — permet de relancer la saisie du PIN
 // en cliquant sur l'aperçu de l'image (voir displayImage).
-let lastQRData = null;
+//
+// `var` et non `let` : Jeedom charge les pages de plugin en AJAX dans
+// #div_pageContainer, et réinjecte la balise <script> à chaque retour sur la
+// page. Le fichier est donc réévalué dans le même contexte global, où un `let`
+// refuse d'être redéclaré — « SyntaxError: redeclaration of let lastQRData » —
+// ce qui interrompt le script et laisse la page de configuration sans aucun de
+// ses gestionnaires. `var` tolère la réévaluation ; la valeur repart à null,
+// ce qui est le comportement voulu pour un tampon de scan.
+//
+// C'est la seule déclaration au niveau global du fichier : tout le reste est
+// porté par des fonctions ou des callbacks, donc hors de portée du problème.
+var lastQRData = null;
 
 /**
  * Demande le code PIN puis envoie le QR au serveur.
