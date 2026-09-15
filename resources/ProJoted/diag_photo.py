@@ -6,27 +6,41 @@
 """
 diag_photo.py — Diagnostic de la récupération de la photo de profil PRONOTE.
 
-Outil hors démon, à lancer à la main sur le Jeedom pour savoir POURQUOI la
-photo d'un équipement ne remonte pas, et si le canal historique fonctionne
-encore sur l'établissement concerné.
+Outil hors démon, à lancer à la main sur le Jeedom pour savoir si un
+établissement joint bien la photo de l'élève, et si le plugin sait la lire.
 
-Ce que le script établit, sur le serveur réel de l'utilisateur :
+# Ce qu'il faut savoir avant de lire la sortie
 
-  1. Ce que PRONOTE déclare      — avecPhoto, photoBase64, identifiant ressource.
-  2. L'URL du client officiel    — réplique exacte de composeUrlImgPhotoIndividu
-                                   du JS PRONOTE 2026 (payload {"N":…,"Actif":true},
-                                   nom de fichier « Prénom_Nom.jpg »), plus les
-                                   variantes (nom photo.jpg, &miniature=).
-  3. Un témoin de contrôle       — téléchargement d'une pièce jointe quelconque
-                                   par la MÊME mécanique FichiersExternes.
+La photo de l'utilisateur ne transite pas par ``FichiersExternes``. Les deux
+clients officiels de PRONOTE 2026, espace classique comme espace mobile, la
+lisent dans la réponse ``ParametresUtilisateur`` elle-même :
 
-Le témoin est le cœur du diagnostic :
+    dataNonSec.fichiers = ["<base64 du JPEG>", …]
+    dataSec.data.ressource.photoBase64 = {"_T": 25, "V": 0}
 
-  - témoin OK + photo 404  → la mécanique de chiffrement et la session sont
-    saines ; c'est l'endpoint photo qui ne sert plus rien. Rien à corriger côté
-    plugin : PRONOTE lui-même affiche sa silhouette de repli dans ce cas.
-  - témoin KO              → le problème est en amont (session, chiffrement,
-    droits) et concerne tous les fichiers, pas seulement la photo.
+Le champ « photoBase64 » ne porte donc pas la charge mais un **renvoi** vers le
+tableau ``dataNonSec.fichiers`` de cette même réponse : ``_T: 25`` annonce le
+renvoi, ``V`` en donne l'indice. Un compte parent reçoit une entrée par enfant.
+
+``FichiersExternes`` et sa fonction ``composeUrlImgPhotoIndividu`` ne servent
+qu'à la photo des **autres** individus — professeurs, camarades. C'est pourquoi
+les versions précédentes de cet outil accumulaient des 404 : elles frappaient
+une porte qui n'a jamais été celle de sa propre photo, et le témoin qu'elles
+opposaient — le téléchargement d'une pièce jointe — validait un chemin que la
+photo n'emprunte pas. D'où le verdict « le serveur ne sert pas la photo sur les
+sessions mobiles », qui était faux.
+
+# Ce que le script établit
+
+  1. Ce que PRONOTE déclare  — avecPhoto, forme du champ photoBase64, nombre de
+                               fichiers joints à la réponse.
+  2. Ce que le plugin en tire — en appelant ``ProJoted.photo_jointe()``, la
+                               fonction que le démon exécute réellement, et non
+                               une réplique qui pourrait diverger d'elle.
+  3. Le repli FichiersExternes — à titre indicatif seulement : le démon ne s'en
+                               sert que si la charge jointe manque.
+
+Sur un compte parent, chaque enfant est examiné.
 
 ATTENTION — le jeton tourne à chaque connexion. Le script se reconnecte avec le
 jeton stocké, donc il le consomme. Il réécrit par défaut le jeton rafraîchi dans
@@ -46,18 +60,23 @@ import json
 import logging
 import os
 import sys
-from urllib.parse import quote
 
 import pronotepy
-import requests
-from Crypto.Util import Padding
 
 import pronote_compat
 
 pronote_compat.apply()
 
+# La fonction du démon, importée et non recopiée : un diagnostic qui réplique
+# le code qu'il teste finit tôt ou tard par diverger de lui, et c'est
+# exactement ce qui a rendu la version précédente trompeuse.
+from ProJoted import photo_jointe  # noqa: E402
+
 DATA_DIR = "/var/www/html/plugins/ProJote/data"
 NOM_FICHIER = "enfant.ProJote.json.txt"
+
+# Marqueur PRONOTE d'un renvoi vers dataNonSec.fichiers (cf. ProJoted).
+RENVOI_FICHIER_JOINT = 25
 
 
 def charger_token(data_dir, eqid):
@@ -72,8 +91,12 @@ def charger_token(data_dir, eqid):
     return chemin, data, token
 
 
+def est_parent_url(token):
+    return "parent.html" in token["pronote_url"]
+
+
 def connecter(token, enfant):
-    est_parent = "parent.html" in token["pronote_url"]
+    est_parent = est_parent_url(token)
     classe = pronotepy.ParentClient if est_parent else pronotepy.Client
     client = classe.token_login(
         pronote_url=token["pronote_url"],
@@ -89,65 +112,76 @@ def connecter(token, enfant):
     return client, est_parent
 
 
-def url_photo(client, numero, libelle, nom_fichier=None, extra=""):
-    """Réplique de composeUrlImgPhotoIndividu (client web PRONOTE 2026)."""
-    padd = Padding.pad(
-        json.dumps({"N": numero, "Actif": True}).replace(" ", "").encode(), 16
-    )
-    magic = client.communication.encryption.aes_encrypt(padd).hex()
-    nom = nom_fichier or (libelle.replace(" ", "_") + ".jpg")
-    return (
-        f"{client.communication.root_site}/FichiersExternes/{magic}/"
-        + quote(nom, safe="~()*!.'")
-        + f"?Session={client.attributes['h']}"
-        + extra
-    )
+def decrire_champ(champ):
+    """Rend lisible la forme du champ photoBase64 tel que PRONOTE l'envoie."""
+    if champ is None:
+        return "absent"
+    if isinstance(champ, str):
+        return f"charge en clair dans le champ ({len(champ)} caractères)"
+    if isinstance(champ, dict) and champ.get("_T") == RENVOI_FICHIER_JOINT:
+        return f"renvoi vers dataNonSec.fichiers[{champ.get('V')}]"
+    return f"forme inattendue : {champ!r}"
 
 
-def essai(client, label, url, headers=None):
+def examiner(client, libelle, raw, dossier_sortie):
+    """Examine un sujet — l'élève, ou un enfant d'un compte parent."""
+    print(f"\n--- {libelle}")
+    champ = (raw or {}).get("photoBase64")
+    print("    avecPhoto    :", raw.get("avecPhoto"))
+    print("    photoBase64  :", decrire_champ(champ))
+
+    image = photo_jointe(client, raw)
+    if image:
+        nom = "".join(c if c.isalnum() else "_" for c in libelle)
+        chemin = os.path.join(dossier_sortie, f"diag_photo_{nom}.jpg")
+        try:
+            with open(chemin, "wb") as f:
+                f.write(image)
+            ecrit = chemin
+        except OSError as e:
+            ecrit = f"(écriture impossible : {e})"
+        print(
+            f"    >>> CHARGE LUE : {len(image)} octets, "
+            f"format {image[:4].hex()} — écrite dans {ecrit}"
+        )
+        return True
+
+    if raw.get("avecPhoto") and champ is not None:
+        print("    >>> la charge est annoncée mais illisible (voir les logs ci-dessus)")
+    elif not raw.get("avecPhoto"):
+        print("    >>> ce compte n'a pas de photo dans PRONOTE (avecPhoto=False)")
+    else:
+        print("    >>> aucune charge jointe à la réponse")
+
+    # Repli indicatif : c'est ce que tenterait le démon à défaut de charge.
+    photo = None
     try:
-        r = client.communication.session.get(url, timeout=20, headers=headers or {})
+        photo = (
+            client._selected_child.profile_picture
+            if getattr(client, "_selected_child", None)
+            else client.info.profile_picture
+        )
     except Exception as e:
-        print(f"  [ERR] {label:<44} {e}")
-        return False
-    ok = r.status_code == 200 and len(r.content) > 100
-    print(
-        f"  [{'OK ' if ok else '   '}] {label:<44} HTTP {r.status_code} "
-        f"{len(r.content):>8} o  {r.headers.get('Content-Type', '?')[:28]}"
-    )
-    return ok
-
-
-def temoin_piece_jointe(client):
-    """Télécharge n'importe quelle pièce jointe par la même mécanique."""
-    debut = client.start_day
-    try:
-        for hw in client.homework(debut, debut + datetime.timedelta(days=60)):
-            for f in hw.files:
-                if f.type == 1:
-                    return essai(client, f"pièce jointe devoir : {f.name[:26]}", f.url)
-    except Exception as e:
-        print("  (devoirs indisponibles :", e, ")")
-    try:
-        for lesson in client.lessons(debut, debut + datetime.timedelta(days=20)):
-            try:
-                contenu = lesson.content
-            except Exception:
-                continue
-            for f in getattr(contenu, "files", None) or []:
-                if f.type == 1:
-                    return essai(client, f"contenu de cours : {f.name[:30]}", f.url)
-    except Exception as e:
-        print("  (contenus de cours indisponibles :", e, ")")
-    print("  aucune pièce jointe trouvée : témoin non concluant")
-    return None
+        print("    repli FichiersExternes indisponible :", e)
+    if photo:
+        try:
+            r = client.communication.session.get(photo.url, timeout=20)
+            print(
+                f"    repli FichiersExternes : HTTP {r.status_code}, "
+                f"{len(r.content)} octets"
+            )
+        except Exception as e:
+            print("    repli FichiersExternes : échec —", e)
+    return False
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--eqid", required=True, help="ID de l'équipement Jeedom")
     parser.add_argument("--datadir", default=DATA_DIR)
-    parser.add_argument("--enfant", default=None, help="Nom de l'enfant (compte parent)")
+    parser.add_argument(
+        "--enfant", default=None, help="Nom de l'enfant (compte parent)"
+    )
     parser.add_argument(
         "--no-write",
         action="store_true",
@@ -155,7 +189,7 @@ def main():
     )
     args = parser.parse_args()
 
-    logging.basicConfig(level=logging.WARNING)
+    logging.basicConfig(level=logging.INFO, format="    [%(levelname)s] %(message)s")
 
     chemin, data, token = charger_token(args.datadir, args.eqid)
     enfant = args.enfant or data.get("Eleve")
@@ -164,7 +198,10 @@ def main():
     print(f"Élève     : {enfant}")
 
     client, est_parent = connecter(token, enfant if est_parent_url(token) else None)
-    print(f"Connecté  : {client.logged_in}  (compte {'parent' if est_parent else 'élève'})")
+    print(
+        f"Connecté  : {client.logged_in}  "
+        f"(compte {'parent' if est_parent else 'élève'})"
+    )
 
     if not args.no_write:
         data["Token"] = client.export_credentials()
@@ -175,84 +212,59 @@ def main():
     else:
         print("!! Jeton NON réécrit : le jeton stocké est maintenant périmé.")
 
-    info = client._selected_child if est_parent and client._selected_child else client.info
-    raw = info.raw_resource
+    parametres = getattr(client, "parametres_utilisateur", None) or {}
+    fichiers = parametres.get("dataNonSec", {}).get("fichiers") or []
 
-    print("\n=== 1. Ce que PRONOTE déclare ===")
-    print("  nom          :", info.name)
-    print("  N (ressource):", raw.get("N"))
-    print("  avecPhoto    :", raw.get("avecPhoto"))
-    print("  photoBase64  :", raw.get("photoBase64"))
-    print("  profile_picture pronotepy :", "None" if info.profile_picture is None else "Attachment")
+    print("\n=== 1. Ce que PRONOTE joint à ParametresUtilisateur ===")
+    print(f"    fichiers joints : {len(fichiers)}")
+    for i, charge in enumerate(fichiers):
+        taille = len(charge) if isinstance(charge, str) else "?"
+        print(f"      [{i}] {taille} caractères de base64")
+    if not fichiers:
+        print("      (aucun — voir le verdict)")
 
-    print("\n=== 2. URL du client officiel et variantes ===")
-    n = raw.get("N")
-    if not n:
-        print("  pas d'identifiant de ressource, arrêt")
-        return
-    essai(client, "nom officiel « Prénom_Nom.jpg »", url_photo(client, n, info.name))
-    essai(client, "nom pronotepy « photo.jpg »", url_photo(client, n, info.name, "photo.jpg"))
-    essai(client, "nom officiel + &miniature=1", url_photo(client, n, info.name, None, "&miniature=1"))
-
-    print("\n=== 2 bis. Stratégies de repli du démon ===")
-    url = url_photo(client, n, info.name, "photo.jpg")
-    root = client.communication.root_site
-    essai(
-        client,
-        "stratégie 2 : Referer + Origin",
-        url,
-        headers={"Referer": root + "/", "Origin": root},
-    )
-    try:
-        r = requests.get(
-            url,
-            cookies=client.communication.session.cookies,
-            timeout=20,
-            headers={"User-Agent": "Mozilla/5.0", "Referer": root + "/"},
+    print("\n=== 2. Ce que le plugin en tire (ProJoted.photo_jointe) ===")
+    dossier = os.path.join(args.datadir, str(args.eqid))
+    resultats = {}
+    if est_parent:
+        enfants = list(getattr(client, "children", []) or [])
+        if not enfants:
+            print("    Aucun enfant listé sur ce compte parent.")
+        for ch in enfants:
+            client.set_child(ch)
+            resultats[ch.name] = examiner(
+                client, ch.name, client._selected_child.raw_resource, dossier
+            )
+        # Rendre la sélection à l'enfant de l'équipement, par politesse pour
+        # le prochain cycle du démon s'il partage le même jeton.
+        if enfant:
+            try:
+                client.set_child(enfant)
+            except Exception:
+                pass
+    else:
+        resultats[client.info.name] = examiner(
+            client, client.info.name, client.info.raw_resource, dossier
         )
-        print(
-            f"  [{'OK ' if r.status_code == 200 and len(r.content) > 100 else '   '}] "
-            f"{'stratégie 3 : cookies de session':<44} HTTP {r.status_code} "
-            f"{len(r.content):>8} o  {r.headers.get('Content-Type', '?')[:28]}"
-        )
-    except Exception as e:
-        print(f"  [ERR] {'stratégie 3 : cookies de session':<44} {e}")
-    essai(
-        client,
-        "silhouette de repli du client officiel",
-        root + "/FichiersRessource/PortraitSilhouette.png",
-    )
-
-    print("\n=== 3. Témoin de contrôle (même mécanique, autre fichier) ===")
-    temoin = temoin_piece_jointe(client)
 
     print("\n=== VERDICT ===")
-    if temoin:
-        print("  Le témoin passe : session et chiffrement sains.")
-        print("  ATTENTION — le témoin ne valide PAS la composition de l'URL :")
-        print("  une pièce jointe porte une URL fournie par le serveur, alors que")
-        print("  la photo est composée par le client. Il n'exerce donc pas le")
-        print("  chemin qui échoue.")
-        print("  Ce qui a été établi le 13 septembre 2026, sur deux établissements :")
-        print("    - la composition est correcte : la charge déchiffrée d'une pièce")
-        print("      jointe qui fonctionne a exactement la même forme que la nôtre,")
-        print("      {\"N\":…,\"Actif\":true}, au préfixe de ressource près ;")
-        print("    - les 8 variantes de charge et de padding renvoient 404 ;")
-        print("    - photoBase64 revient vide alors qu'avecPhoto vaut True ;")
-        print("    - l'espace classique, lui, affiche bien la photo, mais il refuse")
-        print("      le jeton d'application mobile.")
-        print("  Conclusion : sur une connexion par QR Code (espace mobile), le")
-        print("  serveur ne sert pas la photo d'un individu. Ne pas en conclure")
-        print("  que le compte n'a pas de photo.")
-    elif temoin is False:
-        print("  Le témoin échoue aussi : le problème touche TOUS les fichiers,")
-        print("  pas seulement la photo (session, chiffrement ou droits).")
+    lues = [nom for nom, ok in resultats.items() if ok]
+    manquantes = [nom for nom, ok in resultats.items() if not ok]
+    if lues and not manquantes:
+        print("    Photo disponible et lisible pour :", ", ".join(lues))
+        print("    Rien à corriger : le démon écrira ces images telles quelles.")
+    elif lues:
+        print("    Photo lue pour   :", ", ".join(lues))
+        print("    Photo manquante  :", ", ".join(manquantes))
+        print("    Comparer les deux cas ci-dessus : si avecPhoto vaut False, le")
+        print("    compte n'a simplement pas de photo dans PRONOTE.")
     else:
-        print("  Témoin non concluant : relancer quand des pièces jointes existent.")
-
-
-def est_parent_url(token):
-    return "parent.html" in token["pronote_url"]
+        print("    Aucune photo lue.")
+        print("    Si avecPhoto vaut True et qu'aucun fichier n'est joint, cet")
+        print("    établissement ne diffuse pas la photo à l'application mobile ;")
+        print("    l'espace web de l'établissement permet de le confirmer.")
+        print("    Si avecPhoto vaut False, le compte n'a pas de photo : c'est")
+        print("    normal, et le widget affichera les initiales.")
 
 
 if __name__ == "__main__":
