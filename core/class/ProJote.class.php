@@ -884,6 +884,37 @@ class ProJote extends eqLogic
       $widgetData = [];
     }
 
+    // 3a. État de la connexion — le widget doit pouvoir dire qu'il montre des
+    //     données figées.
+    //
+    //     Quand un cycle échoue, jeeProJote.php s'arrête avant d'écrire
+    //     'widget_json' : le blob reste celui du dernier cycle réussi. Rien ne
+    //     distinguait donc un widget à jour d'un widget figé depuis des jours —
+    //     l'utilisateur lisait des notes et un emploi du temps périmés en les
+    //     croyant courants. La commande 'Statut_Connexion', elle, est
+    //     rafraîchie sur tous les chemins, y compris ceux qui s'arrêtent tôt.
+    //
+    //     On la lit à l'affichage plutôt qu'au moment de la collecte : c'est la
+    //     seule façon d'informer sur un cycle qui n'écrit rien.
+    $cmdStatut = $this->getCmd(null, 'Statut_Connexion');
+    if (is_object($cmdStatut)) {
+      $statut = trim((string) $cmdStatut->execCmd());
+      // Tout ce qui ne commence pas par « Connecté » est un état à signaler :
+      // « Déconnecté : … », « Erreur : … », « IP suspendue — reprise à … ».
+      if ($statut !== '' && stripos($statut, 'Connecté') !== 0) {
+        $estSuspension = (stripos($statut, 'IP suspendue') !== false);
+        $widgetData['alerte'] = array(
+          'message' => $statut,
+          // Date du dernier CHANGEMENT de valeur, pas de la dernière collecte :
+          // c'est « depuis quand est-ce cassé », pas « quand a-t-on regardé ».
+          'depuis'  => $cmdStatut->getValueDate(),
+          // Une suspension d'IP se résorbe seule ; un jeton refusé demande une
+          // action. Le widget ne doit pas presser l'utilisateur dans le premier cas.
+          'action'  => $estSuspension ? 'attendre' : 'revalider',
+        );
+      }
+    }
+
     // 3b. Recalcul de la photo en temps réel selon photo_source
     //     (indépendant du démon — toujours à jour après upload/changement de source).
     $dataDir         = realpath(dirname(__FILE__) . '/../../data');

@@ -19,6 +19,53 @@
     }
 
     /* ── En-tête : flex horizontal ──────────────────────── */
+    /* Bandeau d'état : le widget affiche des données figées quand un cycle
+       échoue. Discret mais pas escamotable — il annonce que ce qui suit n'est
+       plus à jour. Ambre pour une suspension d'IP, qui se résorbe seule ;
+       rouge pour un jeton refusé, qui demande une action. */
+    .pjw-#id# .pj-banner {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 8px 10px;
+        margin-bottom: 12px;
+        border-radius: 6px;
+        border-left: 3px solid #c0392b;
+        background: rgba(192, 57, 43, .10);
+        line-height: 1.35;
+    }
+
+    .pjw-#id# .pj-banner.pj-banner-wait {
+        border-left-color: #b8860b;
+        background: rgba(184, 134, 11, .10);
+    }
+
+    .pjw-#id# .pj-banner-ico {
+        flex-shrink: 0;
+        font-size: 13px;
+        color: #c0392b;
+    }
+
+    .pjw-#id# .pj-banner.pj-banner-wait .pj-banner-ico {
+        color: #b8860b;
+    }
+
+    .pjw-#id# .pj-banner-txt {
+        min-width: 0;
+    }
+
+    .pjw-#id# .pj-banner-title {
+        font-weight: 600;
+        font-size: .92em;
+    }
+
+    .pjw-#id# .pj-banner-sub {
+        font-size: .82em;
+        opacity: .85;
+        margin-top: 2px;
+        word-break: break-word;
+    }
+
     .pjw-#id# .ph {
         display: flex;
         align-items: center;
@@ -936,6 +983,9 @@
 </style>
 
 <div class="pjw-#id#">
+
+    <!-- ══ BANDEAU D'ÉTAT ═════════════════════════════════ -->
+    <div class="pj-banner" id="pjwban#id#" style="display:none"></div>
 
     <!-- ══ EN-TÊTE ════════════════════════════════════════ -->
     <div class="ph">
@@ -1971,8 +2021,53 @@
         }
 
         /* ─── RENDU GLOBAL ────────────────────────────────── */
+        /* Bandeau d'état — voir ProJote.class.php : quand un cycle échoue, le
+           blob widget_json n'est pas réécrit et le widget continue d'afficher
+           les données du dernier cycle réussi. Sans ce bandeau, rien ne les
+           distingue de données fraîches. */
+        function renderBanner(d) {
+            var box = el('pjwban' + ID);
+            if (!box) return;
+            var a = d && d.alerte;
+            if (!a || !a.message) { box.style.display = 'none'; return; }
+
+            var attendre = (a.action === 'attendre');
+            box.className = 'pj-banner' + (attendre ? ' pj-banner-wait' : '');
+
+            // Le titre dit la conséquence — ce que l'utilisateur constate —
+            // plutôt que la cause technique, qui est donnée en dessous.
+            var titre = attendre
+                ? 'Collecte en pause'
+                : 'Données non mises à jour';
+            var sous = esc(a.message);
+            if (a.depuis) sous += ' · depuis le ' + esc(formatDepuis(a.depuis));
+            if (!attendre) {
+                sous += ' · le compte doit être revalidé dans la configuration '
+                    + 'de l\'équipement si les cycles suivants échouent aussi';
+            }
+
+            box.innerHTML =
+                '<span class="pj-banner-ico"><i class="fas fa-' +
+                (attendre ? 'hourglass-half' : 'exclamation-triangle') + '"></i></span>' +
+                '<span class="pj-banner-txt">' +
+                '<div class="pj-banner-title">' + esc(titre) + '</div>' +
+                '<div class="pj-banner-sub">' + sous + '</div>' +
+                '</span>';
+            box.style.display = 'flex';
+        }
+
+        /* « 2026-09-15 07:24:18 » → « 15/09 à 07:24 ». Rendu au moment de
+           l'affichage, comme les échéances de devoirs : un widget resté ouvert
+           ne doit pas figer une date relative. */
+        function formatDepuis(s) {
+            var m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
+            if (!m) return String(s || '');
+            return m[3] + '/' + m[2] + ' à ' + m[4] + ':' + m[5];
+        }
+
         function render(d, ts) {
             if (!d || typeof d !== 'object') return;
+            renderBanner(d);
             renderHeader(d, ts);
             renderEDT(d);
             renderNotesBar(d);
