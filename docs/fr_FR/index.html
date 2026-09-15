@@ -712,6 +712,14 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
         <tbody>
             <tr>
                 <td><span class="badge badge-new">Nouveauté</span></td>
+                <td><strong>Les comptes de démonstration PRONOTE sont utilisables</strong> — ProJote se connecte normalement par jeton d'application mobile : la validation échange les identifiants contre deux jetons, et seuls ceux-là sont conservés. Or le site de démonstration d'Index Éducation n'en délivre aucun, si bien qu'aucun compte de démonstration ne pouvait être enregistré — alors que ce sont justement les comptes qui permettent d'essayer le plugin sans toucher aux données scolaires d'un enfant réel. Ces serveurs, et eux seuls, se connectent désormais par identifiants à chaque cycle. Créez l'équipement en mode <em>Login</em> avec l'URL <code>https://demo.index-education.net/pronote/parent.html</code> (ou <code>eleve.html</code>) et les identifiants publics <code>demonstration</code> / <code>pronotevs</code> : tout fonctionne ensuite comme un compte ordinaire, photo comprise.
+                <div class="callout callout-info" style="margin-top:8px;">
+                    <strong>Pourquoi c'est sans risque</strong>
+                    L'exception porte sur l'adresse du serveur, jamais sur un réglage : l'établissement de votre enfant ne peut pas emprunter ce chemin, même par mégarde. Et les identifiants de la démonstration sont publics — Index Éducation les pré-remplit dans son propre formulaire — pour des données entièrement fictives.
+                </div></td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-new">Nouveauté</span></td>
                 <td><strong>Le widget signale qu'il affiche des données figées</strong> — quand un cycle échouait, le plugin s'arrêtait avant de réécrire les données du widget : notes, emploi du temps et devoirs restaient ceux du dernier cycle réussi, sans rien qui les distingue de données du jour. Rien ne remontait d'ailleurs l'échec — la commande <em>Statut_Connexion</em> affichait encore « Connecté » sur un équipement qui ne se connectait plus depuis deux jours, avec une date de dernier changement vieille de près de quatre mois. Un bandeau apparaît désormais en tête du widget : <strong>ambre</strong> pour une suspension d'adresse IP, qui se résorbe seule et ne demande rien, <strong>rouge</strong> pour un jeton refusé, qui appelle une action. Il indique depuis quand la collecte est interrompue.</td>
             </tr>
             <tr>

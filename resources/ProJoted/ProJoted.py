@@ -109,6 +109,7 @@ try:
     from LoginConnect import writedataPronotepy
 
     # Détection des suspensions d'IP par Pronote (module local, stdlib uniquement).
+    from pronote_demo import est_compte_demo
     from pronote_errors import (
         SuspensionIP,
         ip_suspension_reason,
@@ -2845,9 +2846,10 @@ def download_photo(client, eqLogicId, tokenconnected, message):
         str or None: Chemin relatif de la photo, ou None si échec
     """
     try:
-        is_parent = (tokenconnected == "true") and (
-            "parent.html" in message["TokenUrl"]
-        )
+        # Comme pour l'identité : c'est l'enfant sélectionné qui fait le compte
+        # parent, pas le mode de connexion. Un compte de démonstration parent
+        # n'a pas de jeton et « TokenUrl » peut manquer.
+        is_parent = bool(getattr(client, "_selected_child", None))
 
         data_dir = os.path.join(_data_dir, str(eqLogicId)) + "/"
         verifdossier(data_dir)
@@ -3137,6 +3139,65 @@ def identites(clientinfo):
             line_number,
             e,
         )
+
+
+def connexion_demo(message):
+    """Connecte un équipement de démonstration par identifiants.
+
+    Chemin réservé aux serveurs de ``pronote_demo.HOTES_DEMO``. La démonstration
+    ne délivre aucun jeton d'application mobile : sans cette voie, aucun compte
+    de démonstration ne peut être enregistré, et il faut éprouver le plugin sur
+    les données scolaires d'un enfant réel.
+
+    Le mot de passe arrive **en clair** dans le message. Les anciennes fonctions
+    Connectparent()/Connect() lui appliquaient ``my_decrypt()``, ce qui ne
+    correspond plus à ce que Jeedom transmet : « password » ne figure pas dans
+    ``$_encryptConfigKey`` côté PHP. Les réveiller telles quelles aurait
+    réintroduit ce décalage, d'où cette fonction distincte.
+
+    Args:
+        message: dictionnaire reçu du socket Jeedom.
+
+    Returns:
+        tuple: (client, liste des enfants) ou (None, []) si la connexion échoue.
+    """
+    url = (message.get("url") or message.get("TokenUrl") or "").strip()
+    login = (message.get("login") or "").strip()
+    password = message.get("password") or ""
+    enfant = (message.get("enfant") or "").strip()
+    est_parent = "parent.html" in url
+
+    try:
+        classe = pronotepy.ParentClient if est_parent else pronotepy.Client
+        client = classe(url, login, password)
+        if not client.logged_in:
+            logging.error(
+                "Compte de démonstration : identifiants refusés pour %s", url
+            )
+            return None, []
+    except Exception as e:
+        if is_ip_suspension_error(e):
+            raise
+        logging.error(
+            "Compte de démonstration : connexion impossible (%s) — %s",
+            type(e).__name__,
+            e,
+        )
+        return None, []
+
+    listenfant = []
+    if est_parent:
+        listenfant = [c.name for c in client.children]
+        cible = enfant if enfant in listenfant else (listenfant[0] if listenfant else "")
+        if not cible:
+            logging.error("Compte de démonstration parent sans enfant.")
+            return None, []
+        client.set_child(cible)
+        logging.info("Compte de démonstration : connecté à l'enfant %s", cible)
+    else:
+        logging.info("Compte de démonstration : connecté en tant qu'élève")
+
+    return client, listenfant
 
 
 def GetTokenFromLogin(Account, pin="4321", uuid=None):
@@ -3554,6 +3615,15 @@ def process_message(message):
             return
 
         # ========================================================
+        #   0 : Cas particulier des serveurs de démonstration
+        # ========================================================
+        # La démonstration ne délivre aucun jeton d'application mobile : la
+        # connexion s'y fait par identifiants, à chaque cycle. Le test porte sur
+        # l'hôte (cf. pronote_demo), jamais sur un réglage — un établissement
+        # réel ne doit pas pouvoir emprunter ce chemin.
+        mode_demo = est_compte_demo(message)
+
+        # ========================================================
         #   1 : On se connecte avec le Token réçu par défault
         # ========================================================
         # Vérifier que les informations de Token sont présentes et non vides
@@ -3561,9 +3631,29 @@ def process_message(message):
         all_keys_present = True
         for key in required_keys:
             if key not in message or not message[key].strip():
-                logging.error("Information de Token manquante ou vide : %s", key)
+                if not mode_demo:
+                    logging.error("Information de Token manquante ou vide : %s", key)
                 all_keys_present = False
-        if all_keys_present:
+        if mode_demo:
+            # Le cas démonstration passe AVANT le jeton, et non après : une
+            # validation antérieure a pu laisser des champs Token_* renseignés,
+            # qui enverraient le cycle sur un chemin voué à l'échec.
+            client, listenfant = connexion_demo(message)
+            if client is None:
+                jeedom_com.send_change_immediate(
+                    {
+                        "error": (
+                            "Compte de démonstration : identifiants refusés. "
+                            "Vérifiez l'identifiant et le mot de passe."
+                        ),
+                        "CmdId": message.get("CmdId", ""),
+                        "connection_status": "disconnected",
+                    }
+                )
+                return
+            tokenconnected = "false"
+            enfant = message.get("enfant", "")
+        elif all_keys_present:
             logging.debug(
                 "Toutes les informations de Token sont présentes et non vides. Je me connecte avec le Token"
             )
@@ -3797,7 +3887,11 @@ def process_message(message):
                 "Validation Token %s",
                 tokenconnected,
             )
-            if (tokenconnected == "true") and ("parent.html" in message["TokenUrl"]):
+            # Se fier à l'enfant sélectionné plutôt qu'au mode de connexion :
+            # un compte de démonstration parent n'a pas de jeton, et « TokenUrl »
+            # peut manquer — l'ancien test partait alors sur l'identité du
+            # parent au lieu de celle de l'enfant.
+            if getattr(client, "_selected_child", None):
                 logging.debug("Le nom de l'élève %s", client._selected_child.name)
                 jsondata["Eleve"] = identites(client._selected_child)
                 # Ajouter la liste des enfants pour les comptes parents
