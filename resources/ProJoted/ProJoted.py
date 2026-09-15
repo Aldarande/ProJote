@@ -3159,7 +3159,9 @@ def connexion_demo(message):
         message: dictionnaire reçu du socket Jeedom.
 
     Returns:
-        tuple: (client, liste des enfants) ou (None, []) si la connexion échoue.
+        Le client pronotepy connecté, ou None si la connexion échoue. La liste
+        des enfants n'est pas rendue : la section de collecte la reconstruit
+        depuis ``client.children``.
     """
     url = (message.get("url") or message.get("TokenUrl") or "").strip()
     login = (message.get("login") or "").strip()
@@ -3174,7 +3176,7 @@ def connexion_demo(message):
             logging.error(
                 "Compte de démonstration : identifiants refusés pour %s", url
             )
-            return None, []
+            return None
     except Exception as e:
         if is_ip_suspension_error(e):
             raise
@@ -3183,21 +3185,20 @@ def connexion_demo(message):
             type(e).__name__,
             e,
         )
-        return None, []
+        return None
 
-    listenfant = []
     if est_parent:
         listenfant = [c.name for c in client.children]
         cible = enfant if enfant in listenfant else (listenfant[0] if listenfant else "")
         if not cible:
             logging.error("Compte de démonstration parent sans enfant.")
-            return None, []
+            return None
         client.set_child(cible)
         logging.info("Compte de démonstration : connecté à l'enfant %s", cible)
     else:
         logging.info("Compte de démonstration : connecté en tant qu'élève")
 
-    return client, listenfant
+    return client
 
 
 def GetTokenFromLogin(Account, pin="4321", uuid=None):
@@ -3638,7 +3639,7 @@ def process_message(message):
             # Le cas démonstration passe AVANT le jeton, et non après : une
             # validation antérieure a pu laisser des champs Token_* renseignés,
             # qui enverraient le cycle sur un chemin voué à l'échec.
-            client, listenfant = connexion_demo(message)
+            client = connexion_demo(message)
             if client is None:
                 jeedom_com.send_change_immediate(
                     {
@@ -3651,8 +3652,9 @@ def process_message(message):
                     }
                 )
                 return
+            # `enfant` n'est pas repris ici : la section de collecte lit
+            # l'enfant directement sur le client, jamais une variable locale.
             tokenconnected = "false"
-            enfant = message.get("enfant", "")
         elif all_keys_present:
             logging.debug(
                 "Toutes les informations de Token sont présentes et non vides. Je me connecte avec le Token"
