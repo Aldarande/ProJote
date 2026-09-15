@@ -706,6 +706,49 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
     <!-- ── Historique ─────────────────────── -->
     <h1 id="version">Historique des versions</h1>
 
+    <h2>1.4.6 — Septembre 2026</h2>
+    <table>
+        <thead><tr><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>La photo de l'élève remonte enfin</strong> — le plugin la réclamait depuis des mois à <code>FichiersExternes</code> et n'obtenait que des 404, au point qu'un diagnostic livré avec le plugin concluait que Pronote ne servait plus la photo aux sessions mobiles. C'était faux, et l'erreur venait d'une porte : <code>FichiersExternes</code> ne sert que la photo des <em>autres</em> individus, professeurs et camarades. Sa propre photo accompagne la réponse <code>ParametresUtilisateur</code>, et le champ <code>photoBase64</code> n'en contient pas la charge mais un <strong>renvoi</strong> <code>{"_T":25,"V":&lt;indice&gt;}</code> vers le tableau <code>dataNonSec.fichiers</code> de cette même réponse — que pronotepy ne remonte pas. Lu comme une chaîne, ce renvoi passait pour un champ vide. Un compte parent reçoit une entrée par enfant, désignée par son propre indice. Vérifié sur deux établissements et sur le site de démonstration, compte élève comme compte parent, en connexion par identifiants comme par jeton.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>Le lien ICAL n'avait jamais fonctionné</strong> — la collecte lisait <code>client.ical_url</code>, un attribut qui n'existe dans aucune version de pronotepy : l'API est la méthode <code>export_ical()</code>. La commande recevait donc une chaîne vide à chaque cycle, et le lien du panel ne menait nulle part depuis l'origine.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>Sept informations d'emploi du temps toujours absentes</strong> — visioconférences, retenue, sortie pédagogique, dispense, cahier de textes et service en groupe étaient lus sous leur nom dans le JSON brut de Pronote (<code>estRetenue</code>, <code>listeVisios</code>…). Or l'objet <em>Lesson</em> de pronotepy n'expose que ses propres attributs : les sept valeurs étaient invariablement nulles dans les commandes d'emploi du temps. Elles sont désormais lues là où elles se trouvent réellement.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>Un compte élève ne pouvait pas être enregistré</strong> — la sauvegarde du compte interrogeait <code>_selected_child</code>, une notion propre aux comptes parent. Sur un compte élève l'accès échouait <em>avant</em> l'écriture du fichier de jeton : la validation se terminait sans erreur visible, puis l'interface annonçait « Fichier token JSON introuvable ». Les comptes déjà enregistrés n'étaient pas touchés, le fichier étant réécrit à chaque cycle par Jeedom.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sec">Sécurité</span></td>
+                <td><strong>Les identifiants Pronote n'apparaissent plus dans les journaux</strong> — le message échangé entre Jeedom et le démon porte l'identifiant, le mot de passe de jeton et les identifiants d'appareil en clair. Il était journalisé en entier à chaque cycle, deux fois. Le mode debug étant précisément celui qu'on active pour diagnostiquer un problème de connexion, ces secrets se retrouvaient dans tout journal transmis pour demander de l'aide. Un filtre masque désormais ces valeurs à l'écriture, quel que soit le composant qui les journalise ; l'adresse de l'établissement reste lisible, elle sert au diagnostic et n'est pas un secret. Le jeton de connexion affiché lors d'une validation par identifiants est masqué de même.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-perf">Fiabilité</span></td>
+                <td><strong>Suspensions d'adresse IP à répétition</strong> — quand Pronote refusait une requête sur un compte parent, le plugin rouvrait une session puis rejouait. Mais rouvrir une session passe elle-même par une requête d'identification, soumise au même traitement : un refus relançait une réouverture, indéfiniment. Un seul cycle a produit <strong>415 authentifications en quelques secondes</strong>, jusqu'à ce que Pronote suspende l'adresse IP de l'installation — suspension dont la durée double à chaque récidive. Le garde anti-récursion de pronotepy, absent de cette redéfinition, a été rétabli.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>« Regénérez le QR Code » annoncé à tort</strong> — lorsque Pronote refusait l'authentification, le démon concluait systématiquement à un jeton périmé. Or un jeton hors d'usage et un serveur qui refuse temporairement de répondre laissent exactement la même trace : le message envoyait rescanner un QR Code parfois valide, et avant même que la reconnexion par jeton de secours n'ait été tentée. Le refus est désormais nommé pour ce qu'il est, et la revalidation n'est suggérée que si les cycles suivants échouent aussi.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>Serveur ne délivrant pas de jeton d'application mobile</strong> — le plugin ne conserve jamais le mot de passe : il échange la connexion contre deux jetons, principal et secours. Si le serveur accepte la demande mais ne renvoie rien, la validation échouait sur une erreur technique illisible. Elle explique maintenant que les identifiants sont corrects, qu'il n'y a simplement rien à enregistrer, et qu'il est inutile de les ressaisir.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-perf">Maintenance</span></td>
+                <td><strong>Diagnostic de photo réécrit</strong> — l'outil <code>diag_photo.py</code> éprouvait la mécanique de <code>FichiersExternes</code> à l'aide d'une pièce jointe, dont l'adresse est fournie par le serveur alors que celle d'une photo est composée par le client : il validait un chemin que la photo n'emprunte pas, d'où une fausse assurance et un verdict erroné. Il examine désormais la charge jointe à la réponse, appelle la fonction que le démon exécute réellement plutôt qu'une réplique, traite chaque enfant d'un compte parent, et enregistre l'image obtenue pour qu'elle puisse être vue.</td>
+            </tr>
+        </tbody>
+    </table>
+
     <h2>1.4.5 — Septembre 2026</h2>
     <table>
         <thead><tr><th>Type</th><th>Description</th></tr></thead>
