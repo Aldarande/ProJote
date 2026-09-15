@@ -345,6 +345,9 @@ $('#bt_Validate').on('click', function () {
   document.querySelector('.form-group.Login .fa-hourglass-half').classList.remove('hidden');
   document.querySelector('.form-group.Login .fa-check').classList.add('hidden');
   document.querySelector('.form-group.Login .fa-times').classList.add('hidden');
+  // Repartir d'une zone vide : un refus précédent resterait sinon affiché sous
+  // un sablier qui tourne, et laisserait croire à un nouvel échec immédiat.
+  $('#login-error-message').empty();
 
 
   //on valide si Url contient la chaine de caractéres parent.html si oui il faut cocher la case type="checkbox" id="Parent"
@@ -373,8 +376,18 @@ $('#bt_Validate').on('click', function () {
     dataType: 'json',
     global: false,
     error: function (request, status, error) {
-      // Gestion des erreurs
+      // Sans ce traitement, un échec de transport laissait le sablier tourner
+      // indéfiniment et n'écrivait que dans la console : l'utilisateur restait
+      // devant une validation qui semblait ne jamais finir.
       console.error("AJAX Error:", request, status, error);
+      document.querySelector('.form-group.Login .fa-hourglass-half').classList.add('hidden');
+      document.querySelector('.form-group.Login .fa-times').classList.remove('hidden');
+      $('#error-message').text(
+        'Erreur : la requête de validation n\'a pas abouti (' +
+        (request && request.status ? 'HTTP ' + request.status : status) +
+        '). Si le code est 401, votre session Jeedom a expiré : rechargez la page ' +
+        'et reconnectez-vous.'
+      );
     },
     success: function (data) {
       // Traitement de la réponse JSON
@@ -398,6 +411,16 @@ $('#bt_Validate').on('click', function () {
         // Masquer le sablier et afficher la croix
         document.querySelector('.form-group.Login .fa-hourglass-half').classList.add('hidden');
         document.querySelector('.form-group.Login .fa-times').classList.remove('hidden');
+        // Le serveur explique toujours son refus dans « result » — session
+        // expirée, identifiants rejetés, adresse IP suspendue, serveur sans
+        // jeton d'application mobile. Cette explication était jetée : il ne
+        // restait qu'une croix rouge, muette, et rien dans les journaux quand
+        // le refus survenait avant la journalisation. Le flux QR Code, lui,
+        // affichait déjà ce message.
+        console.error('ProJote.js:: validation refusée —', data.result);
+        $('#login-error-message').text(
+          data.result || 'La validation a échoué, sans explication du serveur.'
+        );
         //je fais disparataire la coche au bout de 10 secondes
         setTimeout(function () {
           document.querySelector('.form-group.Login .fa-times').classList.add('hidden');
