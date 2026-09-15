@@ -31,6 +31,7 @@ Arguments attendus en ligne de commande :
 # de sortie — y compris si l'import de pronotepy échoue.
 import sys
 
+from pronote_demo import est_serveur_demo
 from pronote_errors import (
     IP_SUSPENSION_EXIT_CODE,
     NO_MOBILE_TOKEN_EXIT_CODE,
@@ -622,6 +623,19 @@ try:
             # Ne jamais logger Account.password
             logging.info("ENT : %s", Account.ent)
             logging.debug("Picture : %s", Account.info.profile_picture)
+
+            # ── Serveur de démonstration : pas d'échange contre un jeton ──────
+            # La démonstration n'en délivre aucun (cf. pronote_demo). Le compte
+            # est enregistré tel quel : le démon s'y reconnectera par
+            # identifiants à chaque cycle. Ces identifiants sont publics, ils
+            # ne valent que pour des données fictives.
+            if est_serveur_demo(Pronote_url):
+                logging.info(
+                    "Serveur de démonstration : compte enregistré sans jeton, "
+                    "la reconnexion se fera par identifiants."
+                )
+                writedataPronotepy(Account, DataDir, EqID)
+                sys.exit(0)
 
             # Demander deux QR codes depuis la session mot de passe (avant tout qrcode_login)
             # Ne pas logger les QR codes : ils contiennent des credentials temporaires
