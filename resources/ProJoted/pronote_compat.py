@@ -320,11 +320,15 @@ def _install() -> None:
             if getattr(self, "_refreshing", False):
                 raise
 
+            # Le libellé PRONOTE est journalisé avec le code : sans lui, on ne
+            # peut pas savoir si une réinitialisation de session était la bonne
+            # réponse, et l'on paie une authentification complète à l'aveugle.
             logging.debug(
-                "pronote_compat :: %s refusé (%s) — réinitialisation puis "
-                "rejeu avec l'identifiant d'enfant à jour.",
+                "pronote_compat :: %s refusé (G=%s « %s ») — réinitialisation "
+                "puis rejeu avec l'identifiant d'enfant à jour.",
                 function_name,
                 getattr(e, "pronote_error_code", None),
+                getattr(e, "pronote_error_msg", None) or e,
             )
             self._refreshing = True
             try:
