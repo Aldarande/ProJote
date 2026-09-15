@@ -452,3 +452,65 @@ class TestPostParent:
         dernier = faux_pronotepy.journal["reseau"][-1][1]
         attendu = f"-s{faux_pronotepy.journal['sessions']}"
         assert dernier["Signature"]["membre"]["N"].endswith(attendu)
+
+    def test_un_refus_pendant_le_refresh_ne_boucle_pas(self, faux_pronotepy):
+        """Le rejeu ne doit pas se relancer lui-même indéfiniment.
+
+        `refresh()` appelle `_login()`, qui poste « Identification » — donc
+        cette même méthode. Si le serveur refuse aussi cette Identification, la
+        réparation se rappelle elle-même sans fin. Un seul cycle a produit
+        415 ré-authentifications en quelques secondes le 13 septembre 2026,
+        jusqu'à ce que PRONOTE suspende l'adresse IP — suspension dont la durée
+        double à chaque récidive.
+
+        pronotepy protège son propre `ClientBase.post` par le drapeau
+        `_refreshing` (« prevent refresh recursion ») ; la redéfinition parent
+        l'avait laissé tomber.
+        """
+        faux_pronotepy.module.apply()
+        parent = faux_pronotepy.ParentClient()
+
+        # Le refresh repose « Identification » à travers post(), comme le vrai
+        # _login, et le serveur la refuse — la session ne se rétablit jamais.
+        def refresh_qui_repose(self):
+            self._nouvelle_session()
+            self.post("Identification", 88)
+
+        type(parent).refresh = refresh_qui_repose
+        journal = faux_pronotepy.journal
+        journal["onglets_autorises"][:] = [88]
+        journal["reseau"].clear()
+        # Périme la session : tout post signé sera refusé, refresh compris.
+        parent._nouvelle_session()
+        parent.set_child(parent.children[0])
+        journal["sessions"] += 1
+
+        with pytest.raises(faux_pronotepy.PronoteAPIError):
+            parent.post("PageCahierDeTexte", 88)
+
+        # Sans le garde, le compteur explose (RecursionError) ; avec lui, la
+        # tentative de réparation est unique.
+        assert len(journal["reseau"]) <= 3, (
+            "la réparation doit être tentée une seule fois, "
+            f"or {len(journal['reseau'])} requêtes sont parties"
+        )
+
+    def test_le_drapeau_est_rendu_meme_si_le_refresh_leve(self, faux_pronotepy):
+        """Un refresh qui échoue ne doit pas condamner les cycles suivants.
+
+        Le drapeau est rendu dans un `finally` : laissé armé, il ferait lever
+        tout refus ultérieur sans jamais retenter la réparation.
+        """
+        faux_pronotepy.module.apply()
+        parent = faux_pronotepy.ParentClient()
+
+        def refresh_qui_leve(self):
+            raise RuntimeError("réseau coupé")
+
+        type(parent).refresh = refresh_qui_leve
+        faux_pronotepy.journal["sessions"] += 1  # périme la session
+
+        with pytest.raises(RuntimeError):
+            parent.post("PageCahierDeTexte", 88)
+
+        assert getattr(parent, "_refreshing", False) is False

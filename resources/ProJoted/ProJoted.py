@@ -112,6 +112,7 @@ try:
     from pronote_errors import (
         SuspensionIP,
         ip_suspension_reason,
+        is_authentification_refusee,
         is_ip_suspension_error,
     )
 
@@ -175,6 +176,63 @@ _pidfile = "/tmp/ProJoted.pid"
 _cycle = 0.3
 _socket_port = 55369
 _data_dir = "/var/www/html/plugins/ProJote/data"
+
+
+# ── Masquage des secrets dans les journaux ───────────────────────────────────
+# Le message que Jeedom envoie au démon porte les identifiants Pronote en clair :
+# TokenUsername, TokenPassword, TokenId, TokenUuid. Il était journalisé entier à
+# chaque cycle, deux fois — par le framework Jeedom (jeedom.py, « Message read
+# from socket », en INFO) et par read_socket() ici même, en DEBUG. Or le mode
+# debug est précisément celui qu'on active pour diagnostiquer un problème de
+# connexion : les journaux transmis pour demander de l'aide contenaient donc les
+# secrets du compte.
+#
+# Le filtre est posé sur les handlers plutôt que sur les appels : il couvre les
+# deux sites, dont celui du framework Jeedom — code vendoré, non maintenu ici
+# (cf. ruff.toml) — et tout site futur, sans avoir à les recenser.
+_CLES_SECRETES = (
+    "TokenPassword",
+    "TokenUsername",
+    "TokenId",
+    "TokenUuid",
+    "jetonConnexionAppliMobile",
+    "jeton",
+    "password",
+    "login",
+)
+
+# Reconnaît « "clé": "valeur" » comme « 'clé': 'valeur' » : le message traverse
+# les journaux tantôt en JSON (framework Jeedom), tantôt en repr Python (démon).
+_MOTIF_SECRET = _re.compile(
+    r"(?P<avant>['\"](?:%s)['\"]\s*:\s*)['\"][^'\"]*['\"]" % "|".join(_CLES_SECRETES)
+)
+
+
+class _FiltreSecrets(logging.Filter):
+    """Remplace la valeur des clés sensibles par « *** » dans tout message."""
+
+    def filter(self, record):
+        try:
+            texte = record.getMessage()
+        except Exception:
+            # Un enregistrement mal formé ne doit pas faire disparaître la ligne :
+            # mieux vaut la laisser passer telle quelle que perdre la trace.
+            return True
+        masque = _MOTIF_SECRET.sub(r'\g<avant>"***"', texte)
+        if masque != texte:
+            # msg pré-formaté et args vidés : sinon logging réappliquerait les
+            # arguments d'origine, secrets compris, au moment de l'émission.
+            record.msg = masque
+            record.args = ()
+        return True
+
+
+def installer_filtre_secrets():
+    """Pose le filtre sur les handlers du logger racine (idempotent)."""
+    racine = logging.getLogger()
+    for handler in racine.handlers:
+        if not any(isinstance(f, _FiltreSecrets) for f in handler.filters):
+            handler.addFilter(_FiltreSecrets())
 
 
 def send_jeedom_message(message, message_type="error"):
@@ -521,8 +579,16 @@ def verifdossier(chemin_dossier):
 
 def Checkeleve(client, CmdId):
     try:
-        if client._selected_child == "":
-            logging.error("Aucun élève sélectionné.")
+        # `_selected_child` n'existe que sur ParentClient : pronotepy ne
+        # l'assigne nulle part ailleurs. L'accès direct levait donc une
+        # AttributeError à chaque cycle sur un compte élève, avalée par le
+        # `except` ci-dessous et journalisée comme une panne. Il n'y en a pas :
+        # un compte élève n'a pas d'enfant à sélectionner, donc rien à vérifier.
+        enfant = getattr(client, "_selected_child", None)
+        if not enfant:
+            logging.debug(
+                "Compte sans enfant sélectionné (compte élève) : rien à vérifier."
+            )
             return False
         else:
             chemin_fichier = _data_dir
@@ -640,13 +706,21 @@ def build_cours_data(lesson_data):
         "annulation": lesson_data.canceled,
         "status": lesson_data.status,
         "background_color": lesson_data.background_color,
-        "est_service_groupe": getattr(lesson_data, "estServiceGroupe", None),
-        "cahier_de_texte": getattr(lesson_data, "cahierDeTextes", None),
-        "est_retenue": getattr(lesson_data, "estRetenue", None),
-        "liste_visios": getattr(lesson_data, "listeVisios", None),
-        "dispense_eleve": getattr(lesson_data, "dispenseEleve", None),
-        "est_sortie_pedagogique": getattr(lesson_data, "estSortiePedagogique", None),
-        "est_Annule": getattr(lesson_data, "estAnnule", None),
+        # Ces sept champs étaient lus sous leur nom dans le JSON brut PRONOTE
+        # (estServiceGroupe, cahierDeTextes…). Or `Lesson` dérive d'un objet à
+        # slots, sans __getattr__ : aucun de ces noms n'existe, et les sept
+        # valeurs étaient donc invariablement None dans les commandes d'emploi
+        # du temps. On lit désormais les attributs que pronotepy expose vraiment.
+        "est_service_groupe": bool(getattr(lesson_data.subject, "groups", False))
+        if lesson_data.subject
+        else None,
+        "cahier_de_texte": getattr(lesson_data, "test", None),
+        "est_retenue": getattr(lesson_data, "detention", None),
+        "liste_visios": getattr(lesson_data, "virtual_classrooms", None),
+        "dispense_eleve": getattr(lesson_data, "exempted", None),
+        "est_sortie_pedagogique": getattr(lesson_data, "outing", None),
+        # Doublon assumé d'« annulation » : la clé est déjà consommée ailleurs.
+        "est_Annule": getattr(lesson_data, "canceled", None),
     }
 
 
@@ -2643,18 +2717,29 @@ def ical(client):
     Args:
         client: L'objet client pronotepy connecté.
 
+    L'URL est composée par pronotepy à partir de l'onglet « Informations
+    personnelles » (PageInfosPerso, onglet 16), qui n'est pas toujours ouvert :
+    un compte sans ce droit fait lever pronotepy, sans que ce soit une panne.
+
     Returns:
         str: L'URL du calendrier iCal, ou une chaîne vide si non trouvée ou en cas d'erreur.
     """
     try:
-        # pronotepy expose l'URL iCal comme un attribut de l'objet client
-        ical_url = getattr(client, "ical_url", None)
+        # `export_ical()` est une MÉTHODE. Le code lisait auparavant un attribut
+        # `client.ical_url` qui n'a jamais existé dans pronotepy — ni en 2.14 ni
+        # en 2.15 — si bien que cette fonction rendait toujours la chaîne vide
+        # et que le lien ICAL du panel n'a jamais fonctionné.
+        if not hasattr(client, "export_ical"):
+            logging.warning(
+                "La version de pronotepy installée n'expose pas export_ical()."
+            )
+            return ""
+        ical_url = client.export_ical()
         if ical_url:
             logging.info("URL iCal récupérée avec succès.")
             return ical_url
-        else:
-            logging.warning("Aucune URL iCal n'a été trouvée pour ce compte.")
-            return ""
+        logging.warning("Aucune URL iCal n'a été trouvée pour ce compte.")
+        return ""
     except Exception as e:
         line_number = e.__traceback__.tb_lineno if e.__traceback__ else "unknown"
         logging.error(
@@ -2665,12 +2750,90 @@ def ical(client):
         return ""
 
 
+# Marqueur PRONOTE d'un renvoi vers la charge d'un fichier joint à la réponse :
+# le champ ne porte pas la donnée mais son indice dans « dataNonSec.fichiers ».
+_RENVOI_FICHIER_JOINT = 25
+
+
+def photo_jointe(client, raw):
+    """Extrait la photo de profil de la réponse ParametresUtilisateur.
+
+    C'est ainsi que procèdent les deux clients officiels de PRONOTE 2026,
+    espace classique comme espace mobile : la photo de l'utilisateur n'est pas
+    téléchargée depuis FichiersExternes — cet endpoint ne sert que la photo des
+    AUTRES individus, professeurs et camarades — elle accompagne la réponse.
+
+    Le champ « photoBase64 » de la ressource ne contient pas la charge mais un
+    renvoi ``{"_T": 25, "V": <indice>}`` vers le tableau ``dataNonSec.fichiers``
+    de cette même réponse. Un compte parent reçoit un tableau à plusieurs
+    entrées, une par enfant, chacun désigné par son propre indice.
+
+    pronotepy ne lit que la moitié « dataSec » de l'enveloppe et laisse tomber
+    « dataNonSec » : le renvoi arrive donc tel quel jusqu'ici. Le prendre pour
+    une chaîne le fait passer pour vide, d'où le diagnostic « le serveur ne
+    sert pas la photo sur les sessions mobiles », longtemps retenu à tort.
+
+    Args:
+        client: client pronotepy connecté
+        raw: ``raw_resource`` de l'élève ou de l'enfant sélectionné
+
+    Returns:
+        bytes or None: la charge de l'image, ou None si absente ou illisible.
+    """
+    champ = (raw or {}).get("photoBase64")
+
+    if isinstance(champ, str):
+        # Un serveur qui inscrirait la charge directement dans le champ.
+        charge = champ
+    elif isinstance(champ, dict) and champ.get("_T") == _RENVOI_FICHIER_JOINT:
+        fichiers = (
+            (getattr(client, "parametres_utilisateur", None) or {})
+            .get("dataNonSec", {})
+            .get("fichiers")
+            or []
+        )
+        indice = champ.get("V")
+        if not isinstance(indice, int) or not 0 <= indice < len(fichiers):
+            logging.info(
+                "Renvoi photo inexploitable : indice %r pour %d fichier(s) joint(s)",
+                indice,
+                len(fichiers),
+            )
+            return None
+        charge = fichiers[indice]
+    else:
+        return None
+
+    if not isinstance(charge, str) or len(charge) < 100:
+        return None
+
+    try:
+        # La charge est découpée en lignes : les blancs ne font pas partie du
+        # base64.
+        image = base64.b64decode("".join(charge.split()))
+    except Exception as e:
+        logging.info("Charge photo indécodable : %s", e)
+        return None
+
+    # N'écrire que ce qu'un navigateur saura afficher, plutôt que de propager
+    # une charge inattendue jusqu'au widget.
+    if not (image.startswith(b"\xff\xd8\xff") or image.startswith(b"\x89PNG")):
+        logging.info(
+            "Charge photo d'un format inattendu (%s), ignorée", image[:4].hex()
+        )
+        return None
+
+    return image
+
+
 def download_photo(client, eqLogicId, tokenconnected, message):
     """
-    Télécharge la photo de profil de l'élève ou de l'enfant sélectionné.
-    Pour les comptes parent (Pronote 2024+) : la photo est extraite en base64
-    depuis la réponse de l'API Pronote (PageEmploiDuTemps), car FichiersExternes
-    retourne systématiquement 404 avec les sessions mobiles/token.
+    Récupère la photo de profil de l'élève ou de l'enfant sélectionné.
+
+    La photo accompagne la réponse ParametresUtilisateur (voir
+    :func:`photo_jointe`) ; c'est le chemin normal. Les stratégies
+    FichiersExternes qui suivent ne sont qu'un repli pour les serveurs qui ne
+    joindraient pas la charge.
 
     Args:
         client: Objet client PronotePy
@@ -2702,23 +2865,39 @@ def download_photo(client, eqLogicId, tokenconnected, message):
                 logging.debug("Pas de photo pour cet enfant (avecPhoto=False)")
                 return None
 
-            photo = client._selected_child.profile_picture
-            if not photo:
-                logging.debug("Aucune photo trouvée pour l'enfant")
-                return None
-
             downloaded = False
-            logging.info("Téléchargement photo parent — URL : %s", photo.url)
+
+            # ── Stratégie 0 : charge jointe à ParametresUtilisateur ───────────
+            image = photo_jointe(client, raw)
+            if image:
+                with open(temp_path, "wb") as f:
+                    f.write(image)
+                logging.info(
+                    "Photo parent obtenue — stratégie 0 (charge jointe, %d octets)",
+                    len(image),
+                )
+                downloaded = True
+
+            photo = None
+            if not downloaded:
+                photo = client._selected_child.profile_picture
+                if not photo:
+                    logging.debug("Aucune photo trouvée pour l'enfant")
+                    return None
+                logging.info("Téléchargement photo parent — URL : %s", photo.url)
 
             # ── Stratégie 1 : méthode native pronotepy ────────────────────────
-            try:
-                photo.save(temp_path)
-                logging.info("Photo téléchargée — stratégie 1 (FichiersExternes natif)")
-                downloaded = True
-            except FileNotFoundError:
-                logging.info("Stratégie 1 échouée (404) — essai stratégie 2")
-            except Exception as e:
-                logging.info("Stratégie 1 échouée (%s) — essai stratégie 2", e)
+            if not downloaded:
+                try:
+                    photo.save(temp_path)
+                    logging.info(
+                        "Photo téléchargée — stratégie 1 (FichiersExternes natif)"
+                    )
+                    downloaded = True
+                except FileNotFoundError:
+                    logging.info("Stratégie 1 échouée (404) — essai stratégie 2")
+                except Exception as e:
+                    logging.info("Stratégie 1 échouée (%s) — essai stratégie 2", e)
 
             # ── Stratégie 2 : session + headers Referer/Origin ────────────────
             if not downloaded:
@@ -2802,30 +2981,39 @@ def download_photo(client, eqLogicId, tokenconnected, message):
                     os.remove(temp_path)
                 return None
 
-        # ── Compte élève : méthode standard FichiersExternes ─────────────────
-        photo = None
-        if client.info.profile_picture:
-            photo = client.info.profile_picture
-            logging.debug("Photo trouvée pour l'élève")
-
-        if not photo:
-            logging.debug("Aucune photo trouvée dans Pronote")
-            return None
-
+        # ── Compte élève ─────────────────────────────────────────────────────
         downloaded = False
-        logging.info("Téléchargement photo — URL : %s", photo.url)
+
+        # ── Stratégie 0 : charge jointe à ParametresUtilisateur ──────────────
+        image = photo_jointe(client, client.info.raw_resource)
+        if image:
+            with open(temp_path, "wb") as f:
+                f.write(image)
+            logging.info(
+                "Photo obtenue — stratégie 0 (charge jointe, %d octets)", len(image)
+            )
+            downloaded = True
+
+        photo = None
+        if not downloaded:
+            photo = client.info.profile_picture
+            if not photo:
+                logging.debug("Aucune photo trouvée dans Pronote")
+                return None
+            logging.info("Téléchargement photo — URL : %s", photo.url)
 
         # ── Stratégie 1 : méthode native pronotepy (photo.save) ──────────────
-        try:
-            photo.save(temp_path)
-            logging.info("Photo téléchargée — stratégie 1 (FichiersExternes natif)")
-            downloaded = True
-        except FileNotFoundError:
-            logging.info(
-                "Stratégie 1 échouée (404 FichiersExternes) — essai stratégie 2"
-            )
-        except Exception as e:
-            logging.info("Stratégie 1 échouée (%s) — essai stratégie 2", e)
+        if not downloaded:
+            try:
+                photo.save(temp_path)
+                logging.info("Photo téléchargée — stratégie 1 (FichiersExternes natif)")
+                downloaded = True
+            except FileNotFoundError:
+                logging.info(
+                    "Stratégie 1 échouée (404 FichiersExternes) — essai stratégie 2"
+                )
+            except Exception as e:
+                logging.info("Stratégie 1 échouée (%s) — essai stratégie 2", e)
 
         # ── Stratégie 2 : session API + headers Referer/Origin ───────────────
         if not downloaded:
@@ -3446,10 +3634,24 @@ def process_message(message):
                 if is_ip_suspension_error(e):
                     trigger_ip_suspension(eqLogicId=eqLogicId, exc=e)
                     return
-                logging.error(
-                    "Token invalide, regénérer le QR CODE ou re valider le compte : %s",
-                    e,
-                )
+                if is_authentification_refusee(e):
+                    # Le refus lui-même n'est pas expliqué par PRONOTE : un jeton
+                    # périmé et un serveur qui refuse temporairement de répondre
+                    # laissent exactement la même trace. N'affirmer ni l'un ni
+                    # l'autre — d'autant que le jeton de secours est essayé juste
+                    # après, et qu'il répare le cas le plus fréquent sans que
+                    # l'utilisateur ait à toucher à quoi que ce soit.
+                    logging.error(
+                        "Authentification refusée par Pronote (%s). Le jeton de "
+                        "secours va être essayé. Si les cycles suivants échouent "
+                        "aussi, alors seulement revalidez le compte.",
+                        e,
+                    )
+                else:
+                    logging.error(
+                        "Connexion au jeton impossible : %s",
+                        e,
+                    )
                 _erreur_connexion = e
                 client = None
             # Le jeton transmis par Jeedom est refusé : avant d'exiger un
@@ -3930,6 +4132,11 @@ def _run_daemon():
     _cycle = int(_cycle)
 
     jeedom_utils.set_log_level(_log_level)
+
+    # Après set_log_level(), qui installe les handlers : un filtre posé avant
+    # serait perdu. Avant toute lecture du socket, en revanche — c'est là que
+    # les identifiants arrivent.
+    installer_filtre_secrets()
 
     # Filet de sécurité sur le jeton : PRONOTE le renouvelle à chaque
     # authentification et refuse tout jeton antérieur. On le range sur disque

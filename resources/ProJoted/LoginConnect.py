@@ -33,7 +33,10 @@ import sys
 
 from pronote_errors import (
     IP_SUSPENSION_EXIT_CODE,
+    NO_MOBILE_TOKEN_EXIT_CODE,
+    NoMobileTokenError,
     is_ip_suspension_error,
+    is_missing_mobile_token,
     ip_suspension_reason,
 )
 
@@ -268,7 +271,11 @@ try:
         last_part = base_url.split("parent.html")[0] + "mobile.parent.html"
 
         qrcode_data["url"] = last_part
-        logging.debug("Les info du QRCode : %s", qrcode_data)
+        # Ne journaliser que l'URL : qrcode_data porte le jetonConnexionAppliMobile,
+        # c'est-à-dire le secret d'authentification du compte. Le mode debug est
+        # précisément celui qu'on active quand la connexion pose problème — le
+        # secret finissait donc en clair dans log/ProJote au pire moment.
+        logging.debug("URL du QRCode : %s", qrcode_data.get("url", ""))
         Token_data = Account.qrcode_login(
             qrcode_data,
             "4321",
@@ -423,7 +430,13 @@ try:
             }
             if backup_token is not None:
                 data["BackupToken"] = backup_token
-            if client._selected_child:
+            # getattr et non accès direct : pronotepy n'assigne `_selected_child`
+            # que dans ParentClient. Sur un compte élève, l'accès direct levait
+            # une AttributeError ici même — donc AVANT le json.dump plus bas, si
+            # bien que le fichier de jeton n'était jamais écrit et que le cycle
+            # suivant annonçait « Token invalide, regénérer le QR CODE » alors
+            # que le jeton n'y était pour rien.
+            if getattr(client, "_selected_child", None):
                 logging.debug(
                     "Je recherche l'enfants : %s", client._selected_child.name
                 )
@@ -456,7 +469,11 @@ try:
             # un cas normal côté PRONOTE. Il ne doit JAMAIS faire échouer
             # l'écriture du fichier, sinon le token de reconnexion est perdu et
             # la connexion échoue alors même qu'elle a réussi.
-            profil = client._selected_child if client._selected_child else client.info
+            # getattr : sur un compte élève, `_selected_child` n'existe pas et
+            # l'accès direct levait ici — avant même d'entrer dans le `try`
+            # ci-dessous, donc exactement l'échec que le commentaire ci-dessus
+            # entend prévenir.
+            profil = getattr(client, "_selected_child", None) or client.info
             try:
                 photo = profil.profile_picture
             except Exception as e:
@@ -609,6 +626,15 @@ try:
             # Demander deux QR codes depuis la session mot de passe (avant tout qrcode_login)
             # Ne pas logger les QR codes : ils contiennent des credentials temporaires
             Qrcode_data = Account.request_qr_code_data(Pin)
+            # Le serveur peut accepter l'appel et ne rien renvoyer. pronotepy ne
+            # s'en aperçoit qu'au moment de lire le jeton, et lève alors un
+            # « KeyError: 'login' » qui ne dit rien de la cause. On tranche ici,
+            # tant qu'on peut encore nommer le problème.
+            if is_missing_mobile_token(Qrcode_data):
+                raise NoMobileTokenError(
+                    "Le serveur Pronote a accepté la demande de jeton d'application "
+                    "mobile mais n'a renvoyé aucun jeton."
+                )
             Qrcode_data_backup = None
             try:
                 Qrcode_data_backup = Account.request_qr_code_data(Pin)
@@ -681,6 +707,19 @@ except Exception as e:
             logging.error(ip_suspension_reason(e))
             print(f"LoginConnect.py :: {ip_suspension_reason(e)}", flush=True)
             sys.exit(IP_SUSPENSION_EXIT_CODE)
+        # Serveur qui ne délivre pas de jeton d'application mobile. Les
+        # identifiants sont bons — la connexion a réussi juste avant — mais
+        # ProJote n'a rien à enregistrer, puisqu'il ne stocke jamais le mot de
+        # passe. Inviter à réessayer ne servirait à rien.
+        if isinstance(e, NoMobileTokenError) or (
+            exc_name == "KeyError" and msg.strip("'\"") in ("login", "jeton")
+        ):
+            logging.error(
+                "La connexion a réussi, mais le serveur Pronote n'a renvoyé aucun "
+                "jeton d'application mobile : il n'y a donc rien à enregistrer. "
+                "Vos identifiants ne sont pas en cause, inutile de les ressaisir."
+            )
+            sys.exit(NO_MOBILE_TOKEN_EXIT_CODE)
         # Page de connexion Pronote non reconnue par pronotepy — cf. QRConnect.py :
         # les serveurs PRONOTE 2026 ne publient plus Start({...}) dans l'attribut
         # « onload » du <body>, que pronotepy <= 2.14.6 lisait directement.

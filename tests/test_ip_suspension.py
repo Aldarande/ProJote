@@ -47,7 +47,8 @@ class TestIsIpSuspensionError:
 
     def test_detail_dans_pronote_error_msg(self):
         exc = _FakePronoteError(
-            "Unknown error from pronote: 42", pronote_msg="Suspension temporaire de l'accès"
+            "Unknown error from pronote: 42",
+            pronote_msg="Suspension temporaire de l'accès",
         )
         assert pronote_errors.is_ip_suspension_error(exc)
 
@@ -62,15 +63,22 @@ class TestIsIpSuspensionError:
         assert not pronote_errors.is_ip_suspension_error(None)
 
     def test_insensible_a_la_casse(self):
-        assert pronote_errors.is_ip_suspension_error(Exception("YOUR IP ADDRESS IS SUSPENDED."))
+        assert pronote_errors.is_ip_suspension_error(
+            Exception("YOUR IP ADDRESS IS SUSPENDED.")
+        )
 
 
 class TestIpSuspensionReason:
     def test_sans_exception(self):
-        assert pronote_errors.ip_suspension_reason() == pronote_errors.IP_SUSPENSION_MESSAGE
+        assert (
+            pronote_errors.ip_suspension_reason()
+            == pronote_errors.IP_SUSPENSION_MESSAGE
+        )
 
     def test_avec_detail(self):
-        reason = pronote_errors.ip_suspension_reason(Exception("Your IP address is suspended."))
+        reason = pronote_errors.ip_suspension_reason(
+            Exception("Your IP address is suspended.")
+        )
         assert pronote_errors.IP_SUSPENSION_MESSAGE in reason
         assert "Your IP address is suspended." in reason
 
@@ -119,7 +127,10 @@ class TestFenetreDePause:
 
     def test_retour_au_niveau_de_base_apres_24h(self, suspension):
         suspension._ip_suspension.update(
-            {"level": 4, "last": time.time() - suspension._IP_SUSPENSION_LEVEL_RESET - 60}
+            {
+                "level": 4,
+                "last": time.time() - suspension._IP_SUSPENSION_LEVEL_RESET - 60,
+            }
         )
         delay = suspension.trigger_ip_suspension()
         assert suspension._ip_suspension["level"] == 1
@@ -159,7 +170,9 @@ class TestPersistance:
 
     def test_fenetre_expiree_rechargee_sans_effet(self, suspension, tmp_path):
         (tmp_path / "ip_suspension.json").write_text(
-            json.dumps({"until": time.time() - 10, "level": 1, "last": time.time() - 3600})
+            json.dumps(
+                {"until": time.time() - 10, "level": 1, "last": time.time() - 3600}
+            )
         )
         suspension.load_ip_suspension()
         assert suspension.ip_suspension_remaining() == 0
@@ -238,7 +251,9 @@ class TestProcessMessage:
             @staticmethod
             def token_login(**kwargs):
                 appels.append(1)
-                raise AssertionError("Pronote ne doit pas être contacté pendant la pause")
+                raise AssertionError(
+                    "Pronote ne doit pas être contacté pendant la pause"
+                )
 
         monkeypatch.setattr(daemon.pronotepy, "Client", _Client, raising=False)
         daemon.trigger_ip_suspension()
@@ -392,3 +407,83 @@ class TestCollecteInterrompue:
         statuts = [p.get("connection_status") for p in recorder.sent]
         assert "connected" not in statuts, "aucune donnée partielle ne doit partir"
         assert statuts[-1] == "ip_suspended"
+
+
+# ── Serveur sans application mobile ──────────────────────────────────────────
+class TestIsMissingMobileToken:
+    """Un serveur peut accepter la demande de jeton et répondre une charge vide.
+
+    Relevé le 13 septembre 2026 sur le site de démonstration d'Index Éducation :
+    ``JetonAppliMobile`` renvoie ``dataSec.data == {}``, si bien que
+    ``request_qr_code_data`` ne rend que l'URL, qu'il reconstruit lui-même.
+    pronotepy ne le découvre qu'en lisant ``qr_code["login"]`` — d'où un
+    ``KeyError: 'login'`` illisible.
+
+    Un site de démonstration n'est pas un établissement : on ne sait pas si la
+    cause est une option désactivée, une restriction propre à la démo, ou un
+    état passager. La garde se contente donc de constater l'absence de jeton,
+    sans rien conclure — c'est aussi ce que dit le message rendu à
+    l'utilisateur.
+    """
+
+    def test_jeton_complet(self):
+        qr = {
+            "url": "https://x/pronote/mobile.eleve.html",
+            "login": "ab",
+            "jeton": "cd",
+        }
+        assert pronote_errors.is_missing_mobile_token(qr) is False
+
+    def test_charge_vide_seule_url(self):
+        assert pronote_errors.is_missing_mobile_token(
+            {"url": "https://x/pronote/mobile.eleve.html"}
+        )
+
+    def test_login_present_mais_vide(self):
+        assert pronote_errors.is_missing_mobile_token({"login": "", "jeton": "cd"})
+
+    def test_jeton_present_mais_vide(self):
+        assert pronote_errors.is_missing_mobile_token({"login": "ab", "jeton": ""})
+
+    @pytest.mark.parametrize("valeur", [None, "", [], 0])
+    def test_reponse_qui_n_est_pas_un_dictionnaire(self, valeur):
+        assert pronote_errors.is_missing_mobile_token(valeur)
+
+
+# ── Authentification refusée, sans cause connue ──────────────────────────────
+class TestIsAuthentificationRefusee:
+    """pronotepy initialise `parametres_utilisateur` à {} et n'y range la
+    réponse que si la connexion a réussi. Après un refus, `ParentClient.__init__`
+    lit `self.parametres_utilisateur["dataSec"]` et lève un KeyError bien après
+    la cause — pronotepy a seulement journalisé « login failed » entre-temps.
+
+    Le démon en déduisait « Token invalide, regénérer le QR CODE ». Or un jeton
+    périmé et un serveur qui refuse temporairement de répondre laissent la même
+    trace : le message affirmait une cause sur deux, et envoyait rescanner un QR
+    Code parfois valide. Observé le 13 septembre 2026, vingt secondes avant que
+    la vraie cause — une suspension d'IP — ne se déclare.
+    """
+
+    @pytest.mark.parametrize("cle", ["dataSec", "dataNonSec", "data", "session"])
+    def test_cles_d_enveloppe(self, cle):
+        assert pronote_errors.is_authentification_refusee(KeyError(cle))
+
+    def test_autre_cle_non_confondue(self):
+        """Un KeyError métier ne doit pas passer pour un refus d'authentification."""
+        assert not pronote_errors.is_authentification_refusee(KeyError("listeAbsences"))
+
+    def test_autre_exception(self):
+        assert not pronote_errors.is_authentification_refusee(ValueError("dataSec"))
+
+    def test_none(self):
+        assert not pronote_errors.is_authentification_refusee(None)
+
+    def test_keyerror_sans_argument(self):
+        assert not pronote_errors.is_authentification_refusee(KeyError())
+
+    def test_non_confondu_avec_une_suspension_d_ip(self):
+        """Les deux diagnostics doivent rester disjoints : la suspension est
+        testée en premier dans le démon, et ouvre une fenêtre de pause."""
+        suspension = _FakePronoteError("Your IP address is suspended.")
+        assert pronote_errors.is_ip_suspension_error(suspension)
+        assert not pronote_errors.is_authentification_refusee(suspension)
