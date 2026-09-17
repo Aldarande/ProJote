@@ -37,9 +37,15 @@ class _Client:
 
 @pytest.fixture
 def cycle_neuf(daemon, monkeypatch):
-    """Isole la mémoire des refus et fixe l'équipement courant."""
+    """Isole la mémoire des refus et fixe l'équipement courant.
+
+    L'équipement courant est connu du démon seul et injecté dans le module des
+    collecteurs (cf. collecteurs.installer) : c'est donc là qu'il se remplace.
+    """
+    import collecteurs
+
     daemon._presence_refusee.clear()
-    monkeypatch.setattr(daemon, "_equipement_en_cours", lambda: 4)
+    monkeypatch.setattr(collecteurs, "_equipement_en_cours", lambda: 4)
     yield daemon
     daemon._presence_refusee.clear()
 
@@ -102,7 +108,9 @@ class TestPropagationDansLeCycle:
     def test_equipements_independants(self, cycle_neuf, monkeypatch):
         cycle_neuf.absences(_Client(_Periode()))
 
-        monkeypatch.setattr(cycle_neuf, "_equipement_en_cours", lambda: 9)
+        import collecteurs
+
+        monkeypatch.setattr(collecteurs, "_equipement_en_cours", lambda: 9)
         periode = _Periode()
         cycle_neuf.absences(_Client(periode))
 
