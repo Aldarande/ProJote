@@ -1,0 +1,85 @@
+<div class="cmd cmd-widget #history#" data-type="info" data-subtype="string" data-template="competence"
+    data-cmd_id="#id#" data-cmd_uid="#uid#" data-version="#version#" data-eqLogic_id="">
+    <div class="content-xs">
+        <div class="cmdName #hide_name#">#name_display#</div>
+        <div class="value pjm-#uid#" style="font-size:12px;line-height:1.35;"></div>
+    </div>
+
+    <script>
+        // Gabarit mobile ProJote — compétences.
+        //
+        // Ces commandes portent du JSON : sans gabarit, le mobile affichait la
+        // chaîne brute dans un badge. Le rendu est volontairement sobre — aucune
+        // couleur imposée, « color: inherit » — pour suivre le thème de Jeedom,
+        // clair comme sombre. Au plus 5 éléments, le reste est compté.
+        (function () {
+            var LIMITE = 5;
+
+            function texte(valeur) {
+                if (valeur === null || valeur === undefined) return '';
+                if (Array.isArray(valeur)) return valeur.join(', ');
+                return String(valeur);
+            }
+
+            // Les libellés viennent de l'établissement et finissent dans le DOM :
+            // ils sont échappés, jamais insérés tels quels.
+            function ech(valeur) {
+                return texte(valeur)
+                    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            }
+
+            function ligne(contenu, second) {
+                return '<div style="padding:4px 0 4px 8px;margin-bottom:3px;'
+                    + 'border-left:2px solid currentColor;opacity:.95;">'
+                    + '<div>' + contenu + '</div>'
+                    + (second ? '<div style="opacity:.65;font-size:11px;">' + second + '</div>' : '')
+                    + '</div>';
+            }
+
+            function rendre(element) {
+                return ligne(
+                    '<strong>' + ech(element.Sujet) + '</strong> ' + ech(element.nom),
+                    ech(element.date)
+                );
+            }
+
+            jeedom.cmd.addUpdateFunction('#id#', function (_options) {
+                var cmd = document.querySelector('.cmd[data-cmd_uid="#uid#"]');
+                if (!is_object(cmd)) { return; }
+                var cible = cmd.querySelector('.value');
+                if (!cible) { return; }
+
+                var brut = _options.value;
+                if (!brut || String(brut).trim() === '' || String(brut).trim() === '[]') {
+                    cible.innerHTML = '<div style="opacity:.6;">Aucune évaluation</div>';
+                    return;
+                }
+
+                var elements;
+                try {
+                    elements = JSON.parse(brut);
+                } catch (e) {
+                    // Valeur non JSON : plutôt que de n'afficher rien, on montre
+                    // ce qui est arrivé — c'est une commande de diagnostic utile.
+                    cible.innerHTML = '<div style="opacity:.6;">' + ech(brut) + '</div>';
+                    return;
+                }
+                if (!Array.isArray(elements)) { elements = [elements]; }
+                if (elements.length === 0) {
+                    cible.innerHTML = '<div style="opacity:.6;">Aucune évaluation</div>';
+                    return;
+                }
+
+                var html = elements.slice(0, LIMITE).map(rendre).join('');
+                if (elements.length > LIMITE) {
+                    html += '<div style="opacity:.6;font-size:11px;padding-left:8px;">+ '
+                        + (elements.length - LIMITE) + ' autre(s)</div>';
+                }
+                cible.innerHTML = html;
+            });
+
+            jeedom.cmd.refreshValue([{ cmd_id: '#id#', value: '#value#', display_value: '#state#', valueDate: '#valueDate#', collectDate: '#collectDate#', alertLevel: '#alertLevel#' }]);
+        })();
+    </script>
+</div>

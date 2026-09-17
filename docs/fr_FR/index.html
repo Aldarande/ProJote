@@ -565,6 +565,15 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
 
     <!-- ── Widget ─────────────────────────── -->
     <h1 id="widget">Widget</h1>
+
+    <div class="callout callout-info">
+        <strong>Sur mobile <span class="badge badge-new">v1.6.0</span></strong>
+        Les commandes qui contiennent une liste — notes, emploi du temps, devoirs, absences, retards,
+        punitions, notifications, compétences — ont désormais leur propre affichage dans l'application
+        mobile. Elles y montraient jusqu'ici leur contenu brut, sous forme de code. L'affichage est
+        volontairement sobre et suit le thème clair ou sombre de votre Jeedom ; les listes longues sont
+        tronquées, avec le nombre d'éléments restants.
+    </div>
     <p>Le widget principal (<em>projote</em>) regroupe toutes les informations sur un seul tuile de tableau de bord :</p>
     <ul>
         <li><strong>En-tête</strong> — photo de profil · nom de l'élève · classe et établissement · date de dernière sync</li>
@@ -770,6 +779,29 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
 
     <!-- ── Historique ─────────────────────── -->
     <h1 id="version">Historique des versions</h1>
+
+    <h2>1.6.0 — Septembre 2026</h2>
+    <table>
+        <thead><tr><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><span class="badge badge-new">Nouveauté</span></td>
+                <td><strong>L'application mobile affiche enfin les listes au lieu de leur code</strong> — notes, emploi du temps, devoirs, absences, retards, punitions, notifications, compétences et photo de profil sont stockés sous forme de JSON dans leur commande. Le tableau de bord disposait d'un affichage pour chacun, pas le mobile : ces commandes y retombaient sur un simple badge, qui montrait la chaîne JSON telle quelle — une ligne de code illisible. Neuf affichages mobiles ont été écrits, volontairement sobres : aucune couleur imposée, ils suivent le thème clair ou sombre de votre Jeedom. Les listes longues sont tronquées avec le compte de ce qui suit, un écran de téléphone n'étant pas un tableau de bord.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>Les équipements déjà créés en profitent aussi</strong> — l'affichage d'une commande n'est choisi qu'à sa création. Sans reprise, seuls les équipements créés après la mise à jour auraient eu les nouveaux affichages mobiles. Ils sont posés à la première sauvegarde de chaque équipement, et uniquement sur les commandes restées sur l'affichage par défaut : un affichage que vous auriez choisi vous-même n'est jamais écrasé.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-perf">Performance</span></td>
+                <td><strong>Quinze secondes d'attente par cycle et par enfant, pour rien</strong> — sept pauses de cinq secondes étaient posées dans le code de collecte, dont trois sur le cas le plus courant : aucun devoir sur la période demandée, aucune notification publiée, aucune punition — c'est-à-dire l'état normal d'un élève. Les quatre autres retardaient un traitement d'erreur qui rendait la main juste après. Aucune n'attendait quoi que ce soit : rien n'était réessayé derrière. Mesuré sur un compte réel, les cinq onglets concernés passent de 10,5 s à 0,3 s.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-perf">Maintenance</span></td>
+                <td><strong>Le démon découpé en modules</strong> — un seul fichier de 4 463 lignes portait le réseau, l'authentification, les douze onglets, la mise en forme, le calcul des moyennes et le calendrier scolaire. Cinq modules en sortent (mise en forme, analyse scolaire, périodes, onglet Présence, collecteurs) et le démon retombe à 2 518 lignes. Rien ne change à l'usage : le déplacement a été vérifié fonction par fonction, et la charge produite par un cycle complet est identique à l'octet près sur les comptes de démonstration. Les collecteurs sont par ailleurs couverts par des tests, ce qu'ils n'étaient pas.</td>
+            </tr>
+        </tbody>
+    </table>
 
     <h2>1.5.0 — Septembre 2026</h2>
     <table>

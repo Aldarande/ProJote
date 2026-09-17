@@ -1,6 +1,6 @@
 # 📚 ProJote - Plugin JEEDOM Pronote
 
-![Version](https://img.shields.io/badge/version-1.5.0-blue)
+![Version](https://img.shields.io/badge/version-1.6.0-blue)
 ![License](https://img.shields.io/badge/license-AGPL%20v3-green)
 ![Jeedom](https://img.shields.io/badge/Jeedom-4.4+-orange)
 
@@ -67,6 +67,8 @@
 - Compatible Jeedom Smart, Luna, Atlas
 - Support Raspberry Pi, Docker, DIY
 - Interface mobile responsive
+- Widgets mobiles pour notes, emploi du temps, devoirs, absences, retards,
+  punitions, notifications, compétences et photo
 
 ---
 
@@ -344,6 +346,6 @@ action volontaire, pas une sollicitation automatique.
 
 ---
 
-**Version :** 1.5.0  
+**Version :** 1.6.0  
 **Dernière mise à jour :** septembre 2026  
 **Support :** Jeedom 4.4+

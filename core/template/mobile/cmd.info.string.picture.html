@@ -1,0 +1,37 @@
+<div class="cmd cmd-widget #history#" data-type="info" data-subtype="string" data-template="picture"
+    data-cmd_id="#id#" data-cmd_uid="#uid#" data-version="#version#" data-eqLogic_id="">
+    <div class="content-xs">
+        <div class="cmdName #hide_name#">#name_display#</div>
+        <div class="value" style="text-align:center;"></div>
+    </div>
+
+    <script>
+        // Gabarit mobile ProJote — photo de profil.
+        // La commande porte un chemin ou une URL, pas du JSON : sans gabarit,
+        // le mobile affichait ce chemin en toutes lettres dans un badge.
+        (function () {
+            jeedom.cmd.addUpdateFunction('#id#', function (_options) {
+                var cmd = document.querySelector('.cmd[data-cmd_uid="#uid#"]');
+                if (!is_object(cmd)) { return; }
+                var cible = cmd.querySelector('.value');
+                if (!cible) { return; }
+
+                var source = _options.value ? String(_options.value).trim() : '';
+                if (!source) {
+                    cible.innerHTML = '<div style="opacity:.6;font-size:12px;">Aucune photo</div>';
+                    return;
+                }
+                var img = document.createElement('img');
+                // src par propriété et non par concaténation HTML : la valeur
+                // n'a alors aucune chance d'être interprétée comme du balisage.
+                img.src = source;
+                img.alt = '';
+                img.style.cssText = 'max-width:80px;max-height:80px;border-radius:50%;object-fit:cover;';
+                cible.innerHTML = '';
+                cible.appendChild(img);
+            });
+
+            jeedom.cmd.refreshValue([{ cmd_id: '#id#', value: '#value#', display_value: '#state#', valueDate: '#valueDate#', collectDate: '#collectDate#', alertLevel: '#alertLevel#' }]);
+        })();
+    </script>
+</div>

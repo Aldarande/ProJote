@@ -634,6 +634,34 @@ class ProJote extends eqLogic
       }
     }
 
+    // 1ter. Migration v1.6.0 : poser les gabarits mobiles sur les commandes existantes.
+    // Ces commandes portent du JSON. Faute de gabarit mobile, le modèle leur
+    // donnait 'core::badge' : l'application mobile affichait donc la chaîne JSON
+    // brute, illisible. Les gabarits existent depuis la v1.6.0, mais setTemplate()
+    // n'est appelé qu'à la création : sans cette reprise, seuls les équipements
+    // créés après la mise à jour en auraient bénéficié.
+    //
+    // On ne remplace que 'core::badge' — et 'core::picture', l'ancien gabarit de
+    // cœur de la photo : le modèle disait 'picture', que setTemplate() préfixe
+    // lui-même en 'core::picture'. Un gabarit choisi par l'utilisateur n'est
+    // jamais écrasé.
+    foreach ($this->getListeDefaultCommandes() as $id => $data) {
+      $modele = $data[8];
+      if ($modele === 'core::badge') {
+        continue;
+      }
+      $cmd = $this->getCmd(null, $id);
+      if (!is_object($cmd)) {
+        continue;
+      }
+      $actuel = $cmd->getTemplate('mobile', '');
+      if ($actuel === 'core::badge' || $actuel === 'core::picture' || $actuel === 'picture' || $actuel === '') {
+        $cmd->setTemplate('mobile', $modele);
+        $cmd->save();
+        log::add('ProJote', 'info', 'postSave : gabarit mobile « ' . $modele . ' » posé sur ' . $id . ' (reprise v1.6.0).');
+      }
+    }
+
     // 2. Supprimer la commande Widget si elle existe encore (migration depuis l'ancienne architecture).
     // Le widget est maintenant affiché via toHtml() sur l'eqLogic, plus via une commande dédiée.
     $widgetCmd = $this->getCmd(null, 'Widget');
@@ -815,7 +843,7 @@ class ProJote extends eqLogic
       "vacances_nom"          => array('Prochaines vacances',                              'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
       "vacances_debut"        => array('Début des prochaines vacances',                    'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
       "vacances_fin"          => array('Fin des prochaines vacances',                      'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
-      "Picture"               => array('Photo de profil',                                  'info',   'string',  "",      0, 1, "GENERIC_PICTURE", 'ProJote::picture',     'picture'),
+      "Picture"               => array('Photo de profil',                                  'info',   'string',  "",      0, 1, "GENERIC_PICTURE", 'ProJote::picture',     'ProJote::picture'),
       "URL_Ical"              => array('URL Ical',                                         'info',   'string',  "",      0, 1, "GENERIC_URL",     'core::badge',          'core::badge'),
       "Nb_absences"           => array("Nombre d'absence",                                 'info',   'numeric', "",      1, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
       "Nb_punitions"          => array("Nombre de punitions",                              'info',   'numeric', "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
@@ -834,45 +862,45 @@ class ProJote extends eqLogic
       "edt_prochainjour_fin"  => array("Heure de fin du Prochain Jour",                    'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
       "edt_prochainjour_cancel" => array("Nombre de cours annulé du Prochain Jour",          'info',   'numeric', "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
       "edt_Cours_canceled"    => array("Nombre de cours annulé",                           'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
-      "edt_prochainjour"      => array("Emploi du temps du Prochain Jour",                 'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::edt',         'core::badge'),
+      "edt_prochainjour"      => array("Emploi du temps du Prochain Jour",                 'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::edt',         'ProJote::edt'),
       // J+1 à J+4 (4 prochains jours scolaires)
-      "edt_J1"                => array("Emploi du temps J+1",                              'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::edt',         'core::badge'),
+      "edt_J1"                => array("Emploi du temps J+1",                              'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::edt',         'ProJote::edt'),
       "edt_J1_date"           => array("Date J+1",                                         'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
       "edt_J1_debut"          => array("Heure de début J+1",                              'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
       "edt_J1_fin"            => array("Heure de fin J+1",                                 'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
       "edt_J1_cancel"         => array("Cours annulés J+1",                               'info',   'numeric', "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
-      "edt_J2"                => array("Emploi du temps J+2",                              'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::edt',         'core::badge'),
+      "edt_J2"                => array("Emploi du temps J+2",                              'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::edt',         'ProJote::edt'),
       "edt_J2_date"           => array("Date J+2",                                         'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
       "edt_J2_debut"          => array("Heure de début J+2",                              'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
       "edt_J2_fin"            => array("Heure de fin J+2",                                 'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
       "edt_J2_cancel"         => array("Cours annulés J+2",                               'info',   'numeric', "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
-      "edt_J3"                => array("Emploi du temps J+3",                              'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::edt',         'core::badge'),
+      "edt_J3"                => array("Emploi du temps J+3",                              'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::edt',         'ProJote::edt'),
       "edt_J3_date"           => array("Date J+3",                                         'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
       "edt_J3_debut"          => array("Heure de début J+3",                              'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
       "edt_J3_fin"            => array("Heure de fin J+3",                                 'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
       "edt_J3_cancel"         => array("Cours annulés J+3",                               'info',   'numeric', "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
-      "edt_J4"                => array("Emploi du temps J+4",                              'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::edt',         'core::badge'),
+      "edt_J4"                => array("Emploi du temps J+4",                              'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::edt',         'ProJote::edt'),
       "edt_J4_date"           => array("Date J+4",                                         'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
       "edt_J4_debut"          => array("Heure de début J+4",                              'info',   'string',  "",      0, 1, "GENERIC_TIME",    'core::badge',          'core::badge'),
       "edt_J4_fin"            => array("Heure de fin J+4",                                 'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
       "edt_J4_cancel"         => array("Cours annulés J+4",                               'info',   'numeric', "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
-      "edt_aujourdhui"        => array("Emploi du temps Aujourd'hui",                      'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::edt',         'core::badge'),
-      "devoir"                => array("Liste des devoirs",                                 'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::devoir',      'core::badge'),
-      "devoir_Demain"         => array("Liste des devoirs pour demain",                    'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::devoir',      'core::badge'),
-      "absence"               => array("Liste des absences",                               'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::absence',     'core::badge'),
-      "derniere_absence"      => array("Dernière absence",                                 'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::absence',     'core::badge'),
-      "retard"                => array("Liste des 10 derniers retards",                    'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::retard',      'core::badge'),
-      "dernier_retard"        => array("Dernier retard",                                   'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::retard',      'core::badge'),
-      "punition"              => array("Liste des punitions",                              'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::punition',    'core::badge'),
-      "derniere_punition"     => array("Dernière punition",                                'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::punition',    'core::badge'),
-      "note"                  => array("Liste des notes",                                  'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::note',        'core::badge'),
-      "derniere_note"         => array("Dernière note",                                    'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::note',        'core::badge'),
+      "edt_aujourdhui"        => array("Emploi du temps Aujourd'hui",                      'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::edt',         'ProJote::edt'),
+      "devoir"                => array("Liste des devoirs",                                 'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::devoir',      'ProJote::devoir'),
+      "devoir_Demain"         => array("Liste des devoirs pour demain",                    'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::devoir',      'ProJote::devoir'),
+      "absence"               => array("Liste des absences",                               'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::absence',     'ProJote::absence'),
+      "derniere_absence"      => array("Dernière absence",                                 'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::absence',     'ProJote::absence'),
+      "retard"                => array("Liste des 10 derniers retards",                    'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::retard',      'ProJote::retard'),
+      "dernier_retard"        => array("Dernier retard",                                   'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::retard',      'ProJote::retard'),
+      "punition"              => array("Liste des punitions",                              'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::punition',    'ProJote::punition'),
+      "derniere_punition"     => array("Dernière punition",                                'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::punition',    'ProJote::punition'),
+      "note"                  => array("Liste des notes",                                  'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::note',        'ProJote::note'),
+      "derniere_note"         => array("Dernière note",                                    'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::note',        'ProJote::note'),
       // ── Statistiques (v1.1.0) ──────────────────────────────────────────────
       "moyenne_generale"      => array("Moyenne générale",                                 'info',   'numeric', "/20",   1, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
       "matiere_en_baisse"     => array("Matière(s) en baisse",                             'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
-      "notifications"         => array("liste des notifications",                          'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::notification', 'core::badge'),
-      "derniere_notification" => array("Dernière notification",                            'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::notification', 'core::badge'),
-      "competences"           => array("Liste des compétences",                            'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::competence',  'core::badge'),
+      "notifications"         => array("liste des notifications",                          'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::notification', 'ProJote::notification'),
+      "derniere_notification" => array("Dernière notification",                            'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::notification', 'ProJote::notification'),
+      "competences"           => array("Liste des compétences",                            'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::competence',  'ProJote::competence'),
       // ── Menu cantine (v1.0.1) ──────────────────────────────────────────────
       "menu_midi_aujourdhui"  => array("Menu cantine - midi aujourd'hui",                  'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
       "menu_midi_demain"      => array("Menu cantine - midi demain",                       'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),

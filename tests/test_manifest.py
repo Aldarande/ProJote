@@ -56,3 +56,68 @@ def test_monolingual_fr_fr(info):
 def test_require_is_supported(info):
     # Jeedom 4.4 minimum.
     assert info["require"] in ("4.4", "4.5", "4.6", "5.0")
+
+
+# ── Gabarits de commandes ────────────────────────────────────────────────────
+#
+# Le modèle de commandes désigne un gabarit par son nom (« ProJote::edt ») ;
+# Jeedom le résout en core/template/<version>/cmd.<type>.<sous-type>.<nom>.html.
+# Un nom sans fichier ne produit aucune erreur : la commande s'affiche vide.
+
+CLASS_PATH = os.path.join(ROOT, "core", "class", "ProJote.class.php")
+
+MODELE_RE = re.compile(
+    r'"(?P<logical>[A-Za-z0-9_]+)"\s*=> array\('
+    r"\s*(?P<nom>'[^']*'|\"[^\"]*\")\s*,"
+    r"\s*'(?P<type>[a-z]+)'\s*,"
+    r"\s*'(?P<sous_type>[a-z]+)'\s*,"
+    r"[^\n]*?,\s*'(?P<dashboard>[^']+)'\s*,\s*'(?P<mobile>[^']+)'\s*\)"
+)
+
+
+@pytest.fixture(scope="module")
+def commandes():
+    with open(CLASS_PATH, encoding="utf-8") as fh:
+        lignes = MODELE_RE.findall(fh.read())
+    assert lignes, "modèle de commandes introuvable"
+    return [
+        {
+            "logical": logical, "type": type_, "sous_type": sous_type,
+            "dashboard": dashboard, "mobile": mobile,
+        }
+        for logical, _nom, type_, sous_type, dashboard, mobile in lignes
+    ]
+
+
+def _chemin_gabarit(version, cmd, gabarit):
+    nom = gabarit.split("::", 1)[1]
+    return os.path.join(
+        ROOT, "core", "template", version,
+        f"cmd.{cmd['type']}.{cmd['sous_type']}.{nom}.html",
+    )
+
+
+@pytest.mark.parametrize("version", ["dashboard", "mobile"])
+def test_gabarits_projote_existent(commandes, version):
+    manquants = [
+        (cmd["logical"], cmd[version])
+        for cmd in commandes
+        if cmd[version].startswith("ProJote::")
+        and not os.path.exists(_chemin_gabarit(version, cmd, cmd[version]))
+    ]
+    assert not manquants, f"gabarits {version} désignés mais absents : {manquants}"
+
+
+def test_les_commandes_riches_ont_un_gabarit_mobile(commandes):
+    """Une commande qui porte du JSON doit être rendue, pas affichée brute.
+
+    Sans gabarit mobile, ces commandes retombaient sur « core::badge » et
+    l'application mobile montrait la chaîne JSON telle quelle.
+    """
+    sans_mobile = [
+        cmd["logical"]
+        for cmd in commandes
+        if cmd["dashboard"].startswith("ProJote::")
+        and not cmd["mobile"].startswith("ProJote::")
+    ]
+    assert not sans_mobile, f"gabarit dashboard riche mais mobile en badge : {sans_mobile}"

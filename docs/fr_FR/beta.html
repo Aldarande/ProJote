@@ -283,6 +283,25 @@
 
 <h1 id="beta-nouveautes">Nouveautés en cours</h1>
 
+<h2>Affichages mobiles, et démon découpé <span class="badge badge-new">1.6.0</span></h2>
+<ul>
+    <li><strong>Neuf affichages mobiles.</strong> Notes, emploi du temps, devoirs, absences, retards,
+    punitions, notifications, compétences et photo sont stockés en JSON dans leur commande. Le tableau
+    de bord savait les afficher, pas le mobile : on y lisait la chaîne JSON brute. Les nouveaux
+    affichages sont sobres — aucune couleur imposée, ils suivent le thème de votre Jeedom — et
+    tronquent les listes longues en comptant le reste.</li>
+    <li><strong>Les équipements existants sont repris.</strong> L'affichage d'une commande n'est choisi
+    qu'à sa création : les nouveaux affichages sont posés à la première sauvegarde, et seulement sur
+    les commandes restées sur l'affichage par défaut.</li>
+    <li><strong>Quinze secondes d'attente par cycle supprimées.</strong> Sept pauses de cinq secondes
+    traînaient dans la collecte, dont trois sur le cas le plus courant — aucun devoir, aucune
+    notification, aucune punition. Aucune n'attendait rien. Mesuré : 10,5 s → 0,3 s sur les cinq
+    onglets concernés.</li>
+    <li><strong>Le démon est découpé en modules</strong> (4 463 → 2 518 lignes), et les collecteurs
+    sont couverts par des tests. Aucun changement à l'usage : la charge produite par un cycle est
+    identique à l'octet près sur les comptes de démonstration.</li>
+</ul>
+
 <h2>Cadence de collecte et onglets suivis <span class="badge badge-new">1.5.0</span></h2>
 <p>Les douze onglets Pronote étaient relevés à chaque cycle, sans distinction. Mesuré sur un compte
 réel, cela coûtait <strong>113 requêtes et 5 ré-authentifications</strong> par heure et par enfant —
