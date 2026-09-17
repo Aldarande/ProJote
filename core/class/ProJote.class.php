@@ -38,6 +38,42 @@ require_once __DIR__  . '/../../../../core/php/core.inc.php';
  * - Créer et gérer les commandes Jeedom associées (ex: "Nombre de devoirs", "Rafraîchir").
  * - Lancer les mises à jour des données depuis Pronote (via le démon).
  * - Interagir avec la base de données Jeedom pour sauvegarder/lire sa configuration.
+ *
+ * QUAND CHAQUE MÉTHODE EST APPELÉE
+ * --------------------------------
+ * Jeedom appelle ces méthodes lui-même, à des moments qu'on ne choisit pas.
+ * Savoir lequel évite bien des surprises :
+ *
+ *   Installation / mise à jour du plugin
+ *     plugin_info/install.php : ProJote_install(), ProJote_update()
+ *
+ *   L'utilisateur enregistre un équipement (bouton Sauvegarder, ou $eq->save())
+ *     preSave()   ← génère l'UUID d'appareil, valide la configuration
+ *     postSave()  ← crée les commandes manquantes, applique les migrations
+ *                   (historisation, gabarits mobiles, nettoyage des orphelines)
+ *     C'est le SEUL endroit où les commandes sont créées. Une commande ajoutée
+ *     au modèle n'apparaît donc qu'à la prochaine sauvegarde de l'équipement —
+ *     d'où les reprises explicites qu'on trouve dans postSave().
+ *
+ *   Toutes les heures (cron Jeedom)
+ *     cronHourly() → pour chaque équipement actif : UpdateInfoPronote()
+ *                    → sendToDaemon() → socket TCP vers le démon Python
+ *
+ *   Le démon a fini de collecter
+ *     core/php/jeeProJote.php (HTTP) → checkAndUpdateCmd() sur chaque commande
+ *
+ *   Suppression d'un équipement
+ *     preRemove() ← efface le dossier data/<id> (jetons, photo, cache)
+ *
+ * PIÈGE À CONNAÎTRE
+ * -----------------
+ * Ne JAMAIS redéfinir ici une méthode d'eqLogic ou de cmd avec une visibilité
+ * plus restrictive que celle du cœur (une méthode publique redéfinie en private
+ * ou protected). PHP refuse la classe au chargement, et Jeedom ENTIER tombe en
+ * HTTP 500 — page blanche, sans la moindre ligne de journal pour l'expliquer,
+ * puisque l'erreur survient avant que le journal ne soit disponible. Si une
+ * méthode d'ici doit rester interne, lui donner un nom qui n'existe pas dans le
+ * cœur plutôt que d'en restreindre une existante.
  */
 class ProJote extends eqLogic
 {

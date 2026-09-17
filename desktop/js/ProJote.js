@@ -13,13 +13,53 @@
 * You should have received a copy of the GNU General Public License
 * along with Jeedom. If not, see <http://www.gnu.org/licenses/>.
 */
-/*********************************************************************
-* Affiche les informations du Token si le niveau de log du plugin est à debug
-*********************************************************************/
+/* ProJote.js — La page de configuration d'un équipement.
+ *
+ * Tout ce que l'utilisateur fait dans l'onglet ProJote de Jeedom passe par ici.
+ * Le fichier est chargé par desktop/php/ProJote.php et s'organise en cinq
+ * groupes :
+ *
+ *   1. Validation du compte
+ *      loadProJoteData(), changeEnfant(), waitForDataUpdate()
+ *      → appellent core/ajax/ProJote.ajax.php, qui lance à son tour les scripts
+ *        Python LoginConnect.py ou QRConnect.py.
+ *
+ *   2. QR Code
+ *      handleImage(), decodeQRFromImage(), parsePronoteQRPayload(),
+ *      askPinAndSend(), sendImageToServer()
+ *      → le QR est décodé DANS LE NAVIGATEUR (3rdparty/jsQR.js) ; seul le
+ *        contenu déchiffré part vers le serveur, jamais l'image.
+ *
+ *   3. Formulaire
+ *      syncAccountTypeRadios(), syncOngletsSuivis(), brancherOngletsSuivis(),
+ *      populateEnfantList()
+ *
+ *   4. Photo de profil
+ *      loadManualPhotoPreview() et l'envoi du fichier choisi
+ *
+ *   5. Prévisualisation du widget
+ *      refreshProJotePreview()
+ *
+ * DEUX PIÈGES, PAYÉS TOUS LES DEUX
+ * --------------------------------
+ * **Le script est réinjecté à chaque affichage de la page.** Jeedom change de
+ * page sans recharger le navigateur : ce fichier est donc évalué une nouvelle
+ * fois à chaque retour sur la page, dans le même contexte. Une variable
+ * déclarée avec `let` ou `const` au premier niveau lève alors
+ * « SyntaxError: redeclaration of let X », ce qui interrompt TOUT le script :
+ * la page perd l'ensemble de ses boutons, sans message à l'écran. Au premier
+ * niveau, utiliser `var`, ou envelopper dans une IIFE.
+ *
+ * **Le remplissage du formulaire par le cœur décoche ce qu'il ne trouve pas.**
+ * Une case à cocher liée directement à une clé de configuration absente se
+ * retrouve décochée, et la première sauvegarde enregistre ce faux « non ».
+ * C'est pourquoi les cases « Onglets suivis » lisent leur valeur dans un champ
+ * caché, où « vide » signifie « suivi » — même règle que ProJote::categorieActive()
+ * côté PHP.
+ */
 
-
 /*********************************************************************
-* Remplit le champs select avec la liste des enfants de l'équipement
+* Récupère la valeur d'un paramètre dans l'URL courante
 *********************************************************************/
 function getParameterByName(name, url = window.location.href) {
   // Cette fonction permet de récupérer la valeur d'un paramètre dans l'URL

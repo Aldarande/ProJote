@@ -1,3 +1,48 @@
+<!--
+    ProJote.html — Le widget affiché sur le tableau de bord de Jeedom.
+
+    D'OÙ VIENNENT LES DONNÉES
+    -------------------------
+    Ce fichier n'interroge rien au chargement : tout lui est remis d'avance.
+
+        démon Python
+            │  (fin de cycle)
+            ▼
+        jeeProJote.php ─ reconstruit ENTIÈREMENT la configuration
+            │            « widget_json » de l'équipement
+            ▼
+        ProJote::toHtml() ─ lit widget_json et l'injecte ici, déjà sérialisé,
+            │               à la place du marqueur #initData#
+            ▼
+        ce fichier ─ rend le HTML à partir de cet objet JavaScript
+
+    Ensuite, et seulement sur événement : quand la commande LastLogin change,
+    le script rappelle l'action AJAX « GetWidgetData » pour relire widget_json
+    sans recharger la page. Aucun rafraîchissement automatique au chargement —
+    c'est un choix, pas un oubli.
+
+    Conséquence à garder en tête : une clé absente de widget_json vide la
+    section correspondante. C'est pour cela que le démon renvoie toujours la
+    dernière valeur connue d'un onglet qu'il n'a pas relevé, plutôt que de
+    l'omettre (voir cadence.py et ProJoted.collecter).
+
+    MARQUEURS REMPLACÉS PAR toHtml()
+    --------------------------------
+        #id#             identifiant de l'équipement — sert aussi à préfixer
+                         TOUTES les classes CSS (.pjw-#id#), pour que deux
+                         widgets côte à côte ne se marchent pas dessus
+        #initData#       le widget_json, déjà encodé en JSON
+        #visibilityMap#  quelles sections afficher, d'après la case « Afficher »
+                         de chaque commande
+        #statsData#      séries historisées des graphiques
+        #lastLoginCmdId# commande à surveiller pour déclencher un rafraîchissement
+        #accent_color#   couleur choisie dans l'onglet Affichage
+        #font_size#      taille de police choisie
+        #width#, #height# posés par le cœur de Jeedom
+
+    Le remplacement est un simple str_replace : un marqueur mal orthographié
+    reste tel quel dans la page, visible à l'écran.
+-->
 <style>
     /* ═══════════════════════════════════════════════════════
    Widget ProJote — Design v2

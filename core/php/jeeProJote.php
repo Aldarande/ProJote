@@ -25,7 +25,36 @@
  *  - Notes, Devoirs, Absences, Retards, Punitions... : Données scolaires
  *  - Emploi_du_temps.edt_next_days : tableau compact [{cours,date,debut,fin,cancel}] pour J+1..J+4
  *  - Emploi_du_temps.edt_J{1..4}[_date|_debut|_fin|_cancel] : commandes Jeedom J+1 à J+4
+ *  - Evenements        : Observations, défauts de carnet, mesures conservatoires
+ *  - Collecte          : état de chaque onglet sur ce cycle — « frais » (relevé
+ *                        à l'instant), « garde » (sauté par cadence, valeur du
+ *                        relevé précédent), « repli » (échec, valeur précédente
+ *                        conservée), « coupe » (onglet non suivi), « echec »
+ *                        (échec sans valeur antérieure connue)
  *  - Token             : Token de reconnexion Pronote à sauvegarder
+ *
+ * RÈGLE À RESPECTER EN AJOUTANT UN ONGLET
+ * ---------------------------------------
+ * Depuis la v1.5.0, un onglet peut être ABSENT de la charge : coupé par
+ * l'utilisateur dans « Onglets suivis », ou en échec sans valeur antérieure
+ * connue. Le motif d'écriture est donc :
+ *
+ *     if (isset($result["Onglet"]["cle"]) && $eqLogic->getCmd(null, 'cle')) {
+ *         $eqLogic->checkAndUpdateCmd('cle', ...);      // donnée reçue
+ *     } elseif (isset($result["Onglet"])) {
+ *         $eqLogic->checkAndUpdateCmd('cle', "Pas de ... retourné");
+ *     }                                                  // onglet absent : on
+ *                                                        // ne touche à rien
+ *
+ * Le `elseif` est essentiel : un simple `else` écrirait « Pas de … retourné »
+ * par-dessus la valeur en place dès qu'un onglet manque, effaçant à l'écran une
+ * donnée parfaitement valide. Vingt-quatre commandes en ont souffert avant la
+ * v1.7.0.
+ *
+ * Même exigence pour le widget : `widget_json` est reconstruit ENTIÈREMENT à
+ * chaque appel, une clé manquante vide donc la section correspondante. C'est la
+ * raison pour laquelle le démon renvoie toujours la dernière valeur connue d'un
+ * onglet sauté, plutôt que de l'omettre.
  *
  * Sécurité : la clé API Jeedom est vérifiée avant tout traitement.
  */

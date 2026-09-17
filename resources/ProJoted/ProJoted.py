@@ -24,6 +24,64 @@
 # Pluugin Jeedom Template : https://github.com/jeedom/plugin-template
 ### ###
 
+"""ProJoted.py — Le démon du plugin : ce qui tourne en permanence.
+
+Jeedom ne parle pas à Pronote. Il parle à ce programme, qui reste allumé et
+s'en charge. Voici le trajet complet d'une mise à jour, de l'horloge de Jeedom
+jusqu'aux commandes affichées à l'écran.
+
+    ProJote::cronHourly() ─ PHP, toutes les heures
+              │  ouvre une connexion TCP sur 127.0.0.1:55369
+              ▼
+        read_socket()  ─ dépose le message dans _work_queue
+              │
+              ▼
+        _worker_loop() ─ UN seul thread, les équipements l'un après l'autre
+              │
+              ▼
+        process_message()
+              ├─ 1. se connecte à Pronote (jeton, ou identifiants en démo)
+              ├─ 2. collecter() relève les treize onglets  ──► collecteurs.py
+              ├─ 3. compare au cycle précédent pour les nouveautés
+              └─ 4. renvoie le tout à Jeedom en HTTP  ──────► jeeProJote.php
+                                                                    │
+                                              checkAndUpdateCmd()  ─┘
+
+Trois décisions de structure méritent d'être connues avant de lire la suite.
+
+**Un seul thread de travail, pas un par équipement.** Les journaux d'un cycle
+restent lisibles de bout en bout, et deux enfants du même établissement ne
+sollicitent jamais Pronote en même temps — ce qui compte, Pronote suspendant
+l'adresse IP des installations qu'il juge trop bavardes. Le prix à payer est
+qu'un compte injoignable retarde les suivants : d'où le délai d'abandon de
+``_run_with_timeout()`` et le ``_watchdog_loop()`` qui surveille le worker.
+
+**Le jeton de connexion tourne à chaque authentification.** Pronote n'accepte
+que le dernier émis. C'est la contrainte qui explique le plus de code ici :
+``RenewToken()`` appelé en toute fin de cycle et non au début, le module
+``token_secours`` qui range une copie sur disque, et le disjoncteur de
+``check_and_update_failed_attempts()`` qui cesse d'insister quand un jeton est
+définitivement refusé.
+
+**Aucun collecteur ne doit faire tomber le cycle.** Chacun rattrape ses erreurs
+et rend une structure vide ; ``collecter()`` pose un second filet par onglet. La
+seule exception traverse volontairement : ``SuspensionIP`` hérite de
+``BaseException`` pour arrêter net un cycle dont chaque requête supplémentaire
+aggraverait le blocage.
+
+Ce fichier ne garde que le démon proprement dit. Le reste vit à côté :
+
+    collecteurs.py        les treize onglets Pronote
+    format_pronote.py     mise en forme des objets pronotepy
+    analyse_scolaire.py   moyennes, tendances, prochains DS, nouveautés
+    periodes_scolaires.py périodes, vacances, année scolaire
+    presence_pronote.py   mémoire des refus de l'onglet Présence
+    cadence.py            à quelle fréquence chaque onglet est relevé
+    secret_jeedom.py      déchiffrement des secrets transmis par Jeedom
+    pronote_compat.py     correctifs de compatibilité pronotepy
+    pronote_errors.py     reconnaissance des erreurs Pronote, codes de sortie
+    token_secours.py      copie de secours du jeton de connexion
+"""
 
 import contextlib
 
@@ -1693,9 +1751,57 @@ def collecter(client, eq_id, message, jsondata):
 
 
 def process_message(message):
-    """
-    Traite un message reçu depuis le socket Jeedom.
-    Appelé séquentiellement par le thread worker unique (_worker_loop).
+    """Traite une demande de mise à jour pour UN équipement.
+
+    C'est le cycle complet, de la connexion à Pronote jusqu'au renvoi des
+    données à Jeedom. Appelée par le thread worker unique, jamais directement :
+    les équipements sont traités l'un après l'autre.
+
+    Déroulé
+    -------
+    0. **Contrôle de la clé API.** Le message vient du socket ; une clé qui ne
+       correspond pas est rejetée sans rien faire d'autre.
+
+    1. **Connexion.** Trois chemins, et trois seulement :
+         - compte de démonstration → connexion par identifiants publics ;
+         - jeton complet → ``token_login()`` ; si PRONOTE le refuse, une seconde
+           tentative avec le jeton rangé par ``token_secours`` — le seul
+           rattrapage possible sans intervention de l'utilisateur ;
+         - ni l'un ni l'autre → « Aucun token disponible », on rend la main.
+       Le disjoncteur (``check_and_update_failed_attempts``) bloque en amont un
+       équipement dont le jeton a été refusé trop souvent : insister ferait
+       tourner le jeton pour rien et rapprocherait d'une suspension d'IP.
+
+    2. **Identité et photo.** Nom, classe, établissement, enfants du compte
+       parent, puis téléchargement de la photo si sa source le prévoit.
+
+    3. **Collecte des onglets** — ``collecter()``, qui applique les cadences et
+       isole chaque onglet. C'est là que passe l'essentiel du temps.
+
+    4. **Nouveautés depuis le cycle précédent.** Comparaison à l'index
+       « déjà vu » pour alimenter ``nouvelle_note`` et ``nouveau_devoir``, les
+       commandes sur lesquelles se branchent les scénarios.
+
+    5. **Renouvellement du jeton, en tout dernier.** PRONOTE fait tourner le
+       jeton à chaque authentification et n'accepte que le dernier émis : un
+       jeton capturé au début du cycle serait déjà périmé à la fin. D'où
+       ``RenewToken()`` ici, et pas plus tôt.
+
+    6. **Envoi à Jeedom** par ``jeedom_com.send_change_immediate()``, qui appelle
+       jeeProJote.php en HTTP.
+
+    Ce qui peut l'interrompre
+    ------------------------
+    ``SuspensionIP`` traverse volontairement tous les filets (elle hérite de
+    ``BaseException``) : quand PRONOTE suspend l'adresse IP, chaque requête
+    supplémentaire allonge le blocage, le cycle s'arrête donc immédiatement et
+    une fenêtre de pause est ouverte côté Jeedom.
+
+    Toute autre exception est rattrapée ici : l'équipement est signalé en erreur,
+    et le worker passe au suivant.
+
+    Args:
+        message: dictionnaire reçu du socket (CmdId, jetons, réglages).
     """
     eq_id = str(message.get("CmdId", ""))
     try:
