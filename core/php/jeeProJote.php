@@ -225,7 +225,7 @@ try {
     // Met à jour le lien Ical
     if (isset($result['Ical']) && $eqLogic->getCmd(null, 'URL_Ical')) {
         $eqLogic->checkAndUpdateCmd('URL_Ical', $result['Ical']);
-    } else {
+    } elseif (isset($result["Ical"])) {
         $resultIcal = "Pas d'URL retournée";
         $eqLogic->checkAndUpdateCmd('URL_Ical', "Pas d'URL retournée");
     }
@@ -233,12 +233,12 @@ try {
     // Met à jour les horaires de l'emploi du temps
     if (isset($result['Emploi_du_temps']['edt_aujourdhui_debut']) && $eqLogic->getCmd(null, 'edt_aujourdhui_debut')) {
         $eqLogic->checkAndUpdateCmd('edt_aujourdhui_debut', $result['Emploi_du_temps']['edt_aujourdhui_debut']);
-    } else {
+    } elseif (isset($result["Emploi_du_temps"])) {
         $eqLogic->checkAndUpdateCmd('edt_aujourdhui_debut', "Pas de cours aujourd'hui retourné");
     }
     if (isset($result['Emploi_du_temps']['edt_aujourdhui_fin']) && $eqLogic->getCmd(null, 'edt_aujourdhui_fin')) {
         $eqLogic->checkAndUpdateCmd('edt_aujourdhui_fin', $result['Emploi_du_temps']['edt_aujourdhui_fin']);
-    } else {
+    } elseif (isset($result["Emploi_du_temps"])) {
         $eqLogic->checkAndUpdateCmd('edt_aujourdhui_fin', "Pas de cours aujourd'hui retourné");
     }
     // Espace parasite corrigé dans 'edt_aujourdhui_cancel' : getCmd() compare le
@@ -251,17 +251,17 @@ try {
     }
     if (isset($result['Emploi_du_temps']['edt_prochainjour_debut']) && $eqLogic->getCmd(null, 'edt_prochainjour_debut')) {
         $eqLogic->checkAndUpdateCmd('edt_prochainjour_debut', $result['Emploi_du_temps']['edt_prochainjour_debut']);
-    } else {
+    } elseif (isset($result["Emploi_du_temps"])) {
         $eqLogic->checkAndUpdateCmd('edt_prochainjour_debut', "Pas de cours suivant retourné");
     }
     if (isset($result['Emploi_du_temps']['edt_prochainjour_fin']) && $eqLogic->getCmd(null, 'edt_prochainjour_fin')) {
         $eqLogic->checkAndUpdateCmd('edt_prochainjour_fin', $result['Emploi_du_temps']['edt_prochainjour_fin']);
-    } else {
+    } elseif (isset($result["Emploi_du_temps"])) {
         $eqLogic->checkAndUpdateCmd('edt_prochainjour_fin', "Pas de cours aujourd'hui retourné");
     }
     if (isset($result['Emploi_du_temps']['edt_prochainjour_cancel']) && $eqLogic->getCmd(null, 'edt_prochainjour_cancel')) {
         $eqLogic->checkAndUpdateCmd('edt_prochainjour_cancel', $result['Emploi_du_temps']['edt_prochainjour_cancel']);
-    } else {
+    } elseif (isset($result["Emploi_du_temps"])) {
         $eqLogic->checkAndUpdateCmd('edt_prochainjour_cancel', "Pas de cours annulé pour le prochain jour");
     }
     // Mise à jour des commandes J+1 à J+4
@@ -279,12 +279,12 @@ try {
     }
     if (isset($result['Emploi_du_temps']['edt_prochainjour_date']) && $eqLogic->getCmd(null, 'edt_prochainjour_date')) {
         $eqLogic->checkAndUpdateCmd('edt_prochainjour_date', $result['Emploi_du_temps']['edt_prochainjour_date']);
-    } else {
+    } elseif (isset($result["Emploi_du_temps"])) {
         $eqLogic->checkAndUpdateCmd('edt_prochainjour_date', "Pas de date pour le prochain jour");
     }
     if (isset($result['Emploi_du_temps']['edt_Cours_canceled']) && $eqLogic->getCmd(null, 'edt_Cours_canceled')) {
         $eqLogic->checkAndUpdateCmd('edt_Cours_canceled', $result['Emploi_du_temps']['edt_Cours_canceled']);
-    } else {
+    } elseif (isset($result["Emploi_du_temps"])) {
         $eqLogic->checkAndUpdateCmd('edt_Cours_canceled', "Pas de cours annulé retourné");
     }
 
@@ -293,14 +293,14 @@ try {
     if (isset($result["Notes"]["note"]) && $eqLogic->getCmd(null, 'note')) {
         log::add('ProJote', 'debug', 'Champ reçu : note - Valeur reçue : ' . json_encode($result["Notes"]["note"]));
         $eqLogic->checkAndUpdateCmd('note', json_encode($result["Notes"]["note"]));
-    } else {
+    } elseif (isset($result["Notes"])) {
         $eqLogic->checkAndUpdateCmd('note', "Pas de notes retournées");
     }
 
     if (isset($result["Notes"]["derniere_note"]) && $eqLogic->getCmd(null, 'derniere_note')) {
         log::add('ProJote', 'debug', 'Champ reçu : derniere_note - Valeur reçue : ' . json_encode($result["Notes"]["derniere_note"]));
         $eqLogic->checkAndUpdateCmd('derniere_note', json_encode($result["Notes"]["derniere_note"]));
-    } else {
+    } elseif (isset($result["Notes"])) {
         $eqLogic->checkAndUpdateCmd('derniere_note', "Pas de dernière note retournée");
     }
 
@@ -373,21 +373,21 @@ try {
     if (isset($result["Retards"]["retard"]) && $eqLogic->getCmd(null, 'retard')) {
         log::add('ProJote', 'debug', 'Champ reçu : retard - Valeur reçue : ' . json_encode($result["Retards"]["retard"]));
         $eqLogic->checkAndUpdateCmd('retard', json_encode($result["Retards"]["retard"]));
-    } else {
+    } elseif (isset($result["Retards"])) {
         $eqLogic->checkAndUpdateCmd('retard', "Pas de retard retourné");
     }
 
     if (isset($result["Retards"]["dernier_retard"]) && $eqLogic->getCmd(null, 'dernier_retard')) {
         log::add('ProJote', 'debug', 'Champ reçu : dernier_retard - Valeur reçue : ' . json_encode($result["Retards"]["dernier_retard"]));
         $eqLogic->checkAndUpdateCmd('dernier_retard', json_encode($result["Retards"]["dernier_retard"]));
-    } else {
+    } elseif (isset($result["Retards"])) {
         $eqLogic->checkAndUpdateCmd('dernier_retard', "Pas de dernier retard retourné");
     }
 
     if (isset($result["Retards"]["nb_retard"]) && $eqLogic->getCmd(null, 'Nb_retard')) {
         log::add('ProJote', 'debug', 'Champ reçu : Nb_retard - Valeur reçue : ' . $result["Retards"]["nb_retard"]);
         $eqLogic->checkAndUpdateCmd('Nb_retard', $result["Retards"]["nb_retard"]);
-    } else {
+    } elseif (isset($result["Retards"])) {
         $eqLogic->checkAndUpdateCmd('Nb_retard', "Pas de nombre de retard retourné");
     }
 
@@ -395,29 +395,50 @@ try {
     if (isset($result["Punitions"]["punition"]) && $eqLogic->getCmd(null, 'punition')) {
         log::add('ProJote', 'debug', 'Champ reçu : punition - Valeur reçue : ' . json_encode($result["Punitions"]["punition"]));
         $eqLogic->checkAndUpdateCmd('punition', json_encode($result["Punitions"]["punition"]));
-    } else {
+    } elseif (isset($result["Punitions"])) {
         $eqLogic->checkAndUpdateCmd('punition', "Pas de punition retournée");
     }
 
     if (isset($result["Punitions"]["derniere_punition"]) && $eqLogic->getCmd(null, 'derniere_punition')) {
         log::add('ProJote', 'debug', 'Champ reçu : derniere_punition - Valeur reçue : ' . json_encode($result["Punitions"]["derniere_punition"]));
         $eqLogic->checkAndUpdateCmd('derniere_punition', json_encode($result["Punitions"]["derniere_punition"]));
-    } else {
+    } elseif (isset($result["Punitions"])) {
         $eqLogic->checkAndUpdateCmd('derniere_punition', "Pas de dernière punition retournée");
+    }
+
+    // Évènements de vie scolaire : observations, défauts de carnet, mesures
+    // conservatoires. Ils arrivent dans la même réponse PagePresence que les
+    // punitions, sous des codes « G » que pronotepy ne modélise pas — ils
+    // n'atteignaient donc jamais Jeedom, alors que l'application PRONOTE les
+    // affiche au Carnet.
+    if (isset($result["Evenements"]["evenement"]) && $eqLogic->getCmd(null, 'evenement')) {
+        $eqLogic->checkAndUpdateCmd('evenement', json_encode($result["Evenements"]["evenement"]));
+    } elseif (isset($result["Evenements"])) {
+        $eqLogic->checkAndUpdateCmd('evenement', "Pas d'évènement retourné");
+    }
+
+    if (isset($result["Evenements"]["dernier_evenement"]) && $eqLogic->getCmd(null, 'dernier_evenement')) {
+        $eqLogic->checkAndUpdateCmd('dernier_evenement', json_encode($result["Evenements"]["dernier_evenement"]));
+    } elseif (isset($result["Evenements"])) {
+        $eqLogic->checkAndUpdateCmd('dernier_evenement', "Pas de dernier évènement retourné");
+    }
+
+    if (isset($result["Evenements"]["Nb_Evenements"]) && $eqLogic->getCmd(null, 'Nb_Evenements')) {
+        $eqLogic->checkAndUpdateCmd('Nb_Evenements', $result["Evenements"]["Nb_Evenements"]);
     }
 
     // Vérifie les entrées des Notifications (tableaux "Notification" et "dernier_Notification")
     if (isset($result["Notifications"]["Notification"]) && $eqLogic->getCmd(null, 'notifications')) {
         log::add('ProJote', 'debug', 'Champ reçu : notifications - Valeur reçue : ' . json_encode($result["Notifications"]["Notification"]));
         $eqLogic->checkAndUpdateCmd('notifications', json_encode($result["Notifications"]["Notification"]));
-    } else {
+    } elseif (isset($result["Notifications"])) {
         $eqLogic->checkAndUpdateCmd('notifications', "Pas de notification retournée");
     }
 
     if (isset($result["Notifications"]["dernier_Notification"]) && $eqLogic->getCmd(null, 'derniere_notification')) {
         log::add('ProJote', 'debug', 'Champ reçu : derniere_notification - Valeur reçue : ' . json_encode($result["Notifications"]["dernier_Notification"]));
         $eqLogic->checkAndUpdateCmd('derniere_notification', json_encode($result["Notifications"]["dernier_Notification"]));
-    } else {
+    } elseif (isset($result["Notifications"])) {
         $eqLogic->checkAndUpdateCmd('derniere_notification', "Pas de dernière notification retournée");
     }
 
@@ -471,7 +492,7 @@ try {
     if (isset($result["Competences"]) && $eqLogic->getCmd(null, 'competences')) {
         log::add('ProJote', 'debug', 'Champ reçu : notifications - Valeur reçue : ' . json_encode($result["Competences"]));
         $eqLogic->checkAndUpdateCmd('competences', json_encode($result["Competences"]));
-    } else {
+    } elseif (isset($result["Competences"])) {
         $eqLogic->checkAndUpdateCmd('competences', "Pas de compétences retournée");
     }
     // ── SAUVEGARDE DU TOKEN DE RECONNEXION ──────────────────────────────────
@@ -498,41 +519,41 @@ try {
     if (isset($result['Emploi_du_temps']['edt_aujourdhui']) && $eqLogic->getCmd(null, 'edt_aujourdhui')) {
         log::add('ProJote', 'debug', 'Champ reçu : edt_aujourdhui - Valeur reçue : ' . json_encode($result['Emploi_du_temps']['edt_aujourdhui'],));
         $eqLogic->checkAndUpdateCmd('edt_aujourdhui', json_encode($result['Emploi_du_temps']['edt_aujourdhui'],));
-    } else {
+    } elseif (isset($result["Emploi_du_temps"])) {
         $eqLogic->checkAndUpdateCmd('edt_aujourdhui', "Pas d'emploi du temps retourné");
     }
     if (isset($result['Emploi_du_temps']['edt_prochainjour']) && $eqLogic->getCmd(null, 'edt_prochainjour')) {
         log::add('ProJote', 'debug', 'Champ reçu : edt_prochainjour - Valeur reçue : ' . json_encode($result['Emploi_du_temps']['edt_prochainjour'],));
         $eqLogic->checkAndUpdateCmd('edt_prochainjour', json_encode($result['Emploi_du_temps']['edt_prochainjour'],));
-    } else {
+    } elseif (isset($result["Emploi_du_temps"])) {
         $eqLogic->checkAndUpdateCmd('edt_prochainjour', "Pas d'emploi du temps retourné");
     }
     // Je recherche devoir
     if (isset($result['Devoirs']['devoir']) && $eqLogic->getCmd(null, 'devoir')) {
         log::add('ProJote', 'debug', 'Champ reçu : devoirs - Valeur reçue : ' . json_encode($result['Devoirs']['devoir'], JSON_PRETTY_PRINT));
         $eqLogic->checkAndUpdateCmd('devoir', json_encode($result['Devoirs']['devoir'],));
-    } else {
+    } elseif (isset($result["Devoirs"])) {
         $eqLogic->checkAndUpdateCmd('devoir', "Pas de devoirs retourné");
     }
     // Je recherche devoir_Demain
     if (isset($result['Devoirs']['devoir_Demain']) && $eqLogic->getCmd(null, 'devoir_Demain')) {
         log::add('ProJote', 'debug', 'Champ reçu : devoirs - Valeur reçue : ' . json_encode($result['Devoirs']['devoir_Demain'], JSON_PRETTY_PRINT));
         $eqLogic->checkAndUpdateCmd('devoir_Demain', json_encode($result['Devoirs']['devoir_Demain'],));
-    } else {
+    } elseif (isset($result["Devoirs"])) {
         $eqLogic->checkAndUpdateCmd('devoir_Demain', "Pas de devoir pour demain retourné");
     }
     // Je recherche les absences
     if (isset($result['Absences']['absence']) && $eqLogic->getCmd(null, 'absence')) {
         log::add('ProJote', 'debug', 'Champ reçu : absence - Valeur reçue : ' . json_encode($result['Absences']['absence'],));
         $eqLogic->checkAndUpdateCmd('absence', json_encode($result['Absences']['absence'],));
-    } else {
+    } elseif (isset($result["Absences"])) {
         $eqLogic->checkAndUpdateCmd('absence', "Pas d'absence retourné");
     }
     // Je recherche la derniére absence
     if (isset($result['Absences']['derniere_absence']) && $eqLogic->getCmd(null, 'derniere_absence')) {
         log::add('ProJote', 'debug', 'Champ reçu : derniere_absence - Valeur reçue : ' . json_encode($result['Absences']['derniere_absence'],));
         $eqLogic->checkAndUpdateCmd('derniere_absence', json_encode($result['Absences']['derniere_absence'],));
-    } else {
+    } elseif (isset($result["Absences"])) {
         $eqLogic->checkAndUpdateCmd('derniere_absence', "Pas de dernière absence retournée");
     }
 
@@ -639,6 +660,8 @@ try {
         'absences'              => isset($result['Absences']['absence'])                      ? $result['Absences']['absence']                      : array(),
         'retards'               => isset($result['Retards']['retard'])                        ? $result['Retards']['retard']                        : array(),
         'punitions'             => isset($result['Punitions']['punition'])                    ? $result['Punitions']['punition']                    : array(),
+        'evenements'            => isset($result['Evenements']['evenement'])                  ? $result['Evenements']['evenement']                  : array(),
+        'nb_evenements'         => isset($result['Evenements']['Nb_Evenements'])               ? $result['Evenements']['Nb_Evenements']               : 0,
         'devoirs'               => isset($result['Devoirs']['devoir'])                        ? $result['Devoirs']['devoir']                        : array(),
         'devoirs_demain'        => isset($result['Devoirs']['devoir_Demain'])                 ? $result['Devoirs']['devoir_Demain']                 : array(),
         'nb_devoirs_f'          => isset($result['Devoirs']['Nb_devoir_F'])                   ? $result['Devoirs']['Nb_devoir_F']                   : 0,

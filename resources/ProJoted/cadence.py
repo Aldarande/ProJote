@@ -50,6 +50,9 @@ CADENCES = {
     "Periodes": 0,
     "Competences": 0,
     "Ical": 0,
+    # Observations, défauts de carnet, mesures conservatoires : un mot du
+    # professeur principal se lit le jour même, pas le lendemain.
+    "Evenements": 0,
     # Consultables plus tard sans conséquence, et chers en requêtes.
     "Notifications": TROIS_HEURES,
     "Messages": TROIS_HEURES,

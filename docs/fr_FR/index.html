@@ -412,6 +412,7 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
             <tr><td>Photo</td><td>info</td><td>Chemin local de la photo de profil</td></tr>
             <tr><td>URL iCal</td><td>info</td><td>Lien d'abonnement au calendrier Pronote</td></tr>
             <tr><td>Nb absences / retards / punitions</td><td>info</td><td>Compteurs sur la période en cours</td></tr>
+            <tr><td>Évènements de vie scolaire <span class="badge badge-new">v1.7.0</span></td><td>info</td><td>Observations, défauts de carnet et mesures conservatoires — les entrées du Carnet que Pronote ne classe pas comme punitions. Trois commandes : la liste, le dernier en date, et le compteur.</td></tr>
             <tr><td>Nb devoirs (fait / non fait)</td><td>info</td><td>Devoirs de la semaine, ventilés par statut</td></tr>
             <tr><td>Nb devoirs demain (fait / non fait)</td><td>info</td><td>Devoirs pour le prochain jour de cours</td></tr>
             <tr><td>EDT aujourd'hui — début / fin / cours annulés</td><td>info</td><td>Repères horaires de la journée</td></tr>
@@ -530,6 +531,8 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
                 <td>Cœur du suivi quotidien.</td></tr>
             <tr><td>Menus de la cantine</td><td>2 requêtes</td><td>2 fois par jour</td>
                 <td>Publiés pour la semaine entière.</td></tr>
+            <tr><td>Évènements de vie scolaire</td><td>1 requête</td><td>Chaque heure</td>
+                <td>Un mot du professeur principal se lit le jour même, pas le lendemain.</td></tr>
             <tr><td>Périodes, retards, punitions</td><td>0 requête</td><td>Chaque heure</td>
                 <td>Ces données arrivent avec la session : les espacer n'aurait rien fait gagner.</td></tr>
         </tbody>
@@ -549,8 +552,8 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
 
     <p>Tout le monde ne suit ni la messagerie, ni la cantine, ni les compétences. Dans l'onglet
     <em>Affichage</em> de l'équipement, la ligne <strong>Onglets suivis</strong> permet de décocher
-    quatre catégories : <em>Messagerie</em>, <em>Cantine</em>, <em>Notifications</em> et
-    <em>Compétences</em>.</p>
+    cinq catégories : <em>Messagerie</em>, <em>Cantine</em>, <em>Notifications</em>,
+    <em>Compétences</em> et <em>Évènements de vie scolaire</em>.</p>
 
     <p>Décocher une catégorie a deux effets : ses commandes ne sont plus créées — un équipement en crée
     une centaine, autant de lignes en base et sur le tableau de bord — et le plugin cesse d'interroger
@@ -787,6 +790,14 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
             <tr>
                 <td><span class="badge badge-sec">Sécurité</span></td>
                 <td><strong>Le mot de passe est désormais chiffré de façon authentifiée</strong> — lorsque vous validez vos identifiants, le mot de passe passe de l'interface au programme de connexion sous forme chiffrée. Le chiffrement employé jusqu'ici, AES-256-CBC, protégeait le contenu mais ne le signait pas : une charge modifiée en route se déchiffrait en octets quelconques, que rien ne distinguait d'un mot de passe. AES-256-GCM la refuse. Rien à faire de votre côté, et rien à migrer : ce chiffré ne vit que le temps d'une validation, il n'est jamais conservé.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-new">Nouveauté</span></td>
+                <td><strong>Les observations et défauts de carnet remontent enfin</strong> — Pronote range tous les évènements du Carnet dans une même liste, en les distinguant par un code interne. La bibliothèque utilisée par le plugin n'en reconnaît que trois : absence, retard et punition. Tout le reste était écarté sans un mot. Sur un compte éprouvé le 17 septembre, le plugin annonçait <em>zéro punition</em> alors que le Carnet portait <strong>neuf entrées</strong> : cinq observations, trois défauts de carnet et une mesure conservatoire. Ces trois catégories font désormais l'objet de leurs propres commandes — la liste, le dernier évènement, le compteur — pour une seule requête supplémentaire par cycle. Elles se décochent comme les autres dans <em>Onglets suivis</em> si vous ne souhaitez pas les suivre.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>Une commande ne se vide plus quand son onglet n'est pas relevé</strong> — depuis la 1.5.0, un onglet peut être absent d'un cycle : coupé dans <em>Onglets suivis</em>, ou en échec sans valeur antérieure connue. Le code qui range les données dans Jeedom écrivait alors « Pas de … retourné » par-dessus la valeur en place, effaçant ce qui s'affichait. Le texte de repli n'est plus écrit que lorsque l'onglet a bien été transmis mais ne portait pas la donnée. Vingt-quatre commandes étaient concernées.</td>
             </tr>
             <tr>
                 <td><span class="badge badge-perf">Maintenance</span></td>

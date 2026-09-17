@@ -763,6 +763,10 @@ class ProJote extends eqLogic
         'onglet'   => 'Notifications',
         'commandes' => array('notifications', 'derniere_notification'),
       ),
+      'evenements' => array(
+        'onglet'   => 'Evenements',
+        'commandes' => array('evenement', 'dernier_evenement', 'Nb_Evenements'),
+      ),
     );
   }
 
@@ -891,6 +895,13 @@ class ProJote extends eqLogic
       "derniere_absence"      => array("Dernière absence",                                 'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::absence',     'ProJote::absence'),
       "retard"                => array("Liste des 10 derniers retards",                    'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::retard',      'ProJote::retard'),
       "dernier_retard"        => array("Dernier retard",                                   'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::retard',      'ProJote::retard'),
+      // ── Évènements de vie scolaire (v1.7.0) ────────────────────────────────
+      // Observations, défauts de carnet et mesures conservatoires : la même
+      // réponse PagePresence que les punitions, des codes « G » que pronotepy
+      // ne modélise pas et qui n'atteignaient donc jamais Jeedom.
+      "evenement"             => array("Liste des évènements de vie scolaire",         'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::evenement',   'ProJote::evenement'),
+      "dernier_evenement"     => array("Dernier évènement de vie scolaire",            'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::evenement',   'ProJote::evenement'),
+      "Nb_Evenements"         => array("Nombre d'évènements de vie scolaire",          'info',   'numeric', "",      1, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
       "punition"              => array("Liste des punitions",                              'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::punition',    'ProJote::punition'),
       "derniere_punition"     => array("Dernière punition",                                'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::punition',    'ProJote::punition'),
       "note"                  => array("Liste des notes",                                  'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::note',        'ProJote::note'),

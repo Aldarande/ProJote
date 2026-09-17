@@ -1234,3 +1234,153 @@ def ical(client):
             e,
         )
         return ""
+
+
+# Codes « G » des évènements de vie scolaire, tels que PRONOTE les mélange dans
+# l'unique liste « listeAbsences » de PagePresence. pronotepy n'en modélise que
+# trois — 13 absence, 14 retard, 41 punition — et jette silencieusement tous les
+# autres. Les trois ci-dessous sont ceux relevés sur le serveur de démonstration
+# le 15 septembre 2026 : 25 observations, 15 défauts de carnet, 5 mesures
+# conservatoires. Le code 41, lui, n'y apparaît pas une seule fois — le plugin
+# interrogeait donc la seule catégorie que l'établissement n'utilisait pas.
+G_OBSERVATION = 40
+
+
+G_DEFAUT_CARNET = 46
+
+
+G_MESURE_CONSERVATOIRE = 71
+
+
+_LIBELLES_EVENEMENTS = {
+    G_OBSERVATION: "Observation",
+    G_DEFAUT_CARNET: "Défaut de carnet/carte",
+    G_MESURE_CONSERVATOIRE: "Mesure conservatoire",
+}
+
+
+def _libelle_evenement(brut, genre):
+    """Compose un libellé lisible pour un évènement de vie scolaire.
+
+    PRONOTE ne nomme pas ces évènements de façon uniforme : un défaut de carnet
+    porte son intitulé dans « L », une mesure conservatoire dans « nature.V.L »,
+    une observation n'en a pas du tout. On retombe donc sur la catégorie.
+    """
+    for lecture in (
+        lambda: brut.get("L"),
+        lambda: brut.get("nature", {}).get("V", {}).get("L"),
+        lambda: brut.get("libelle"),
+    ):
+        try:
+            valeur = lecture()
+        except Exception:
+            continue
+        if isinstance(valeur, str) and valeur.strip():
+            return valeur.strip()
+    return _LIBELLES_EVENEMENTS.get(genre, "Évènement")
+
+
+def _quand(evenement):
+    """Date de l'évènement, en objet comparable.
+
+    PRONOTE rend « JJ/MM/AAAA HH:MM:SS ». Trier ces chaînes telles quelles
+    ordonne par jour avant le mois : le 2 décembre passait avant le 17 septembre,
+    et « dernier_evenement » pouvait désigner le mauvais. Une date illisible
+    part en queue de liste plutôt que de faire échouer le tri.
+    """
+    brut = (evenement.get("date") or "").strip()
+    for forme in ("%d/%m/%Y %H:%M:%S", "%d/%m/%Y %H:%M", "%d/%m/%Y"):
+        try:
+            return datetime.datetime.strptime(brut, forme)
+        except ValueError:
+            continue
+    return datetime.datetime.min
+
+
+def evenements_vie_scolaire(client):
+    """Collecte les évènements du Carnet que pronotepy ne modélise pas.
+
+    Observations, défauts de carnet/carte et mesures conservatoires vivent dans
+    la même réponse PagePresence que les absences, les retards et les punitions,
+    distingués par leur code « G ». pronotepy filtre sur trois codes seulement :
+    ces évènements n'atteignaient donc jamais Jeedom, alors que l'application
+    PRONOTE les affiche au Carnet — trois entrées visibles sur un compte dont le
+    plugin annonçait « aucune punition ».
+
+    La requête est faite ici directement plutôt que par une propriété pronotepy,
+    puisqu'aucune ne les expose.
+
+    Returns:
+        dict: evenement (liste), dernier_evenement (liste), Nb_Evenements (int),
+        et « error » si la collecte a échoué.
+    """
+    data = {"evenement": [], "dernier_evenement": [], "Nb_Evenements": 0}
+    try:
+        all_periods = client.periods
+    except Exception as e:
+        logging.error("Erreur lors de l'accès aux périodes (évènements) : %s", e)
+        data["error"] = str(e)
+        return data
+
+    eq_id = _equipement_en_cours()
+    if _presence_deja_refusee(eq_id):
+        logging.debug(
+            "Collecte des évènements ignorée : l'onglet Présence a déjà été refusé "
+            "sur ce cycle."
+        )
+        return data
+
+    # Déduplication par identifiant : les découpages de périodes se recouvrent,
+    # un même évènement revient donc plusieurs fois.
+    trouves = {}
+    for period in _periodes_couvrantes(all_periods):
+        try:
+            reponse = client.post(
+                "PagePresence",
+                19,
+                {
+                    "periode": {"N": period.id, "L": period.name, "G": 2},
+                    "DateDebut": {
+                        "_T": 7,
+                        "V": period.start.strftime("%d/%m/%Y %H:%M:%S"),
+                    },
+                    "DateFin": {
+                        "_T": 7,
+                        "V": period.end.strftime("%d/%m/%Y %H:%M:%S"),
+                    },
+                },
+            )
+        except Exception as e:
+            if _refus_de_presence(e):
+                _noter_refus_presence(eq_id, "évènements", e)
+                return data
+            logging.warning(
+                "Évènements de vie scolaire non récupérés pour « %s » : %s",
+                getattr(period, "name", "?"),
+                e,
+            )
+            continue
+
+        liste = reponse.get("dataSec", {}).get("data", {}).get("listeAbsences", {})
+        for brut in liste.get("V", []) or []:
+            genre = brut.get("G")
+            if genre not in _LIBELLES_EVENEMENTS:
+                continue
+            identifiant = brut.get("N") or "%s-%s" % (genre, len(trouves))
+            if identifiant in trouves:
+                continue
+            debut = brut.get("dateDebut", {})
+            trouves[identifiant] = {
+                "id": identifiant,
+                "categorie": _LIBELLES_EVENEMENTS[genre],
+                "libelle": _libelle_evenement(brut, genre),
+                "date": debut.get("V", "") if isinstance(debut, dict) else "",
+                "periode": getattr(period, "name", ""),
+            }
+
+    evenements = sorted(trouves.values(), key=_quand, reverse=True)
+    data["evenement"] = evenements
+    data["Nb_Evenements"] = len(evenements)
+    data["dernier_evenement"] = evenements[:1]
+    logging.debug("Évènements de vie scolaire collectés : %d", len(evenements))
+    return data

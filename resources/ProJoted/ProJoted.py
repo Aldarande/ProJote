@@ -119,6 +119,7 @@ try:
         absences,
         devoirs,
         evaluations,
+        evenements_vie_scolaire,
         ical,
         menus,
         messages,
@@ -1586,6 +1587,7 @@ def _collecteurs(message):
         ("Punitions", "les punitions", punitions),
         ("Devoirs", "les devoirs", lambda c: devoirs(c, _fenetre_devoirs(message))),
         ("Competences", "les évaluations", evaluations),
+        ("Evenements", "les évènements de vie scolaire", evenements_vie_scolaire),
         ("Ical", "l'ICAL", ical),
     )
 
