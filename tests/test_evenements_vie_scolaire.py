@@ -260,3 +260,59 @@ def test_champs_d_un_evenement():
     entree = collecteurs.evenements_vie_scolaire(client)["evenement"][0]
     assert set(entree) == {"id", "categorie", "libelle", "date", "periode"}
     assert entree["periode"] == "Trimestre 1"
+
+
+# ── La date n'est pas rangée au même endroit selon la catégorie ─────────────
+#
+# Relevé sur le serveur de démonstration le 17 septembre 2026 :
+#   G=40 Observation            → dateDebut
+#   G=46 Défaut de carnet/carte → date, et rien d'autre
+#   G=71 Mesure conservatoire   → dateDebut, dateDemande, dateFin
+#
+# Ne lire que dateDebut laissait les défauts de carnet sans date. Constaté sur
+# un compte réel : quatre défauts de carnet remontés avec une date vide, donc
+# relégués en queue de tri.
+
+
+@pytest.mark.parametrize(
+    "brut, attendu",
+    [
+        ({"dateDebut": {"V": "01/10/2025 08:00:00"}}, "01/10/2025 08:00:00"),
+        ({"date": {"V": "28/11/2025 09:00:00"}}, "28/11/2025 09:00:00"),
+        ({"dateDemande": {"V": "10/07/2025 13:41:06"}}, "10/07/2025 13:41:06"),
+        # dateDebut l'emporte quand plusieurs sont présentes.
+        (
+            {"dateDebut": {"V": "11/07/2025 08:00:00"}, "dateDemande": {"V": "10/07/2025 13:41:06"}},
+            "11/07/2025 08:00:00",
+        ),
+        ({}, ""),
+        ({"dateDebut": {}}, ""),
+        ({"dateDebut": {"V": "   "}}, ""),
+        ({"dateDebut": "pas un dictionnaire"}, "pas un dictionnaire"),
+    ],
+)
+def test_date_lue_selon_la_categorie(brut, attendu):
+    assert collecteurs._date_evenement(brut) == attendu
+
+
+def test_un_defaut_de_carnet_a_bien_sa_date():
+    """Le cas qui manquait : la date est dans « date », pas dans « dateDebut »."""
+    client = _Client([
+        {"G": collecteurs.G_DEFAUT_CARNET, "N": "n1", "L": "Défauts de carnet/carte",
+         "date": {"_T": 7, "V": "28/11/2025 09:00:00"}},
+    ])
+    entree = collecteurs.evenements_vie_scolaire(client)["evenement"][0]
+    assert entree["date"] == "28/11/2025 09:00:00"
+
+
+def test_les_trois_categories_gardent_leur_date():
+    client = _Client([
+        {"G": collecteurs.G_OBSERVATION, "N": "o", "dateDebut": {"V": "01/10/2025 08:00:00"}},
+        {"G": collecteurs.G_DEFAUT_CARNET, "N": "d", "date": {"V": "28/11/2025 09:00:00"}},
+        {"G": collecteurs.G_MESURE_CONSERVATOIRE, "N": "m",
+         "dateDebut": {"V": "11/07/2025 08:00:00"}, "dateDemande": {"V": "10/07/2025 13:41:06"}},
+    ])
+    data = collecteurs.evenements_vie_scolaire(client)
+    assert all(e["date"] for e in data["evenement"]), "une date manque"
+    # Et le tri reste chronologique, toutes catégories confondues.
+    assert [e["id"] for e in data["evenement"]] == ["d", "o", "m"]

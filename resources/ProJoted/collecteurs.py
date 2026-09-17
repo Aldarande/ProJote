@@ -1280,6 +1280,30 @@ def _libelle_evenement(brut, genre):
     return _LIBELLES_EVENEMENTS.get(genre, "Évènement")
 
 
+def _date_evenement(brut):
+    """Date d'un évènement de vie scolaire, selon sa catégorie.
+
+    PRONOTE ne la range pas au même endroit d'une catégorie à l'autre — relevé
+    sur le serveur de démonstration le 17 septembre 2026 :
+
+        G=40 Observation            dateDebut
+        G=46 Défaut de carnet/carte date          ← et rien d'autre
+        G=71 Mesure conservatoire   dateDebut, dateDemande, dateFin
+
+    Ne lire que ``dateDebut``, comme au premier jet, laissait donc les défauts
+    de carnet sans date : quatre d'entre eux sont remontés d'un compte réel avec
+    une date vide, ce qui les envoyait aussi en queue de tri. On essaie les
+    champs dans l'ordre où ils font sens.
+    """
+    for cle in ("dateDebut", "date", "dateDemande"):
+        valeur = brut.get(cle)
+        if isinstance(valeur, dict):
+            valeur = valeur.get("V")
+        if isinstance(valeur, str) and valeur.strip():
+            return valeur.strip()
+    return ""
+
+
 def _quand(evenement):
     """Date de l'évènement, en objet comparable.
 
@@ -1369,12 +1393,11 @@ def evenements_vie_scolaire(client):
             identifiant = brut.get("N") or "%s-%s" % (genre, len(trouves))
             if identifiant in trouves:
                 continue
-            debut = brut.get("dateDebut", {})
             trouves[identifiant] = {
                 "id": identifiant,
                 "categorie": _LIBELLES_EVENEMENTS[genre],
                 "libelle": _libelle_evenement(brut, genre),
-                "date": debut.get("V", "") if isinstance(debut, dict) else "",
+                "date": _date_evenement(brut),
                 "periode": getattr(period, "name", ""),
             }
 
