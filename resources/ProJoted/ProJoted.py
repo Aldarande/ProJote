@@ -4117,9 +4117,13 @@ def process_message(message):
             # Détection des nouveautés depuis la sync précédente (P3, v1.1.0)
             try:
                 _seen = _load_seen_index(_data_dir, message["CmdId"])
-                _dev = jsondata["Devoirs"] if isinstance(jsondata["Devoirs"], dict) else {}
-                _abs = jsondata["Absences"] if isinstance(jsondata["Absences"], dict) else {}
-                _pun = jsondata["Punitions"] if isinstance(jsondata["Punitions"], dict) else {}
+                # .get() et non [] : depuis la collecte isolée (v1.5.0), un onglet
+                # dont la collecte a échoué sans valeur antérieure connue est absent
+                # de la charge. Une clé manquante ne doit pas priver de détection
+                # les deux autres.
+                _dev = jsondata.get("Devoirs") if isinstance(jsondata.get("Devoirs"), dict) else {}
+                _abs = jsondata.get("Absences") if isinstance(jsondata.get("Absences"), dict) else {}
+                _pun = jsondata.get("Punitions") if isinstance(jsondata.get("Punitions"), dict) else {}
                 _deltas, _new_index = compute_deltas(
                     _seen,
                     notes_data.get("note", []) if isinstance(notes_data, dict) else [],
