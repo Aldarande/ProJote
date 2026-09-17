@@ -283,6 +283,20 @@
 
 <h1 id="beta-nouveautes">Nouveautés en cours</h1>
 
+<h2>Chiffrement authentifié du mot de passe <span class="badge badge-sec">1.7.0</span></h2>
+<p>À la validation de vos identifiants, le mot de passe passe de l'interface au programme de
+connexion sous forme chiffrée. AES-256-CBC protégeait ce contenu sans le signer : une charge
+modifiée en route se déchiffrait en octets quelconques, que rien ne distinguait d'un mot de passe.
+<strong>AES-256-GCM</strong> la refuse.</p>
+<div class="callout callout-info">
+    <strong>Rien à migrer</strong>
+    Ce chiffré ne vit que le temps d'une validation ; il n'est jamais conservé. Les jetons gardés en
+    base, eux, sont chiffrés par Jeedom lui-même et ne sont pas concernés.
+</div>
+<p>La préparation de ce changement a montré que la connexion par identifiants en cours de cycle
+n'était plus jamais empruntée par le démon. Les deux fonctions concernées et leur fonction de
+déchiffrement ont été supprimées : le déchiffrement ne vit plus qu'à un seul endroit.</p>
+
 <h2>Affichages mobiles, et démon découpé <span class="badge badge-new">1.6.0</span></h2>
 <ul>
     <li><strong>Neuf affichages mobiles.</strong> Notes, emploi du temps, devoirs, absences, retards,

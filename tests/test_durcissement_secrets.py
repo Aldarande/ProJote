@@ -49,49 +49,38 @@ def _chiffrer(clair, apikey=APIKEY):
     ).decode()
 
 
-# ── L4 — un secret illisible ne tue plus le démon ───────────────────────────
+# ── L4 — le démon ne déchiffre plus rien du tout ────────────────────────────
+#
+# Le finding L4 visait l'exit(1) de ProJoted.my_decrypt(). En préparant le
+# passage à AES-GCM, la lecture du code a montré que cette fonction n'était
+# atteignable que depuis Connect() et Connectparent() — deux fonctions que rien
+# n'appelait. process_message n'a que trois chemins : compte de démonstration,
+# jeton, et « aucun jeton disponible » qui rend la main.
+#
+# Le correctif de la v1.4.7 portait donc, pour le démon, sur du code mort ; il
+# reste entier pour LoginConnect, où le même défaut était bien atteint à chaque
+# validation par identifiants. Les trois fonctions ont été supprimées, et ces
+# tests gardent leur absence : les faire revenir remettrait une seconde copie du
+# déchiffrement, et c'est la divergence des deux copies qui avait laissé passer
+# le remplissage non vérifié.
 
 
-def test_my_decrypt_leve_au_lieu_de_tuer_le_demon(daemon):
-    """Une donnée indéchiffrable lève, elle n'appelle plus exit()."""
-    with pytest.raises(pronote_errors.DechiffrementImpossible):
-        daemon.my_decrypt("ceci-n-est-pas-du-base64-chiffre")
-
-
-def test_my_decrypt_ne_leve_pas_systemexit(daemon):
-    """Garde-fou explicite : SystemExit signerait le retour de l'exit(1)."""
-    try:
-        daemon.my_decrypt("charge-illisible")
-    except pronote_errors.DechiffrementImpossible:
-        pass
-    except SystemExit:  # pragma: no cover - ne doit jamais arriver
-        pytest.fail("my_decrypt a appelé exit() : le démon entier tomberait.")
-
-
-def test_connect_rend_none_sur_secret_illisible(daemon):
-    """Connect() abandonne cet équipement et laisse tourner les autres."""
-    assert (
-        daemon.Connect(
-            pronote_url="https://exemple.index-education.net/pronote/eleve.html",
-            login="clara",
-            password="secret-illisible",
-            ent="",
+def test_le_demon_ne_porte_plus_de_dechiffrement(daemon):
+    for nom in ("my_decrypt", "Connect", "Connectparent"):
+        assert not hasattr(daemon, nom), (
+            f"{nom}() est revenue dans le démon : code mort, et seconde copie "
+            "du déchiffrement"
         )
-        is None
-    )
 
 
-def test_connectparent_rend_none_sur_secret_illisible(daemon):
-    """Connectparent() suit la même règle et rend sa paire (client, enfants)."""
-    client, enfants = daemon.Connectparent(
-        pronote_url="https://exemple.index-education.net/pronote/parent.html",
-        login="parent",
-        password="secret-illisible",
-        ent="",
-        enfant="",
-    )
-    assert client is None
-    assert enfants == []
+def test_le_demon_ne_se_connecte_que_par_jeton_ou_demonstration(daemon):
+    """Garde du fait qui rend ce code mort : il n'y a pas de troisième chemin."""
+    import inspect
+
+    source = inspect.getsource(daemon.process_message)
+    assert "connexion_demo(message)" in source
+    assert "token_login(" in source
+    assert "Aucun token disponible" in source
 
 
 # ── L3 — l'identifiant d'équipement ne compose plus un chemin tel quel ──────
@@ -308,19 +297,26 @@ def test_charge_illisible_leve_aussi():
         secret_jeedom.dechiffrer("pas-du-base64", secret_jeedom.cle_depuis_apikey(APIKEY))
 
 
-def test_demon_et_validation_partagent_le_meme_dechiffrement():
-    """Une vérification de sécurité dupliquée finit par diverger."""
+def test_le_dechiffrement_ne_vit_qu_a_un_endroit():
+    """Une vérification de sécurité dupliquée finit par diverger.
+
+    C'est exactement ce qui s'était produit : deux copies du déchiffrement, et
+    un remplissage non vérifié dans les deux. Il n'en reste qu'une, appelée par
+    LoginConnect — seul chemin où un secret chiffré arrive réellement.
+    """
+    racine = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "resources",
+        "ProJoted",
+    )
+    with open(os.path.join(racine, "LoginConnect.py"), encoding="utf-8") as f:
+        assert "secret_jeedom.dechiffrer(" in f.read()
+
+    # secret_jeedom.py est exclu : sa documentation cite l'expression fautive
+    # pour expliquer ce qu'elle faisait. C'est du texte, pas du code.
     for fichier in ("ProJoted.py", "LoginConnect.py"):
-        chemin = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            "resources",
-            "ProJoted",
-            fichier,
-        )
-        with open(chemin, encoding="utf-8") as f:
-            source = f.read()
-        assert "secret_jeedom.dechiffrer(" in source, fichier
-        assert "unpad = lambda s: s[: -s[-1]]" not in source, fichier
+        with open(os.path.join(racine, fichier), encoding="utf-8") as f:
+            assert "unpad = lambda s: s[: -s[-1]]" not in f.read(), fichier
 
 
 # ── Un refus d'identifiants ne passe plus pour une réussite ─────────────────
@@ -354,3 +350,87 @@ def test_ajax_php_traite_le_refus_d_identifiants():
     with open(chemin, encoding="utf-8") as f:
         source = f.read()
     assert "$return_var === 10" in source
+
+
+# ── M3 — AES-256-GCM, et ce que l'audit supposait à tort ────────────────────
+#
+# L'audit recommandait AES-GCM « avec re-chiffrement transparent au premier
+# accès ». La lecture du code a montré qu'il n'y a rien à migrer : `my_encrypt`
+# n'est appelé qu'à un seul endroit, ProJote.ajax.php, pour passer le mot de
+# passe au script de validation en argument de ligne de commande. Le chiffré ne
+# vit que le temps d'une requête. Le secret conservé en base, lui, est chiffré
+# par le cœur de Jeedom ($_encryptConfigKey), pas par ce code.
+#
+# GCM apporte donc ici une chose précise : une charge altérée est refusée, là où
+# CBC la déchiffrait en octets quelconques que rien ne distinguait d'un mot de
+# passe.
+
+
+def _chiffrer_gcm(clair, apikey=APIKEY):
+    """Chiffre comme ProJote::my_encrypt() depuis la v1.7.0 : AES-256-GCM."""
+    import os as _os
+
+    from Crypto.Cipher import AES
+
+    cle = bytes.fromhex(secret_jeedom.cle_depuis_apikey(apikey))
+    iv = _os.urandom(12)
+    chiffre, tag = AES.new(cle, AES.MODE_GCM, nonce=iv).encrypt_and_digest(clair.encode())
+    return base64.b64encode(
+        json.dumps(
+            {
+                "v": 2,
+                "iv": base64.b64encode(iv).decode(),
+                "data": base64.b64encode(chiffre).decode(),
+                "tag": base64.b64encode(tag).decode(),
+            }
+        ).encode()
+    ).decode()
+
+
+def test_gcm_aller_retour():
+    chiffre = _chiffrer_gcm("pronotevs")
+    assert (
+        secret_jeedom.dechiffrer(chiffre, secret_jeedom.cle_depuis_apikey(APIKEY))
+        == "pronotevs"
+    )
+
+
+def test_gcm_refuse_une_charge_alteree():
+    """Le gain de GCM sur CBC, en un test."""
+    chiffre = _chiffrer_gcm("pronotevs")
+    enveloppe = json.loads(base64.b64decode(chiffre).decode())
+    octets = bytearray(base64.b64decode(enveloppe["data"]))
+    octets[0] ^= 0x01
+    enveloppe["data"] = base64.b64encode(bytes(octets)).decode()
+    altere = base64.b64encode(json.dumps(enveloppe).encode()).decode()
+
+    with pytest.raises(pronote_errors.DechiffrementImpossible):
+        secret_jeedom.dechiffrer(altere, secret_jeedom.cle_depuis_apikey(APIKEY))
+
+
+def test_gcm_refuse_un_tag_valide_pour_une_autre_cle():
+    chiffre = _chiffrer_gcm("pronotevs", apikey="une-autre-cle")
+    with pytest.raises(pronote_errors.DechiffrementImpossible):
+        secret_jeedom.dechiffrer(chiffre, secret_jeedom.cle_depuis_apikey(APIKEY))
+
+
+def test_l_ancienne_enveloppe_reste_lisible():
+    """Le démon peut tourner un instant avec les fichiers de la version d'avant."""
+    chiffre = _chiffrer("pronotevs")  # enveloppe CBC, sans champ « tag »
+    assert (
+        secret_jeedom.dechiffrer(chiffre, secret_jeedom.cle_depuis_apikey(APIKEY))
+        == "pronotevs"
+    )
+
+
+def test_le_php_chiffre_bien_en_gcm():
+    """Les deux côtés doivent parler la même enveloppe."""
+    ici = os.path.dirname(os.path.abspath(__file__))
+    chemin = os.path.join(
+        os.path.dirname(ici), "core", "class", "ProJote.class.php"
+    )
+    with open(chemin, encoding="utf-8") as f:
+        source = f.read()
+    assert "aes-256-gcm" in source
+    # L'IV de GCM fait 12 octets : la taille pour laquelle le mode est défini.
+    assert "openssl_random_pseudo_bytes(12)" in source

@@ -1,6 +1,6 @@
 # 📚 ProJote - Plugin JEEDOM Pronote
 
-![Version](https://img.shields.io/badge/version-1.6.0-blue)
+![Version](https://img.shields.io/badge/version-1.7.0-blue)
 ![License](https://img.shields.io/badge/license-AGPL%20v3-green)
 ![Jeedom](https://img.shields.io/badge/Jeedom-4.4+-orange)
 
@@ -234,7 +234,7 @@ Si [Pronote].Nombre d'absence augmente
 ⚠️ **Points importants**
 
 - **Tokens stockés localement** dans `/data/[equipmentId]/` (non synchronisés cloud)
-- **Mot de passe chiffré** (AES-256) en configuration
+- **Mot de passe chiffré** (AES-256-GCM, authentifié) lors de son passage au démon
 - **HTTPS recommandé** pour accéder à Jeedom
 - **Port socket (55369)** en localhost uniquement
 - **Logs sensibles** à vérifier en cas de problème
@@ -346,6 +346,6 @@ action volontaire, pas une sollicitation automatique.
 
 ---
 
-**Version :** 1.6.0  
+**Version :** 1.7.0  
 **Dernière mise à jour :** septembre 2026  
 **Support :** Jeedom 4.4+

@@ -5,12 +5,19 @@
 
 """secret_jeedom.py — Déchiffrement des secrets transmis par Jeedom.
 
-Le mot de passe Pronote est chiffré côté PHP par ``ProJote.class.php`` :
+Le mot de passe Pronote est chiffré côté PHP par ``ProJote.class.php``, puis
+passé en argument au script de validation. Il ne vit que le temps d'une requête :
+rien n'est conservé sous cette forme.
 
-    openssl_encrypt($data, 'aes-256-cbc', hex2bin(sha256(apikey)), 0, $iv)
+Deux enveloppes se rencontrent, toutes deux en ``base64(JSON(...))`` :
 
-soit AES-256-CBC avec le remplissage PKCS#7 d'OpenSSL, transporté sous la forme
-``base64(JSON({iv: base64, data: base64}))``.
+* **v2 — AES-256-GCM** (depuis la v1.7.0), champs ``v``, ``iv`` (12 octets),
+  ``data`` et ``tag``. GCM signe ce qu'il chiffre : une charge altérée est
+  refusée au lieu de se déchiffrer en octets quelconques.
+* **héritée — AES-256-CBC** avec remplissage PKCS#7, champs ``iv`` et ``data``.
+  Toujours lue, pour l'installation dont le démon tournerait encore avec les
+  fichiers de la version précédente au moment de la mise à jour. Le repli pourra
+  disparaître d'une version à l'autre.
 
 Ce module existe pour une raison précise. Le démon et le script de validation
 par identifiants portaient chacun leur propre copie du déchiffrement, et toutes
@@ -29,6 +36,8 @@ compte de démonstration, en rejouant une clé API différente.
 
 Le remplissage est désormais vérifié, et le déchiffrement vit à un seul endroit :
 une vérification de sécurité dupliquée est une vérification qui finit par diverger.
+En GCM la question ne se pose plus : le mode authentifie lui-même la charge, et
+un mot de passe vide ne peut plus sortir d'une clé qui ne correspond pas.
 """
 
 import base64
@@ -105,15 +114,33 @@ def dechiffrer(data, passphrase):
     except Exception as e:
         raise DechiffrementImpossible("charge illisible : %s" % e) from e
 
+    # Enveloppe authentifiée : le mode vérifie lui-même l'intégrité.
+    if "tag" in enveloppe:
+        try:
+            tag = base64.b64decode(enveloppe["tag"])
+            clair = AES.new(cle, AES.MODE_GCM, nonce=iv).decrypt_and_verify(chiffre, tag)
+        except Exception as e:
+            raise DechiffrementImpossible(
+                "charge refusée par AES-GCM (clé incorrecte ou données altérées) : %s" % e
+            ) from e
+        return _en_texte(clair)
+
+    # Enveloppe héritée, non authentifiée : le remplissage tient lieu de contrôle.
     try:
         clair = AES.new(cle, AES.MODE_CBC, iv).decrypt(chiffre)
     except Exception as e:
         raise DechiffrementImpossible("déchiffrement AES refusé : %s" % e) from e
+    return _en_texte(retirer_padding(clair))
 
-    # Le rstrip() est conservé du code d'origine : il ne coûte rien sur un
-    # secret correct, et le retirer changerait le mot de passe d'un compte dont
-    # le secret se terminerait par une espace. Ce n'est pas le sujet ici.
+
+def _en_texte(octets):
+    """Rend le secret en texte.
+
+    Le rstrip() est conservé du code d'origine : il ne coûte rien sur un secret
+    correct, et le retirer changerait le mot de passe d'un compte dont le secret
+    se terminerait par une espace. Ce n'est pas le sujet ici.
+    """
     try:
-        return retirer_padding(clair).decode("ascii").rstrip()
+        return octets.decode("ascii").rstrip()
     except UnicodeDecodeError as e:
         raise DechiffrementImpossible("secret non ASCII après déchiffrement") from e

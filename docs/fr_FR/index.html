@@ -780,6 +780,21 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
     <!-- ── Historique ─────────────────────── -->
     <h1 id="version">Historique des versions</h1>
 
+    <h2>1.7.0 — Septembre 2026</h2>
+    <table>
+        <thead><tr><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><span class="badge badge-sec">Sécurité</span></td>
+                <td><strong>Le mot de passe est désormais chiffré de façon authentifiée</strong> — lorsque vous validez vos identifiants, le mot de passe passe de l'interface au programme de connexion sous forme chiffrée. Le chiffrement employé jusqu'ici, AES-256-CBC, protégeait le contenu mais ne le signait pas : une charge modifiée en route se déchiffrait en octets quelconques, que rien ne distinguait d'un mot de passe. AES-256-GCM la refuse. Rien à faire de votre côté, et rien à migrer : ce chiffré ne vit que le temps d'une validation, il n'est jamais conservé.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-perf">Maintenance</span></td>
+                <td><strong>Trois fonctions mortes retirées du démon</strong> — la préparation du point précédent a révélé que la connexion par identifiants en cours de cycle n'était plus jamais empruntée : le démon se connecte par jeton, ou par identifiants pour les seuls comptes de démonstration, et répond « aucun jeton disponible » dans tout autre cas. Les deux fonctions concernées, et la fonction de déchiffrement qu'elles seules appelaient, ont été supprimées. Le déchiffrement ne vit plus qu'à un seul endroit — c'est la coexistence de deux copies qui avait laissé passer, en 1.4.7, un contrôle manquant dans les deux.</td>
+            </tr>
+        </tbody>
+    </table>
+
     <h2>1.6.0 — Septembre 2026</h2>
     <table>
         <thead><tr><th>Type</th><th>Description</th></tr></thead>
@@ -1475,7 +1490,11 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
         <tbody>
             <tr>
                 <td>Mots de passe</td>
-                <td>Chiffrés par Jeedom (AES-256) en base de données. Jamais écrits dans les logs.</td>
+                <td>Jamais conservés par le plugin : à la validation, ils sont échangés contre deux
+                jetons de connexion, et seuls ces jetons sont enregistrés — chiffrés par Jeedom en base
+                de données. Le temps de la validation, le mot de passe transite chiffré en
+                <strong>AES-256-GCM</strong>, un chiffrement authentifié : une charge altérée est
+                refusée au lieu d'être déchiffrée en n'importe quoi. Jamais écrit dans les journaux.</td>
             </tr>
             <tr>
                 <td>Tokens</td>

@@ -128,7 +128,6 @@ try:
         punitions,
         retards,
     )
-    import secret_jeedom
 
     # ── Modules extraits du démon en v1.6.0 ──────────────────────────────────
     #
@@ -172,7 +171,6 @@ try:
         _refus_de_presence,
     )
     from pronote_errors import (
-        DechiffrementImpossible,
         SuspensionIP,
         ip_suspension_reason,
         is_authentification_refusee,
@@ -594,37 +592,6 @@ def clear_ip_suspension():
         "Connexion à Pronote rétablie : fin de la pause pour suspension d'IP."
     )
     return True
-
-
-def my_decrypt(data, passphrase=None):
-    """
-    Déchiffre des données AES-256-CBC chiffrées par my_encrypt() côté PHP.
-
-    Si aucune passphrase n'est fournie, la clé est dérivée de l'API key Jeedom
-    via SHA-256 (produit 64 hex chars = 32 octets), assurant la cohérence PHP↔Python.
-    Format attendu : base64(JSON({iv: base64, data: base64}))
-
-    Audit sécurité (P2c, juin 2026) — dérivation de clé jugée correcte :
-    la clé dérive de l'API key Jeedom, secret ALÉATOIRE à forte entropie généré
-    par le core (pas un ID, une constante ou un nom prévisible). SHA-256 comme
-    KDF est approprié pour une entrée à forte entropie ; PBKDF2 n'apporterait
-    un gain que pour étirer un secret faible (mot de passe humain), ce qui n'est
-    pas le cas ici. Limite connue (acceptée, cf. SECURITY-AUDIT.md) : CBC sans
-    authentification (pas de HMAC/GCM) — le déchiffrement est local, sans oracle
-    exposé à un attaquant réseau.
-
-    Raises:
-        DechiffrementImpossible: le secret est illisible (clé API changée depuis
-            l'enregistrement, donnée tronquée). L'appelant abandonne cet
-            équipement ; les autres continuent d'être collectés.
-    """
-    if passphrase is None:
-        passphrase = secret_jeedom.cle_depuis_apikey(_apikey)
-    try:
-        return secret_jeedom.dechiffrer(data, passphrase)
-    except DechiffrementImpossible as e:
-        logging.error("Déchiffrement impossible : %s", e)
-        raise
 
 
 def verifdossier(chemin_dossier):
@@ -1297,97 +1264,6 @@ def RenewToken(client):
         return data["Token"]
     except Exception as e:
         logging.error("Un erreur est retourné sur le traitement des tokens: %s", e)
-
-
-def Connectparent(pronote_url, login, password, ent, enfant):
-    # Je valide que j'ai les bonnes informations pour me connecter en tant que Parent
-    try:
-        if login == "":
-            logging.error("Pas de login reçu sur le daemon")
-            return None, []
-        if pronote_url == "":
-            logging.error("Pas d'URL reçue sur le daemon")
-            return None, []
-        if password != "":
-            try:
-                password = my_decrypt(password)
-            except DechiffrementImpossible as e:
-                logging.error(
-                    "Mot de passe illisible pour ce compte parent (%s). Le secret "
-                    "stocké a été chiffré avec une autre clé API : ré-enregistrez "
-                    "l'équipement pour le rechiffrer.",
-                    e,
-                )
-                return None, []
-        else:
-            logging.error("Pas de password reçu sur le daemon")
-            return None, []
-        # Maintenant j'essaye de me connecter
-        client = pronotepy.ParentClient(pronote_url, login, password, ent)
-        logging.info("Je suis connecté en tant que parent")
-
-        # je récupére la liste des enfants
-        listenfant = []
-        # je retourne la liste d'enfant du compte parent
-        for child in client.children:
-            logging.debug("Listes des enfants trouvé du compte Parent : %s", child.name)
-            listenfant.append(child.name)
-        # Si pas d'enfant  par défault je prend le premier enfant
-        logging.debug("Je me connecte à l''enfant %s", enfant)
-        if enfant == "":
-            client.set_child(listenfant[0])
-            logging.info("Je suis connecté à l'enfant par défault %s", listenfant[0])
-        else:
-            # Pour mettre à jour la liste d'enfant, je vérifie toujorus la liste
-            client.set_child(enfant)
-            logging.info("Je suis connecté à l'enfant %s", enfant)
-        return client, listenfant
-    except Exception as e:
-        line_number = e.__traceback__.tb_lineno if e.__traceback__ else "unknown"
-        logging.error("Connection parent échouée : ligne %s - %s", line_number, e)
-        return None, []
-
-
-def Connect(pronote_url, login, password, ent):
-    if login == "":
-        logging.error("Pas de login reçu sur le daemon")
-        return None
-
-    if pronote_url != "":
-        if ent == "":
-            if pronote_url.endswith(
-                ".index-education.net/pronote/eleve.html?login=true"
-            ):
-                pronote_url = pronote_url[: -len("?login=true")]
-                logging.info("URL modifiée :", pronote_url)
-        elif pronote_url.endswith(".index-education.net/pronote/eleve.html"):
-            pronote_url += "?login=true"
-            logging.info("URL modifiée : %s", pronote_url)
-        logging.debug("L'url pour se connecter est : %s", pronote_url)
-    else:
-        logging.error("Pas d'URL reçue sur le daemon")
-        return None
-    if password != "":
-        try:
-            password = my_decrypt(password)
-        except DechiffrementImpossible as e:
-            logging.error(
-                "Mot de passe illisible pour ce compte élève (%s). Le secret stocké "
-                "a été chiffré avec une autre clé API : ré-enregistrez l'équipement "
-                "pour le rechiffrer.",
-                e,
-            )
-            return None
-    else:
-        logging.error("Pas de password reçu sur le daemon")
-        return None
-    try:
-        client = pronotepy.Client(pronote_url, login, password, ent)
-        logging.info("Je suis connecté")
-        return client
-    except Exception as e:
-        logging.error("Connection échouée : %s", e)
-        return None
 
 
 def check_and_update_failed_attempts(eqLogicId, increment=False):

@@ -49,7 +49,31 @@ logging.basicConfig(level=logging.DEBUG, ...)
 logging.basicConfig(level=logging.WARNING, ...)
 ```
 
-#### M3 — AES-256-CBC sans authentification (chiffrement du mot de passe Pronote) — **ACCEPTÉ / DOCUMENTÉ**
+#### M3 — AES-256-CBC sans authentification (chiffrement du mot de passe Pronote) — **CORRIGÉ (v1.7.0)**
+
+> **Rectification de l'audit.** La recommandation ci-dessous prévoyait un « re-chiffrement
+> transparent au premier accès ». La relecture faite pour l'appliquer a montré que la prémisse
+> était fausse : **aucun secret n'est conservé sous ce chiffrement.** `my_encrypt()` n'est appelé
+> qu'à un seul endroit — `ProJote.ajax.php`, pour passer le mot de passe au script de validation
+> en argument de ligne de commande — et le chiffré ne vit que le temps d'une requête. Le secret
+> gardé en base (`Token_password`) est chiffré par le cœur de Jeedom via `$_encryptConfigKey`,
+> pas par ce code. Il n'y avait donc rien à migrer, et le passage à GCM s'est fait sans reprise.
+>
+> La même relecture a montré que `ProJoted.my_decrypt()` — la fonction visée par le finding L4 —
+> n'était atteignable que depuis `Connect()` et `Connectparent()`, **que rien n'appelait**. Le
+> correctif L4 portait donc sur du code mort côté démon ; il reste entier pour `LoginConnect`, où
+> le défaut était bien atteint à chaque validation par identifiants. Les trois fonctions ont été
+> supprimées en v1.7.0, et le déchiffrement ne vit plus qu'à un seul endroit.
+
+**Traitement retenu :** AES-256-GCM (IV de 12 octets, tag authentifié) pour le transport
+PHP → Python. Une charge altérée est refusée des deux côtés, là où CBC la déchiffrait en octets
+quelconques que rien ne distinguait d'un mot de passe. L'ancienne enveloppe reste lue au
+déchiffrement, le temps qu'une mise à jour en cours ne laisse pas un démon d'avant face à un
+chiffré d'après. Couvert par `tests/test_durcissement_secrets.py`, et éprouvé de bout en bout
+sur le compte de démonstration (chiffrement PHP réel → validation Python réelle).
+
+<details><summary>Constat d'origine (juin 2026)</summary>
+
 - **CWE-353** (Missing Support for Integrity Check) · OWASP A02:2021
 - **Fichiers :** `ProJote.class.php` (`my_encrypt`/`my_decrypt`), `ProJoted.py`, `LoginConnect.py`
 - Le mot de passe Pronote est chiffré en AES-256-CBC **sans MAC/AEAD** : un ciphertext altéré
@@ -61,6 +85,8 @@ logging.basicConfig(level=logging.WARNING, ...)
 - **Recommandation (prochaine version majeure) :** migrer vers AES-256-GCM (IV 12 o, tag
   authentifié) avec re-chiffrement transparent au premier accès (déchiffrer ancien format →
   rechiffrer nouveau).
+
+</details>
 
 ### LOW
 
@@ -116,10 +142,21 @@ logging.basicConfig(level=logging.WARNING, ...)
 |---|---|---|---|---|
 | CRITICAL | 0 | — | — | 0 |
 | HIGH | 0 | — | — | 0 |
-| MEDIUM | 3 | 2 (M1, M2) | 1 (M3) | 0 |
+| MEDIUM | 3 | 3 (M1, M2, M3) | 0 | 0 |
 | LOW | 4 | 4 (L1–L4, v1.4.7) | 0 | 0 |
 | INFO | 4 | — | — | — |
 
-**Plan recommandé :** L1–L4 traités en v1.4.7, couverts par `tests/test_durcissement_secrets.py`.
-Reste la migration AES-256-CBC → AES-256-GCM (M3), planifiée pour la v2.0.0 avec
-re-chiffrement transparent des secrets au premier accès.
+**État :** tous les findings sont traités. L1–L4 en v1.4.7, M3 en v1.7.0, l'ensemble couvert par
+`tests/test_durcissement_secrets.py`.
+
+**Deux enseignements de cette campagne**, qui valent plus que les correctifs eux-mêmes :
+
+1. **Un finding peut viser du code mort.** L4 décrivait un `exit(1)` réel, dans une fonction que
+   rien n'appelait. L'audit avait lu le code, pas les chemins d'exécution. Vérifier l'accessibilité
+   avant d'estimer une sévérité.
+2. **Le défaut le plus grave n'était dans aucun finding.** Le remplissage PKCS#7 n'était pas
+   vérifié au déchiffrement : avec une mauvaise clé, l'opération rendait une chaîne vide quinze
+   fois sur seize, en silence. Le plugin envoyait alors un mot de passe vide à Pronote et
+   annonçait « identifiants incorrects ». Il a été trouvé en **éprouvant** les correctifs sur un
+   compte réel, pas en relisant le code — les deux findings qui l'encadraient ne se
+   déclenchaient d'ailleurs jamais à cause de lui.

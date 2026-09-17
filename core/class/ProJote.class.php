@@ -938,45 +938,80 @@ class ProJote extends eqLogic
     return hash('sha256', jeedom::getApiKey(__CLASS__));
   }
 
+  /** Version d'enveloppe : AES-256-GCM, authentifié. */
+  const CHIFFREMENT_VERSION = 2;
+
   /**
-   * Chiffre une chaîne avec AES-256-CBC.
-   * Un IV aléatoire est généré à chaque appel pour que le même texte
-   * donne des résultats différents à chaque chiffrement.
+   * Chiffre une chaîne avec AES-256-GCM.
+   *
+   * Sert à un seul usage, et il vaut d'être dit : passer le mot de passe Pronote
+   * de PHP au script Python de validation, en argument de ligne de commande.
+   * Le chiffré ne vit donc que le temps d'une requête ; rien n'est conservé sous
+   * cette forme.
+   *
+   * GCM remplace AES-256-CBC (SECURITY-AUDIT.md, finding M3). CBC ne signe pas
+   * ce qu'il chiffre : un chiffré altéré se déchiffrait en octets quelconques,
+   * que rien ne distinguait d'un mot de passe. GCM refuse la charge modifiée.
+   * L'IV fait 12 octets, la taille pour laquelle GCM est défini.
+   *
+   * La dérivation de clé est inchangée et reste SHA-256 de la clé API Jeedom,
+   * un secret aléatoire à forte entropie généré par le cœur — pas un mot de
+   * passe humain qu'il faudrait étirer (audit P2c).
+   *
    * @param string      $data       Texte clair à chiffrer
    * @param string|null $passphrase Clé hex 64 chars. Si null, utilise la clé API Jeedom.
-   * @return string                 JSON {iv, data} encodé en base64
+   * @return string                 JSON {v, iv, data, tag} encodé en base64
    */
   function my_encrypt($data, $passphrase = null)
   {
     if ($passphrase === null) {
       $passphrase = self::_getEncryptionKey();
     }
-    $secret_key    = hex2bin($passphrase);
-    $iv            = openssl_random_pseudo_bytes(openssl_cipher_iv_length('aes-256-cbc'));
-    $encrypted_64  = openssl_encrypt($data, 'aes-256-cbc', $secret_key, 0, $iv);
-    $iv_64         = base64_encode($iv);
-    $json          = new stdClass();
-    $json->iv      = $iv_64;
-    $json->data    = $encrypted_64;
+    $secret_key = hex2bin($passphrase);
+    $iv         = openssl_random_pseudo_bytes(12);
+    $tag        = '';
+    $chiffre    = openssl_encrypt($data, 'aes-256-gcm', $secret_key, OPENSSL_RAW_DATA, $iv, $tag);
+    if ($chiffre === false) {
+      throw new Exception(__('Chiffrement du mot de passe impossible.', __FILE__));
+    }
+    $json       = new stdClass();
+    $json->v    = self::CHIFFREMENT_VERSION;
+    $json->iv   = base64_encode($iv);
+    $json->data = base64_encode($chiffre);
+    $json->tag  = base64_encode($tag);
     return base64_encode(json_encode($json));
   }
 
   /**
    * Déchiffre une chaîne produite par my_encrypt().
-   * @param string      $data       Données chiffrées (base64 du JSON {iv, data})
+   *
+   * Accepte les deux enveloppes : la nouvelle (GCM, champ « v ») et l'ancienne
+   * (CBC, sans « v »). Le repli ne sert qu'aux installations dont le démon
+   * tournerait encore avec les fichiers de la version précédente au moment de
+   * la mise à jour ; il pourra être retiré d'une version à l'autre.
+   *
+   * @param string      $data       Données chiffrées (base64 d'un JSON)
    * @param string|null $passphrase Clé hex 64 chars. Si null, utilise la clé API Jeedom.
-   * @return string                 Texte clair original
+   * @return string|false           Texte clair, ou false si la charge est refusée
    */
   function my_decrypt($data, $passphrase = null)
   {
     if ($passphrase === null) {
       $passphrase = self::_getEncryptionKey();
     }
-    $secret_key     = hex2bin($passphrase);
-    $json           = json_decode(base64_decode($data));
-    $iv             = base64_decode($json->{'iv'});
-    $data_encrypted = base64_decode($json->{'data'});
-    return openssl_decrypt($data_encrypted, 'aes-256-cbc', $secret_key, OPENSSL_RAW_DATA, $iv);
+    $secret_key = hex2bin($passphrase);
+    $json       = json_decode(base64_decode($data));
+    if (!is_object($json) || !isset($json->iv) || !isset($json->data)) {
+      return false;
+    }
+    $iv      = base64_decode($json->iv);
+    $chiffre = base64_decode($json->data);
+
+    if (isset($json->tag)) {
+      return openssl_decrypt($chiffre, 'aes-256-gcm', $secret_key, OPENSSL_RAW_DATA, $iv, base64_decode($json->tag));
+    }
+    // Enveloppe héritée, non authentifiée.
+    return openssl_decrypt($chiffre, 'aes-256-cbc', $secret_key, OPENSSL_RAW_DATA, $iv);
   }
 
   /**
