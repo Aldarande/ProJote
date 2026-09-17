@@ -1475,7 +1475,6 @@ def evaluations(client):
             line_number,
             e,
         )
-        time.sleep(5)
 
 
 def compute_moyenne_generale(note_list):
@@ -2395,7 +2394,6 @@ def devoirs(client, fenetre_jours=DEVOIRS_FENETRE_DEFAUT):
                 data[key] = []
             # Fusionne agrégats DS vides pour cohérence des cmd Jeedom
             data.update(detect_next_evaluations([]))
-            time.sleep(5)
             return data
 
         today = datetime.date.today()
@@ -2468,7 +2466,6 @@ def devoirs(client, fenetre_jours=DEVOIRS_FENETRE_DEFAUT):
             e,
         )
         logging.debug("Devoirs — trace complète : %s", traceback.format_exc())
-        time.sleep(5)
         return data
 
 
@@ -2500,8 +2497,6 @@ def notifications(client):
                 data["dernier_Notification"] = (
                     [data["Notification"][0]] if data["Notification"] else []
                 )
-            else:
-                time.sleep(5)
         return data
     except Exception as e:
         logging.error(
@@ -2627,7 +2622,6 @@ def absences(client):
             line_number,
             e,
         )
-        time.sleep(5)
         return data
 
 
@@ -2731,12 +2725,9 @@ def punitions(client):
             data["derniere_punition"] = (
                 [data["punition"][0]] if data["punition"] else []
             )
-        else:
-            time.sleep(5)
         return data
     except Exception as e:
         logging.error("Un erreur est retourné sur le traitement des Punitions: %s", e)
-        time.sleep(5)
         return data
 
 
