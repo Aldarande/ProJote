@@ -253,6 +253,7 @@
         <div class="sidebar-section">Référence</div>
         <a href="#prerequis">Prérequis</a>
         <a href="#utilisation">Commandes disponibles</a>
+        <a href="#cadence">Cadence de collecte</a>
         <a href="#widget">Widget</a>
         <a href="#ical">Export iCalendar</a>
         <a href="#scenarios">Exemples de scénarios</a>
@@ -391,8 +392,13 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
 
     <!-- ── Utilisation ────────────────────── -->
     <h1 id="utilisation">Commandes disponibles</h1>
-    <p>Une fois connecté, le démon synchronise les données Pronote <strong>toutes les heures</strong> (désactivé de 20h à 7h).
-    Vous pouvez forcer une actualisation avec la commande <em>Rafraîchir</em>.</p>
+    <p>Une fois connecté, le démon synchronise les données Pronote <strong>toutes les heures</strong>, dans la
+    plage horaire choisie en configuration du plugin (7h–20h par défaut).
+    Vous pouvez forcer une actualisation avec la commande <em>Rafraîchir</em>, à toute heure.</p>
+    <p>Tous les onglets ne sont pas relevés à chaque cycle : notifications et messagerie le sont toutes les
+    trois heures, les menus de la cantine deux fois par jour. Emploi du temps, notes, devoirs, absences,
+    retards et punitions le sont à chaque cycle. Un onglet non relevé conserve sa valeur précédente —
+    aucune commande ne se vide. Voir <a href="#cadence">Cadence de collecte</a>.</p>
 
     <table>
         <thead><tr><th>Commande</th><th>Type</th><th>Description</th></tr></thead>
@@ -496,6 +502,65 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
         </ul>
         Selon l'établissement et la matière, l'un, l'autre, ou les deux peuvent être renseignés.
         Une matière évaluée uniquement par compétences n'apparaîtra pas dans la liste des notes.
+    </div>
+
+    <!-- ── Widget ─────────────────────────── -->
+    <h1 id="cadence">Cadence de collecte <span class="badge badge-new">v1.5.0</span></h1>
+
+    <p>Le plugin interrogeait les douze onglets Pronote à chaque cycle. Mesuré sur un compte réel, un
+    cycle complet coûte <strong>113 requêtes et 5 ré-authentifications</strong>. Ce n'est pas anodin :
+    Pronote suspend l'adresse IP des installations qu'il juge trop bavardes, et la suspension double de
+    durée à chaque récidive.</p>
+
+    <p>Chaque onglet suit désormais sa propre cadence, choisie d'après ce que chacun coûte réellement
+    et d'après ce qu'il apporte à être vu tout de suite :</p>
+
+    <table>
+        <thead><tr><th>Onglet</th><th>Coût par relevé</th><th>Cadence</th><th>Pourquoi</th></tr></thead>
+        <tbody>
+            <tr><td>Emploi du temps</td><td>45 requêtes</td><td>Chaque heure</td>
+                <td>Le plus cher, et gardé au maximum : une annulation de cours vue six heures plus tard ne sert à rien.</td></tr>
+            <tr><td>Notes</td><td>24 requêtes</td><td>Chaque heure</td>
+                <td>C'est ce que la plupart des scénarios surveillent.</td></tr>
+            <tr><td>Notifications</td><td>19 requêtes, 3 ré-authentifications</td><td>Toutes les 3 h</td>
+                <td>Le poste le plus lourd en authentifications, pour un contenu qui n'est pas à la minute.</td></tr>
+            <tr><td>Messagerie</td><td>9 requêtes</td><td>Toutes les 3 h</td>
+                <td>Un message lu trois heures plus tard reste un message lu.</td></tr>
+            <tr><td>Devoirs, absences</td><td>6 requêtes chacun</td><td>Chaque heure</td>
+                <td>Cœur du suivi quotidien.</td></tr>
+            <tr><td>Menus de la cantine</td><td>2 requêtes</td><td>2 fois par jour</td>
+                <td>Publiés pour la semaine entière.</td></tr>
+            <tr><td>Périodes, retards, punitions</td><td>0 requête</td><td>Chaque heure</td>
+                <td>Ces données arrivent avec la session : les espacer n'aurait rien fait gagner.</td></tr>
+        </tbody>
+    </table>
+
+    <div class="callout callout-info">
+        <strong>Un onglet non relevé ne se vide jamais</strong>
+        Sa dernière valeur connue est renvoyée telle quelle : les commandes gardent leur contenu et le
+        widget reste complet. Il en va de même quand la collecte d'un onglet échoue — la valeur du relevé
+        précédent est conservée, et l'échec est écrit dans le journal du plugin.
+    </div>
+
+    <p>Sur un cycle courant, ces cadences font passer la collecte de <strong>107 requêtes et
+    4 ré-authentifications à 72 requêtes et aucune ré-authentification</strong>.</p>
+
+    <h2 id="onglets-suivis">Choisir les onglets suivis</h2>
+
+    <p>Tout le monde ne suit ni la messagerie, ni la cantine, ni les compétences. Dans l'onglet
+    <em>Affichage</em> de l'équipement, la ligne <strong>Onglets suivis</strong> permet de décocher
+    quatre catégories : <em>Messagerie</em>, <em>Cantine</em>, <em>Notifications</em> et
+    <em>Compétences</em>.</p>
+
+    <p>Décocher une catégorie a deux effets : ses commandes ne sont plus créées — un équipement en crée
+    une centaine, autant de lignes en base et sur le tableau de bord — et le plugin cesse d'interroger
+    Pronote pour cet onglet.</p>
+
+    <div class="callout callout-info">
+        <strong>Vos commandes existantes ne sont pas supprimées</strong>
+        Une commande déjà créée porte un historique et peut être citée dans un scénario : décocher une
+        catégorie ne la supprime pas, elle cesse simplement d'être mise à jour. Vous pouvez la retirer
+        vous-même depuis l'onglet <em>Commandes</em> de l'équipement.
     </div>
 
     <!-- ── Widget ─────────────────────────── -->
@@ -705,6 +770,29 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
 
     <!-- ── Historique ─────────────────────── -->
     <h1 id="version">Historique des versions</h1>
+
+    <h2>1.5.0 — Septembre 2026</h2>
+    <table>
+        <thead><tr><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><span class="badge badge-perf">Performance</span></td>
+                <td><strong>Un tiers de requêtes en moins vers Pronote, et plus aucune ré-authentification sur un cycle courant</strong> — les douze onglets étaient relevés à chaque cycle, sans distinction. Mesuré sur un compte réel, cela coûtait 113 requêtes et 5 ré-authentifications par heure et par enfant. Pronote suspend justement l'adresse IP des installations trop bavardes, pour une durée qui double à chaque récidive. Chaque onglet suit maintenant sa propre cadence, choisie d'après ce qu'il coûte et ce qu'il apporte à être vu tout de suite : notifications et messagerie toutes les trois heures, menus deux fois par jour, tout le reste à chaque cycle — emploi du temps compris, bien qu'il soit le plus cher, parce qu'une annulation de cours vue six heures plus tard ne sert à rien. Un cycle courant passe de 107 requêtes et 4 ré-authentifications à <strong>72 requêtes et aucune</strong>. Le détail est documenté dans <a href="#cadence">Cadence de collecte</a>.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-perf">Fiabilité</span></td>
+                <td><strong>Un onglet en panne n'emporte plus le cycle entier</strong> — les collecteurs rattrapent chacun leurs propres erreurs, mais rien ne protégeait d'une exception inattendue : elle remontait jusqu'à l'enveloppe du cycle, qui abandonnait tout. Les onglets déjà relevés étaient jetés, et Jeedom ne recevait qu'un message d'erreur : une seule anomalie sur la messagerie faisait disparaître notes et emploi du temps du widget. Chaque onglet est désormais isolé, et celui qui échoue conserve la valeur de son relevé précédent au lieu de se vider.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-new">Nouveauté</span></td>
+                <td><strong>La plage de collecte est réglable</strong> — elle était figée à 7h-20h dans le code. Elle se choisit maintenant dans la configuration du plugin, et peut enjamber minuit pour qui préfère collecter la nuit. Au passage, un réglage fantôme disparaît : le code consultait depuis l'origine une clé <code>hour_cron</code> qui n'existait dans aucun formulaire — personne ne pouvait la renseigner, et le code qui la lisait ne servait à rien.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-new">Nouveauté</span></td>
+                <td><strong>Choisir les onglets que l'on suit</strong> — un équipement crée une centaine de commandes, soit trois cents pour une fratrie de trois enfants, alors que tout le monde ne suit ni la messagerie, ni la cantine, ni les compétences. Quatre cases dans l'onglet <em>Affichage</em> permettent de couper ces catégories : leurs commandes ne sont plus créées, et surtout le plugin cesse d'interroger Pronote pour ces onglets. Les commandes déjà existantes ne sont jamais supprimées — elles portent un historique et peuvent figurer dans un scénario ; elles cessent simplement d'être alimentées.</td>
+            </tr>
+        </tbody>
+    </table>
 
     <h2>1.4.7 — Septembre 2026</h2>
     <table>
@@ -1258,12 +1346,14 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
     de l'établissement est effectuée — aucune télémétrie, aucun appel vers un serveur tiers.</p>
 
     <h2>À quelle fréquence les données sont-elles synchronisées ?</h2>
-    <p>Toutes les heures par défaut, automatiquement désactivé entre 20h et 7h via le cron Jeedom (droit à la déconnexion).
+    <p>Toutes les heures, entre 7h et 20h par défaut. Ces deux bornes se règlent dans
+    <strong>Plugins → Gestion des plugins → ProJote → Configuration</strong>, champ <em>Plage de collecte</em>.
+    La plage peut enjamber minuit si vous préférez collecter la nuit.
     Vous pouvez forcer une synchronisation manuelle avec la commande <em>Rafraîchir</em> de l'équipement,
-    ou en cliquant sur la photo/avatar dans le widget — cela fonctionne à toute heure, y compris la nuit.</p>
+    ou en cliquant sur la photo/avatar dans le widget — cela fonctionne à toute heure, y compris hors plage.</p>
     <div class="callout callout-info">
-        <strong>Fenêtre nocturne et rafraîchissement manuel</strong>
-        La plage 20h–7h désactive uniquement les synchronisations <em>automatiques</em> planifiées.
+        <strong>Plage de collecte et rafraîchissement manuel</strong>
+        La plage ne concerne que les synchronisations <em>automatiques</em> planifiées.
         Un rafraîchissement manuel (bouton <em>Rafraîchir</em> ou clic sur l'avatar du widget) est toujours
         exécuté immédiatement, quelle que soit l'heure.
     </div>

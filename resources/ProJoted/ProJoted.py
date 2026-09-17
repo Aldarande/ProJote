@@ -110,6 +110,7 @@ try:
 
     # Détection des suspensions d'IP par Pronote (module local, stdlib uniquement).
     from pronote_demo import est_compte_demo
+    import cadence
     import secret_jeedom
     from pronote_errors import (
         DechiffrementImpossible,
@@ -3627,6 +3628,146 @@ def load_persistent_token(eqLogicId):
         return None, None, None
 
 
+# Dernière valeur relevée pour chaque onglet, par équipement. Sert à deux
+# choses : renvoyer à Jeedom la valeur conservée d'un onglet sauté par cadence,
+# et celle d'un onglet dont la collecte vient d'échouer.
+#
+# En mémoire seulement, volontairement. Ce cache ne protège de rien de durable :
+# après un redémarrage du démon, le premier cycle relève tout, ce qui était déjà
+# le comportement. L'écrire sur disque ajouterait des écritures à chaque cycle,
+# un format à faire évoluer et une corruption possible, pour éviter une seule
+# collecte complète après un redémarrage.
+_cache_collecte = {}
+_cache_collecte_lock = threading.Lock()
+
+# Seuls ces deux onglets remontent leur erreur dans la charge, comme avant :
+# jeeProJote.php ne lit « error » que si connection_status vaut disconnected ou
+# error, mais élargir la règle changerait la charge sans nécessité.
+_ONGLETS_A_ERREUR_REMONTEE = ("Emploi_du_temps", "Notes")
+
+
+def _collecteurs(message):
+    """Table des onglets : clé de la charge, libellé de journal, appel.
+
+    L'ordre est celui de la collecte linéaire d'origine : les journaux d'un
+    cycle restent comparables à ceux des versions précédentes.
+    """
+    return (
+        ("Emploi_du_temps", "l'emploi du temps", Emploidutemps),
+        ("Notes", "les notes", notes),
+        ("Periodes", "les dates de période", periodes),
+        ("Menus", "les menus", menus),
+        ("Messages", "la messagerie", messages),
+        ("Notifications", "les notifications", notifications),
+        ("Absences", "les absences", absences),
+        ("Retards", "les retards", retards),
+        ("Punitions", "les punitions", punitions),
+        ("Devoirs", "les devoirs", lambda c: devoirs(c, _fenetre_devoirs(message))),
+        ("Competences", "les évaluations", evaluations),
+        ("Ical", "l'ICAL", ical),
+    )
+
+
+def collecter(client, eq_id, message, jsondata):
+    """Relève les onglets Pronote et remplit ``jsondata``.
+
+    Deux changements par rapport à la collecte linéaire d'origine :
+
+    * **Chaque onglet est isolé.** Les collecteurs rattrapent déjà leurs propres
+      erreurs, mais rien ne protégeait d'une exception inattendue : elle
+      remontait jusqu'au gestionnaire de ``process_message``, qui abandonnait le
+      cycle entier. Tout ce qui avait été relevé avant était perdu, et Jeedom ne
+      recevait qu'une erreur. Un onglet qui tombe ne coûte désormais que
+      lui-même.
+    * **Chaque onglet suit sa cadence** (cadence.py). Un onglet sauté n'est pas
+      absent de la charge : sa dernière valeur connue y est replacée. Jeedom
+      reçoit toujours une charge complète — indispensable, car jeeProJote.php
+      reconstruit le widget entièrement à partir d'elle, et une clé manquante
+      viderait la section correspondante.
+
+    ``SuspensionIP`` hérite de ``BaseException`` : elle traverse ce filet sans
+    être rattrapée, comme prévu, pour arrêter le cycle immédiatement.
+
+    Args:
+        client: client pronotepy connecté.
+        eq_id: identifiant de l'équipement Jeedom.
+        message: message reçu du socket (porte la fenêtre des devoirs).
+        jsondata: charge en cours de construction, complétée sur place.
+
+    Returns:
+        dict: statut de chaque onglet (cf. cadence.FRAIS / GARDE / REPLI / ECHEC).
+    """
+    eq = _id_equipement(eq_id)
+    maintenant = time.time()
+    with _cache_collecte_lock:
+        cache = _cache_collecte.setdefault(eq, {"valeurs": {}, "horodatages": {}})
+    statuts = {}
+    # Onglets que l'utilisateur ne suit pas (cases de la page de configuration).
+    # Leurs commandes ne sont pas créées côté Jeedom : ne rien envoyer est donc
+    # cohérent, et surtout aucune requête n'est faite vers Pronote.
+    coupes = set(message.get("OngletsDesactives") or [])
+
+    for cle, libelle, appel in _collecteurs(message):
+        if cle in coupes:
+            statuts[cle] = cadence.COUPE
+            logging.info("Je saute %s : onglet non suivi pour cet équipement.", libelle)
+            continue
+        connu = cache["valeurs"].get(cle)
+        if not cadence.doit_collecter(cle, cache["horodatages"].get(cle), maintenant):
+            jsondata[cle] = connu
+            statuts[cle] = cadence.GARDE
+            logging.info(
+                "Je conserve %s : relevé il y a moins de %d min.",
+                libelle,
+                cadence.periode(cle) // 60,
+            )
+            continue
+
+        logging.info("Je récupére %s", libelle)
+        try:
+            valeur = appel(client)
+        except Exception as e:
+            if connu is None:
+                statuts[cle] = cadence.ECHEC
+                logging.error(
+                    "Échec de la collecte de %s : %s. Aucune valeur antérieure, "
+                    "cet onglet sera absent de ce cycle.",
+                    libelle,
+                    e,
+                )
+            else:
+                jsondata[cle] = connu
+                statuts[cle] = cadence.REPLI
+                logging.error(
+                    "Échec de la collecte de %s : %s. La valeur du relevé "
+                    "précédent est conservée.",
+                    libelle,
+                    e,
+                )
+            logging.debug("Traceback complet : %s", traceback.format_exc())
+            continue
+
+        jsondata[cle] = valeur
+        statuts[cle] = cadence.FRAIS
+        cache["valeurs"][cle] = valeur
+        cache["horodatages"][cle] = maintenant
+        if (
+            cle in _ONGLETS_A_ERREUR_REMONTEE
+            and isinstance(valeur, dict)
+            and "error" in valeur
+        ):
+            jsondata["error"] = valeur["error"]
+
+    _resume = {}
+    for statut in statuts.values():
+        _resume[statut] = _resume.get(statut, 0) + 1
+    logging.info(
+        "Collecte terminée : %s.",
+        ", ".join(f"{n} {s}" for s, n in sorted(_resume.items())) or "rien",
+    )
+    return statuts
+
+
 def process_message(message):
     """
     Traite un message reçu depuis le socket Jeedom.
@@ -3969,48 +4110,10 @@ def process_message(message):
             # Je valide que le fichier équipement est à jours
             # je lance la foncton qui recherche si le nom de l'enfant à changer dans l'équipement
             Checkeleve(client, message["CmdId"])
-            # J'ajoute l'emploi du temps
-            logging.info("Je récupére l'emploi du temps")
-            edt_data = Emploidutemps(client)
-            jsondata["Emploi_du_temps"] = edt_data
-            if "error" in edt_data:
-                jsondata["error"] = edt_data["error"]
-            # J'ajoute les notes
-            logging.info("Je récupére les notes")
-            notes_data = notes(client)
-            jsondata["Notes"] = notes_data
-            if "error" in notes_data:
-                jsondata["error"] = notes_data["error"]
-            # J'ajoute les dates de la période en cours
-            logging.info("Je récupére les dates de période")
-            jsondata["Periodes"] = periodes(client)
-            # j'ajoute les menus
-            logging.info("Je récupére les menus")
-            jsondata["Menus"] = menus(client)
-            # j'ajoute la messagerie (discussions Pronote)
-            logging.info("Je récupére la messagerie")
-            jsondata["Messages"] = messages(client)
-            # J'ajoute les Notifications
-            logging.info("Je récupére les notifications")
-            jsondata["Notifications"] = notifications(client)
-            # j'ajoutes les absences
-            logging.info("Je récupére les absences")
-            jsondata["Absences"] = absences(client)
-            # J'ajoutes les retards
-            logging.info("Je récupére les retards")
-            jsondata["Retards"] = retards(client)
-            # J'ajoutes les punitions
-            logging.info("Je récupére les punitions")
-            jsondata["Punitions"] = punitions(client)
-            # J'ajoute les devoirs
-            logging.info("Je récupére les devoirs")
-            jsondata["Devoirs"] = devoirs(client, _fenetre_devoirs(message))
-            # J'ajoutes des évaluations -- à finir
-            logging.info("Je récupére les évaluations")
-            jsondata["Competences"] = evaluations(client)
-            # J'ajoutes l'ICAL
-            logging.info("Je récupére l'ICAL")
-            jsondata["Ical"] = ical(client)
+            # Collecte des douze onglets. Chacun est isolé du voisin et suit sa
+            # propre cadence — voir collecter() et cadence.py.
+            jsondata["Collecte"] = collecter(client, message["CmdId"], message, jsondata)
+            notes_data = jsondata.get("Notes") or {}
             # Détection des nouveautés depuis la sync précédente (P3, v1.1.0)
             try:
                 _seen = _load_seen_index(_data_dir, message["CmdId"])

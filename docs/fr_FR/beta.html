@@ -283,6 +283,33 @@
 
 <h1 id="beta-nouveautes">Nouveautés en cours</h1>
 
+<h2>Cadence de collecte et onglets suivis <span class="badge badge-new">1.5.0</span></h2>
+<p>Les douze onglets Pronote étaient relevés à chaque cycle, sans distinction. Mesuré sur un compte
+réel, cela coûtait <strong>113 requêtes et 5 ré-authentifications</strong> par heure et par enfant —
+et Pronote suspend l'adresse IP des installations qu'il juge trop bavardes, pour une durée qui
+double à chaque récidive.</p>
+<ul>
+    <li><strong>Chaque onglet suit sa cadence.</strong> Notifications et messagerie toutes les trois
+    heures, menus de la cantine deux fois par jour, tout le reste à chaque cycle — emploi du temps
+    compris, bien qu'il soit le plus cher (45 requêtes), parce qu'une annulation de cours vue six
+    heures plus tard ne sert à rien. Un cycle courant passe de 107 requêtes et 4 ré-authentifications
+    à <strong>72 requêtes et aucune</strong>.</li>
+    <li><strong>Un onglet en panne n'emporte plus le cycle.</strong> Une exception inattendue
+    abandonnait tout ce qui avait déjà été relevé : une anomalie sur la messagerie faisait disparaître
+    notes et emploi du temps du widget. Chaque onglet est isolé, et celui qui échoue conserve la
+    valeur de son relevé précédent.</li>
+    <li><strong>La plage de collecte est réglable</strong> en configuration du plugin (7h–20h par
+    défaut), et peut enjamber minuit.</li>
+    <li><strong>Quatre catégories peuvent être coupées</strong> — messagerie, cantine, notifications,
+    compétences. Leurs commandes ne sont plus créées, et Pronote n'est plus interrogé pour ces
+    onglets. Les commandes déjà existantes ne sont pas supprimées.</li>
+</ul>
+<div class="callout callout-info">
+    <strong>Aucune commande ne se vide</strong>
+    Un onglet sauté ou en échec renvoie sa dernière valeur connue : les commandes gardent leur
+    contenu et le widget reste complet.
+</div>
+
 <h2>Durcissement issu de l'audit de sécurité <span class="badge badge-sec">1.4.7</span></h2>
 <p>Les quatre points restés ouverts à l'audit de juin 2026 sont traités. Ils partageaient une
 même racine : un secret devenu illisible n'était traité nulle part comme tel.</p>

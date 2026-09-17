@@ -202,6 +202,50 @@ function syncAccountTypeRadios() {
   $('input[name="accountType"][value="' + valeur + '"]').prop('checked', true);
 }
 
+/**
+ * Coche les onglets suivis pour un équipement qui n'a jamais eu ce réglage.
+ *
+ * Les quatre cases « Onglets suivis » sont arrivées en 1.5.0. Un équipement
+ * créé avant n'a aucune de ces clés en configuration, et le remplissage du
+ * formulaire par le cœur de Jeedom laisse alors la case dans l'état où il la
+ * trouve — un état qui dépend de la version de Jeedom, pas de nous. Une case
+ * décochée à tort et sauvegardée couperait silencieusement une collecte que
+ * l'utilisateur n'a jamais demandé d'arrêter.
+ *
+ * On tranche donc explicitement : pas de réglage enregistré = onglet suivi,
+ * exactement ce que retourne ProJote::categorieActive() côté PHP.
+ */
+function syncOngletsSuivis() {
+  $('.pjw-onglet-case').each(function () {
+    let cle = $(this).attr('data-onglet');
+    let champ = $('.pjw-onglet-valeur[data-l2key="' + cle + '"]');
+    if (champ.length === 0) {
+      return;
+    }
+    let valeur = String(champ.val() === undefined ? '' : champ.val()).trim();
+    // Vide = réglage jamais enregistré = onglet suivi. Même règle que
+    // ProJote::categorieActive() côté PHP, qui prend 1 par défaut.
+    let suivi = (valeur === '' || valeur === '1');
+    $(this).prop('checked', suivi);
+    // On écrit la valeur déduite : la prochaine sauvegarde enregistre un état
+    // explicite plutôt qu'une chaîne vide à réinterpréter.
+    champ.val(suivi ? '1' : '0');
+  });
+}
+
+/**
+ * Reporte l'état des cases « Onglets suivis » dans leurs champs cachés.
+ *
+ * Appelé à chaque changement : le formulaire n'est lu qu'à la sauvegarde, et
+ * c'est le champ caché — pas la case — qui porte la valeur enregistrée.
+ */
+function brancherOngletsSuivis() {
+  $('.pjw-onglet-case').off('change.projote').on('change.projote', function () {
+    let cle = $(this).attr('data-onglet');
+    $('.pjw-onglet-valeur[data-l2key="' + cle + '"]').val($(this).is(':checked') ? '1' : '0');
+  });
+}
+
 function resetFields() {
   $('#token-username').text('');
   $('#token-password').text('');
@@ -320,6 +364,10 @@ $(document).ready(function () {
   syncAccountTypeRadios();
   // Trigger initial pour afficher/masquer selon la valeur restaurée
   $('input[name="accountType"]:checked').trigger('change');
+
+  // Onglets suivis : « pas de réglage » vaut « suivi » (cf. syncOngletsSuivis).
+  syncOngletsSuivis();
+  brancherOngletsSuivis();
 
   // Detection automatique parent dans l'URL lors de la saisie
   $('[data-l2key="url"]').on('input', function () {

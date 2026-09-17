@@ -531,6 +531,40 @@ sendVarToJS('eqLogicId', $eqLogic);
 								</div>
 							</div>
 
+							<!-- Onglets Pronote suivis -->
+							<div class="form-group" style="margin-bottom:4px;">
+								<label class="col-sm-6 control-label" style="font-size:12px;">{{Onglets suivis}}
+									<sup><i class="fas fa-question-circle tooltips" title="{{Decochez ce que vous ne suivez pas : les commandes correspondantes ne sont plus creees, et le plugin cesse d'interroger Pronote pour cet onglet. Les commandes deja existantes ne sont pas supprimees : elles cessent simplement d'etre mises a jour, et vous pouvez les retirer vous-meme depuis l'onglet Commandes.}}"></i></sup>
+								</label>
+								<div class="col-sm-6">
+									<!--
+										La valeur vit dans un champ caché, la case n'est que l'habillage
+										(meme motif que #accountTypeValue). Un equipement anterieur a la
+										1.5.0 n'a aucune de ces cles : le champ est alors vide, et JS lit
+										« vide = suivi ». Lier la case directement a la configuration
+										aurait fait dependre son etat du remplissage de formulaire du
+										coeur de Jeedom, qui decoche ce qu'il ne trouve pas — une collecte
+										se serait arretee a la premiere sauvegarde, sans rien demander.
+									-->
+									<input type="text" class="eqLogicAttr pjw-onglet-valeur" data-l1key="configuration" data-l2key="collecte_messagerie" style="display:none;">
+									<input type="text" class="eqLogicAttr pjw-onglet-valeur" data-l1key="configuration" data-l2key="collecte_menus" style="display:none;">
+									<input type="text" class="eqLogicAttr pjw-onglet-valeur" data-l1key="configuration" data-l2key="collecte_notifications" style="display:none;">
+									<input type="text" class="eqLogicAttr pjw-onglet-valeur" data-l1key="configuration" data-l2key="collecte_competences" style="display:none;">
+									<label class="checkbox-inline" style="font-size:12px;">
+										<input type="checkbox" class="pjw-onglet-case" data-onglet="collecte_messagerie" checked>{{Messagerie}}
+									</label>
+									<label class="checkbox-inline" style="font-size:12px;">
+										<input type="checkbox" class="pjw-onglet-case" data-onglet="collecte_menus" checked>{{Cantine}}
+									</label>
+									<label class="checkbox-inline" style="font-size:12px;">
+										<input type="checkbox" class="pjw-onglet-case" data-onglet="collecte_notifications" checked>{{Notifications}}
+									</label>
+									<label class="checkbox-inline" style="font-size:12px;">
+										<input type="checkbox" class="pjw-onglet-case" data-onglet="collecte_competences" checked>{{Competences}}
+									</label>
+								</div>
+							</div>
+
 							<div id="pjw-manual-photo-status" style="font-size:11px;margin-top:8px;padding:0 15px;clear:both;"></div>
 						</fieldset>
 					</form>

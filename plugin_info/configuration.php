@@ -45,6 +45,32 @@ $_pluginVersion = $_pluginInfo['pluginVersion'] ?? '?';
         <input class="configKey form-control" data-l1key="socketport" placeholder="55369" />
       </div>
     </div>
+    <div class="form-group">
+      <label class="col-md-4 control-label">{{Plage de collecte}}
+        <sup><i class="fas fa-question-circle tooltips" title="{{Heures entre lesquelles le plugin interroge Pronote automatiquement. En dehors, aucune collecte : la vie scolaire s'arrête le soir, et Pronote est souvent indisponible la nuit. La commande « Rafraîchir » reste utilisable à toute heure.}}"></i></sup>
+      </label>
+      <div class="col-md-2">
+        <div class="input-group">
+          <span class="input-group-addon">{{de}}</span>
+          <select class="configKey form-control" data-l1key="heure_debut">
+            <?php for ($h = 0; $h < 24; $h++) {
+              echo '<option value="' . $h . '"' . ($h === 7 ? ' data-default="1"' : '') . '>' . sprintf('%02dh', $h) . '</option>';
+            } ?>
+          </select>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <div class="input-group">
+          <span class="input-group-addon">{{à}}</span>
+          <select class="configKey form-control" data-l1key="heure_fin">
+            <?php for ($h = 0; $h < 24; $h++) {
+              echo '<option value="' . $h . '"' . ($h === 20 ? ' data-default="1"' : '') . '>' . sprintf('%02dh', $h) . '</option>';
+            } ?>
+          </select>
+        </div>
+      </div>
+    </div>
+
     <!--
     <div class="form-group">
       <label class="col-md-4 control-label">{{Global param 2}}

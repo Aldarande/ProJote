@@ -1,6 +1,6 @@
 # 📚 ProJote - Plugin JEEDOM Pronote
 
-![Version](https://img.shields.io/badge/version-1.4.7-blue)
+![Version](https://img.shields.io/badge/version-1.5.0-blue)
 ![License](https://img.shields.io/badge/license-AGPL%20v3-green)
 ![Jeedom](https://img.shields.io/badge/Jeedom-4.4+-orange)
 
@@ -57,7 +57,9 @@
 - Gestion sécurisée des tokens
 
 ✅ **Automatisation**
-- Collecte automatique toutes les heures, suspendue de 20h à 7h (droit à la déconnexion)
+- Collecte automatique toutes les heures, dans une plage horaire réglable (7h–20h par défaut)
+- Cadence adaptée à chaque onglet : notifications et messagerie toutes les 3h, menus 2 fois par jour
+- Onglets suivis au choix : messagerie, cantine, notifications, compétences peuvent être coupés
 - Commandes d'actualisation manuelles
 - Webhooks pour intégrations externes
 
@@ -117,6 +119,7 @@ sudo chown www-data:www-data -R /var/www/html/plugins/ProJote/
 | Paramètre | Description | Par défaut |
 |-----------|-------------|-----------|
 | **Port du Démon** | Port socket pour communication | 55369 |
+| **Plage de collecte** | Heures entre lesquelles Pronote est interrogé automatiquement | 7h → 20h |
 | **Niveau de log** | Niveau de verbosité (debug/info/warning) | info |
 
 ### 2. Création d'un Équipement
@@ -341,6 +344,6 @@ action volontaire, pas une sollicitation automatique.
 
 ---
 
-**Version :** 1.4.7  
+**Version :** 1.5.0  
 **Dernière mise à jour :** septembre 2026  
 **Support :** Jeedom 4.4+

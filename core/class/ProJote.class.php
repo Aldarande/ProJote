@@ -425,6 +425,57 @@ class ProJote extends eqLogic
    * La méthode parcourt tous les équipements ProJote actifs et déclenche
    * une demande de rafraîchissement des données pour chacun.
    */
+  /** Heure de début par défaut de la plage de collecte. */
+  const HEURE_DEBUT_DEFAUT = 7;
+
+  /** Heure de fin par défaut de la plage de collecte (exclue). */
+  const HEURE_FIN_DEFAUT = 20;
+
+  /**
+   * Lit une borne de la plage de collecte dans la configuration du plugin.
+   *
+   * La clé historique 'hour_cron' était lue par cronHourly() mais n'existait
+   * dans aucun formulaire : personne ne pouvait la renseigner, et le code qui
+   * la consultait ne servait à rien. Elle est remplacée par une vraie plage,
+   * réglable dans la configuration du plugin.
+   *
+   * @param string $_cle 'heure_debut' ou 'heure_fin'.
+   * @param int $_defaut valeur retenue si la configuration est vide ou aberrante.
+   * @return int une heure entre 0 et 23.
+   */
+  private static function heureCollecte($_cle, $_defaut)
+  {
+    $valeur = config::byKey($_cle, __CLASS__, '');
+    if ($valeur === '' || $valeur === null || !is_numeric($valeur)) {
+      return $_defaut;
+    }
+    $heure = (int) $valeur;
+    return ($heure >= 0 && $heure <= 23) ? $heure : $_defaut;
+  }
+
+  /**
+   * L'heure donnée tombe-t-elle dans la plage [début, fin[ ?
+   *
+   * La plage peut enjamber minuit (début 20, fin 7) : c'est un réglage
+   * légitime pour qui veut collecter la nuit. Début et fin identiques veulent
+   * dire « à toute heure » — refuser toute collecte serait un piège silencieux.
+   *
+   * @param int $_heure heure courante (0-23).
+   * @param int $_debut première heure collectée.
+   * @param int $_fin première heure NON collectée.
+   * @return bool
+   */
+  private static function dansLaPlage($_heure, $_debut, $_fin)
+  {
+    if ($_debut === $_fin) {
+      return true;
+    }
+    if ($_debut < $_fin) {
+      return $_heure >= $_debut && $_heure < $_fin;
+    }
+    return $_heure >= $_debut || $_heure < $_fin;
+  }
+
   public static function cronHourly()
   {
     // Fenêtre de pause : l'adresse IP de la box est suspendue par Pronote.
@@ -436,23 +487,18 @@ class ProJote extends eqLogic
       return;
     }
 
-    $heure = date('G'); // Heure actuelle (0-23)
+    $heure = (int) date('G'); // Heure actuelle (0-23)
 
-    // Droit à la déconnexion : aucune collecte entre 20h et 7h. La vie scolaire
-    // s'arrête le soir, et une note ou une punition récupérée à 23h ne sert qu'à
-    // déclencher une notification au mauvais moment. Accessoirement, Pronote est
-    // souvent indisponible la nuit.
+    // Droit à la déconnexion : hors de la plage choisie, aucune collecte. La vie
+    // scolaire s'arrête le soir, et une note ou une punition récupérée à 23h ne
+    // sert qu'à déclencher une notification au mauvais moment. Accessoirement,
+    // Pronote est souvent indisponible la nuit.
     // La commande « Rafraîchir » reste utilisable à toute heure : c'est une
     // action volontaire de l'utilisateur, pas une sollicitation automatique.
-    if ($heure >= 20 || $heure < 7) {
-      log::add(__CLASS__, 'debug', "Cron_hourly : Il est $heure heure, période de déconnexion (20h-7h). Aucune mise à jour lancée.");
-      return;
-    }
-
-    // L'utilisateur peut définir une heure de démarrage pour les crons dans la config du plugin.
-    $hour_cron = config::byKey('hour_cron', __CLASS__);
-    if (!empty($hour_cron) && $heure < $hour_cron) {
-      log::add(__CLASS__, 'debug', "Cron_hourly : L'heure de récupération est définie à $hour_cron" . "h, il est trop tôt.");
+    $debut = self::heureCollecte('heure_debut', self::HEURE_DEBUT_DEFAUT);
+    $fin   = self::heureCollecte('heure_fin', self::HEURE_FIN_DEFAUT);
+    if (!self::dansLaPlage($heure, $debut, $fin)) {
+      log::add(__CLASS__, 'debug', "Cron_hourly : il est {$heure}h, hors de la plage de collecte ({$debut}h-{$fin}h). Aucune mise à jour lancée.");
       return;
     }
 
@@ -544,6 +590,14 @@ class ProJote extends eqLogic
   {
     // 1. Créer les commandes manquantes à partir d'une liste modèle.
     foreach ($this->getListeDefaultCommandes() as $id => $data) {
+      // Catégorie décochée : la commande n'est pas créée. Une commande déjà
+      // existante n'est jamais supprimée ici — elle porte un historique et
+      // peut être citée dans un scénario. Elle cesse simplement d'être
+      // alimentée, et l'utilisateur la supprime lui-même s'il le souhaite.
+      $categorie = self::categorieDeLaCommande($id);
+      if ($categorie !== null && !$this->categorieActive($categorie)) {
+        continue;
+      }
       $cmd = $this->getCmd(null, $id);
       if (!is_object($cmd)) {
         list($name, $type, $subtype, $unit, $hist, $visible, $generic_type, $template_dashboard, $template_mobile) = $data;
@@ -647,6 +701,97 @@ class ProJote extends eqLogic
    *
    * @return array Tableau associatif décrivant chaque commande.
    */
+  /**
+   * Onglets Pronote que l'utilisateur peut ne pas vouloir suivre.
+   *
+   * Un équipement crée une centaine de commandes, toutes collectées à chaque
+   * cycle. Pour une fratrie de trois enfants cela fait trois cents commandes en
+   * base et autant de lignes sur le tableau de bord, alors que tout le monde ne
+   * suit ni la messagerie, ni la cantine, ni les compétences.
+   *
+   * Chaque entrée porte l'onglet correspondant côté démon : décocher une
+   * catégorie ne se contente pas de masquer des commandes, elle **supprime
+   * aussi les requêtes** vers Pronote (cf. cadence.py et ProJoted.collecter).
+   *
+   * Tout est actif par défaut : un équipement existant ne bouge pas.
+   */
+  private static function categoriesOptionnelles()
+  {
+    return array(
+      'messagerie' => array(
+        'onglet'   => 'Messages',
+        'commandes' => array('Nb_messages', 'Nb_messages_non_lus', 'dernier_message_expediteur',
+          'dernier_message_sujet', 'dernier_message_date', 'dernier_message_extrait', 'messages_html'),
+      ),
+      'menus' => array(
+        'onglet'   => 'Menus',
+        'commandes' => array('menu_midi_aujourdhui', 'menu_midi_demain', 'menu_semaine', 'Nb_menus_semaine'),
+      ),
+      'competences' => array(
+        'onglet'   => 'Competences',
+        'commandes' => array('competences'),
+      ),
+      'notifications' => array(
+        'onglet'   => 'Notifications',
+        'commandes' => array('notifications', 'derniere_notification'),
+      ),
+    );
+  }
+
+  /**
+   * La catégorie est-elle suivie pour cet équipement ?
+   *
+   * Absence de réglage = actif : les équipements créés avant cette version
+   * gardent exactement leur comportement.
+   *
+   * @param string $_cle clé de categoriesOptionnelles().
+   * @return bool
+   */
+  public function categorieActive($_cle)
+  {
+    $valeur = $this->getConfiguration('collecte_' . $_cle, '');
+    // Vide couvre deux cas qui veulent tous deux dire « suivi » : la clé n'a
+    // jamais été enregistrée (équipement antérieur à la 1.5.0), ou le
+    // formulaire a été sauvegardé avant que le champ caché ne soit renseigné.
+    // (int) '' vaut 0 : sans ce garde, une collecte s'arrêterait toute seule.
+    if ($valeur === '' || $valeur === null || is_array($valeur)) {
+      return true;
+    }
+    return (int) $valeur === 1;
+  }
+
+  /**
+   * Onglets que le démon doit sauter pour cet équipement.
+   *
+   * @return array liste de clés d'onglets (ex. ['Messages', 'Menus']).
+   */
+  public function ongletsDesactives()
+  {
+    $desactives = array();
+    foreach (self::categoriesOptionnelles() as $cle => $categorie) {
+      if (!$this->categorieActive($cle)) {
+        $desactives[] = $categorie['onglet'];
+      }
+    }
+    return $desactives;
+  }
+
+  /**
+   * Catégorie optionnelle à laquelle appartient une commande, ou null.
+   *
+   * @param string $_logicalId identifiant logique de la commande.
+   * @return string|null
+   */
+  private static function categorieDeLaCommande($_logicalId)
+  {
+    foreach (self::categoriesOptionnelles() as $cle => $categorie) {
+      if (in_array($_logicalId, $categorie['commandes'], true)) {
+        return $cle;
+      }
+    }
+    return null;
+  }
+
   private function getListeDefaultCommandes()
   {
     return array(
@@ -1102,6 +1247,8 @@ class ProJote extends eqLogic
       'TokenUuid'   => $this->getConfiguration('uuid', 'ProJote'),
       // Nombre de jours couverts par la liste des devoirs (7 par défaut).
       'DevoirsJours' => $this->getConfiguration('devoirs_jours', 7),
+      // Onglets que l'utilisateur ne suit pas : le démon ne les interroge pas.
+      'OngletsDesactives' => $this->ongletsDesactives(),
       'Log'         => log::convertLogLevel(log::getLogLevel(__CLASS__)),
     );
     // Envoi des paramètres au démon via la méthode générique.
