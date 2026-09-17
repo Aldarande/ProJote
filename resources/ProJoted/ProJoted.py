@@ -110,7 +110,9 @@ try:
 
     # Détection des suspensions d'IP par Pronote (module local, stdlib uniquement).
     from pronote_demo import est_compte_demo
+    import secret_jeedom
     from pronote_errors import (
+        DechiffrementImpossible,
         SuspensionIP,
         ip_suspension_reason,
         is_authentification_refusee,
@@ -541,21 +543,19 @@ def my_decrypt(data, passphrase=None):
     pas le cas ici. Limite connue (acceptée, cf. SECURITY-AUDIT.md) : CBC sans
     authentification (pas de HMAC/GCM) — le déchiffrement est local, sans oracle
     exposé à un attaquant réseau.
+
+    Raises:
+        DechiffrementImpossible: le secret est illisible (clé API changée depuis
+            l'enregistrement, donnée tronquée). L'appelant abandonne cet
+            équipement ; les autres continuent d'être collectés.
     """
     if passphrase is None:
-        passphrase = hashlib.sha256(_apikey.encode()).hexdigest()
+        passphrase = secret_jeedom.cle_depuis_apikey(_apikey)
     try:
-        unpad = lambda s: s[: -s[-1]]
-        key = binascii.unhexlify(passphrase)
-        encrypted = json.loads(base64.b64decode(data).decode("ascii"))
-        encrypted_data = base64.b64decode(encrypted["data"])
-        iv = base64.b64decode(encrypted["iv"])
-        cipher = AES.new(key, AES.MODE_CBC, iv)
-        decrypted = cipher.decrypt(encrypted_data)
-        return unpad(decrypted).decode("ascii").rstrip()
-    except Exception as e:
-        logging.error("Cannot decrypt datas: %s", e)
-        exit(1)
+        return secret_jeedom.dechiffrer(data, passphrase)
+    except DechiffrementImpossible as e:
+        logging.error("Déchiffrement impossible : %s", e)
+        raise
 
 
 def verifdossier(chemin_dossier):
@@ -1676,9 +1676,37 @@ def compute_deltas(seen_index, notes_list, devoirs_list, punitions_list, absence
     return deltas, new_index
 
 
+def _id_equipement(eq_id):
+    """Rend l'identifiant d'équipement assaini, prêt à entrer dans un chemin.
+
+    L'identifiant arrive du socket : il ne doit jamais servir tel quel à
+    composer un chemin de fichier (SECURITY-AUDIT.md, finding L3). Jeedom
+    n'émet que des entiers ; tout le reste est refusé plutôt que nettoyé, pour
+    ne pas transformer discrètement « ../7 » en « 7 ».
+
+    Args:
+        eq_id: identifiant reçu, de n'importe quel type.
+
+    Returns:
+        str: l'identifiant sous sa forme canonique (``"12"``).
+
+    Raises:
+        ValueError: l'identifiant n'est pas un entier.
+    """
+    try:
+        return str(int(str(eq_id).strip()))
+    except (TypeError, ValueError):
+        raise ValueError(f"Identifiant d'équipement invalide : {eq_id!r}")
+
+
+def _dossier_equipement(data_dir, eq_id):
+    """Dossier de données d'un équipement, identifiant assaini (cf. _id_equipement)."""
+    return os.path.join(str(data_dir), _id_equipement(eq_id))
+
+
 def _load_seen_index(data_dir, eq_id):
     """Charge l'index « déjà vu » d'un équipement (dict, {} si absent/illisible)."""
-    path = os.path.join(str(data_dir), str(eq_id), "seen_index.json")
+    path = os.path.join(_dossier_equipement(data_dir, eq_id), "seen_index.json")
     try:
         with open(path, "r", encoding="utf-8") as f:
             d = json.load(f)
@@ -1689,7 +1717,7 @@ def _load_seen_index(data_dir, eq_id):
 
 def _save_seen_index(data_dir, eq_id, index):
     """Persiste l'index « déjà vu » d'un équipement."""
-    folder = os.path.join(str(data_dir), str(eq_id))
+    folder = _dossier_equipement(data_dir, eq_id)
     try:
         os.makedirs(folder, exist_ok=True)
         with open(os.path.join(folder, "seen_index.json"), "w", encoding="utf-8") as f:
@@ -2851,7 +2879,7 @@ def download_photo(client, eqLogicId, tokenconnected, message):
         # n'a pas de jeton et « TokenUrl » peut manquer.
         is_parent = bool(getattr(client, "_selected_child", None))
 
-        data_dir = os.path.join(_data_dir, str(eqLogicId)) + "/"
+        data_dir = _dossier_equipement(_data_dir, eqLogicId) + "/"
         verifdossier(data_dir)
         final_path = f"{data_dir}profile_picture.jpg"
         temp_path = f"{data_dir}profile_picture_temp.jpg"
@@ -3234,7 +3262,16 @@ def Connectparent(pronote_url, login, password, ent, enfant):
             logging.error("Pas d'URL reçue sur le daemon")
             return None, []
         if password != "":
-            password = my_decrypt(password)
+            try:
+                password = my_decrypt(password)
+            except DechiffrementImpossible as e:
+                logging.error(
+                    "Mot de passe illisible pour ce compte parent (%s). Le secret "
+                    "stocké a été chiffré avec une autre clé API : ré-enregistrez "
+                    "l'équipement pour le rechiffrer.",
+                    e,
+                )
+                return None, []
         else:
             logging.error("Pas de password reçu sur le daemon")
             return None, []
@@ -3284,7 +3321,16 @@ def Connect(pronote_url, login, password, ent):
         logging.error("Pas d'URL reçue sur le daemon")
         return None
     if password != "":
-        password = my_decrypt(password)
+        try:
+            password = my_decrypt(password)
+        except DechiffrementImpossible as e:
+            logging.error(
+                "Mot de passe illisible pour ce compte élève (%s). Le secret stocké "
+                "a été chiffré avec une autre clé API : ré-enregistrez l'équipement "
+                "pour le rechiffrer.",
+                e,
+            )
+            return None
     else:
         logging.error("Pas de password reçu sur le daemon")
         return None
@@ -3372,7 +3418,9 @@ def load_persistent_token(eqLogicId):
     """
     try:
         data_dir = _data_dir
-        file_path = os.path.join(data_dir, str(eqLogicId), "enfant.ProJote.json.txt")
+        file_path = os.path.join(
+            _dossier_equipement(data_dir, eqLogicId), "enfant.ProJote.json.txt"
+        )
 
         if not os.path.exists(file_path):
             logging.info("Fichier token persistant non trouvé : %s", file_path)

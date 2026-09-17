@@ -706,6 +706,45 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
     <!-- ── Historique ─────────────────────── -->
     <h1 id="version">Historique des versions</h1>
 
+    <h2>1.4.7 — Septembre 2026</h2>
+    <table>
+        <thead><tr><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><span class="badge badge-sec">Sécurité</span></td>
+                <td><strong>Un compte illisible n'arrête plus la collecte des autres enfants</strong> — la clé qui protège le mot de passe enregistré dérive de la clé API du plugin. Si celle-ci est régénérée, l'ancien secret devient indéchiffrable. Le démon appelait alors <code>exit(1)</code> : il sert pourtant tous les équipements ProJote de l'installation, si bien qu'un seul compte dans cet état interrompait la collecte de toute la fratrie, sans rien dire. L'équipement concerné est désormais le seul abandonné, et il est nommé dans le journal ; le cycle se poursuit pour les autres.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sec">Sécurité</span></td>
+                <td><strong>« Mot de passe incorrect » annoncé à tort après un changement de clé API</strong> — dans le même cas, la validation par identifiants envoyait à Pronote le mot de passe <em>encore chiffré</em>, en guise de repli. Pronote le refusait, évidemment, et l'écran affichait un échec d'identifiants : on ressaisissait indéfiniment des identifiants pourtant corrects. Le message dit maintenant ce qui s'est passé — le secret a été chiffré avec une autre clé API — et qu'il suffit de le réenregistrer une fois.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sec">Sécurité</span></td>
+                <td><strong>Contrôle du plugin propriétaire sur les actions de l'interface</strong> — les actions de la page de configuration (changement d'enfant, lecture du widget, envoi ou suppression de photo) chargeaient l'équipement désigné sans vérifier qu'il appartenait bien à ProJote. Ces pages sont réservées aux administrateurs et aucun détournement n'a été observé, mais rien n'obligeait à laisser cette porte ouverte. Un équipement d'un autre plugin est désormais refusé, et le refus est journalisé.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sec">Sécurité</span></td>
+                <td><strong>Identifiant d'équipement assaini avant tout accès disque</strong> — l'identifiant transmis au démon composait directement le chemin du dossier de données. Il est maintenant refusé s'il n'est pas un entier, plutôt que nettoyé : une valeur inattendue échoue franchement au lieu d'être réinterprétée en silence. Les cinq emplacements concernés, jeton de secours compris, suivent la même règle.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sec">Sécurité</span></td>
+                <td><strong>Un mot de passe illisible devenait un mot de passe vide, en silence</strong> — c'est le défaut qui rendait les deux correctifs ci-dessus inopérants, et il a été découvert en les éprouvant. Le déchiffrement retirait le remplissage de fin sans le vérifier : avec une mauvaise clé, les octets obtenus sont aléatoires, et quinze fois sur seize l'opération rendait une <em>chaîne vide</em> plutôt que d'échouer. Le plugin envoyait donc à Pronote un mot de passe vide, que Pronote refusait — et l'écran annonçait des identifiants incorrects. Le remplissage est désormais vérifié. Au passage, le démon et la validation, qui portaient chacun leur copie de ce déchiffrement, partagent le même code : une vérification de sécurité dupliquée finit toujours par diverger.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>Une connexion refusée était annoncée comme réussie</strong> — quand Pronote rejette des identifiants, il ne renvoie pas d'erreur : la bibliothèque rend simplement un compte non connecté. Le script de validation n'en tenait pas compte et se terminait normalement, si bien que l'interface affichait une validation réussie ; l'échec ne se manifestait qu'ensuite, sous la forme d'un « Fichier token JSON introuvable » incompréhensible. Le refus est maintenant signalé pour ce qu'il est, avec la liste de ce qu'il faut vérifier : identifiant, mot de passe, URL de l'établissement, mode CAS/ENT.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-perf">Maintenance</span></td>
+                <td><strong>Versions de Python réellement testées</strong> — l'intégration continue éprouvait Python 3.8, que plus aucune image Jeedom ne fournit, et sautait 3.9 et 3.10. C'est précisément sur 3.9 — le Python de Debian bullseye, encore majoritaire sur Raspberry Pi — que l'installation des dépendances s'est cassée au début du mois. Les trois versions rencontrées en production sont désormais couvertes.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>Documentation alignée sur le comportement réel</strong> — le fichier <code>README</code> annonçait encore la version 0.8, un support « Jeedom 4.3+ », Python 3.7 et surtout un « intervalle de synchronisation » réglable en minutes, qui n'a jamais existé : la collecte suit le cron horaire, de 7h à 20h.</td>
+            </tr>
+        </tbody>
+    </table>
+
     <h2>1.4.6 — Septembre 2026</h2>
     <table>
         <thead><tr><th>Type</th><th>Description</th></tr></thead>
@@ -1338,6 +1377,15 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
                 <td>En mode debug, certaines métadonnées de connexion peuvent apparaître. Ne partagez jamais vos logs publiquement sans les avoir anonymisés.</td>
             </tr>
             <tr>
+                <td>Audit</td>
+                <td>Le code du plugin fait l'objet d'un audit de sécurité documenté
+                (<code>SECURITY-AUDIT.md</code>, à la racine du dépôt). Tous les points relevés
+                en juin 2026 sont corrigés depuis la version 1.4.7, à l'exception d'un seul,
+                assumé et décrit : le chiffrement des secrets utilise AES-256-CBC, sans
+                signature d'intégrité. Le chiffrement et le déchiffrement étant strictement
+                locaux, le passage à AES-256-GCM est planifié pour la version 2.0.0.</td>
+            </tr>
+            <tr>
                 <td>Permissions fichiers</td>
                 <td>Le dossier <code>data/</code> doit appartenir à <code>www-data</code> :
                 <code>sudo chown www-data:www-data -R /var/www/html/plugins/ProJote/data</code></td>
@@ -1402,6 +1450,17 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
                     Testez vos identifiants directement sur le site Pronote.<br>
                     Vérifiez le type CAS/ENT (essayez <em>Aucun</em> en cas de doute).<br>
                     Pour le QR Code : assurez-vous que le PIN saisi est bien celui utilisé à la génération.
+                </td>
+            </tr>
+            <tr>
+                <td>« Le mot de passe enregistré n'a pas pu être déchiffré »</td>
+                <td>
+                    La clé qui protège vos identifiants dérive de la clé API du plugin.
+                    Si celle-ci a été régénérée (Administration → Configuration → API,
+                    ou une restauration de sauvegarde), l'ancien secret devient illisible.<br>
+                    Ressaisissez vos identifiants une fois dans l'équipement, ou rescannez le
+                    QR Code : le secret est réenregistré avec la clé courante. Inutile de
+                    réessayer sans cela, l'échec se répétera à l'identique.
                 </td>
             </tr>
             <tr>

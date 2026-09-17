@@ -64,26 +64,33 @@ logging.basicConfig(level=logging.WARNING, ...)
 
 ### LOW
 
-#### L1 — Fallback silencieux du déchiffrement (LoginConnect)
-- `LoginConnect.my_decrypt` retourne la **donnée brute** en cas d'échec de déchiffrement
-  (« fallback compatibilité ») : un ciphertext corrompu serait envoyé tel quel comme mot de
-  passe à Pronote. Échec de connexion garanti mais comportement silencieux.
-  *Recommandation : logguer en ERROR et échouer explicitement.*
+#### L1 — Fallback silencieux du déchiffrement (LoginConnect) — **CORRIGÉ (v1.4.7)**
+- `LoginConnect.my_decrypt` retournait la **donnée brute** en cas d'échec de déchiffrement
+  (« fallback compatibilité ») : le ciphertext partait tel quel comme mot de passe vers
+  Pronote. Échec de connexion garanti, et muet — l'utilisateur ressaisissait indéfiniment
+  des identifiants pourtant corrects.
+- Lève désormais `DechiffrementImpossible` (`pronote_errors.py`), remontée jusqu'au
+  gestionnaire global qui sort sur le **code dédié 9**. `ProJote.ajax.php` le traduit en
+  « le mot de passe a été chiffré avec une autre clé API, ressaisissez-le ».
 
-#### L2 — AJAX : type d'équipement non vérifié
-- `ChangeEnfant` / `GetConfig` / `GetWidgetData` chargent `eqLogic::byId(init('eqlogic'))`
-  sans vérifier `getEqType_name() === 'ProJote'`. Mitigé : endpoints réservés admin
-  (`isConnect('admin')`). *Recommandation : ajouter le contrôle de type (défense en profondeur).*
+#### L2 — AJAX : type d'équipement non vérifié — **CORRIGÉ (v1.4.7)**
+- `ChangeEnfant` / `GetConfig` / `GetWidgetData` (et les deux actions photo) chargeaient
+  `eqLogic::byId(init('eqlogic'))` sans vérifier `getEqType_name() === 'ProJote'`.
+- Toutes passent désormais par `projoteChargerEquipement()`, qui applique `intval()`,
+  vérifie le type et refuse le reste. Les deux lectures d'UUID, qui doivent tolérer un
+  équipement pas encore enregistré, portent le contrôle en ligne.
 
-#### L3 — Démon : identifiants d'équipement non assainis dans les chemins
-- `os.path.join(_data_dir, str(eqLogicId))` — `eqLogicId` provient des messages socket.
-  Mitigé : le socket exige l'apikey (`message.get("apikey") != _apikey` → rejet) et n'écoute
-  que sur 127.0.0.1. *Recommandation : `int(eqLogicId)` avant usage dans un chemin.*
+#### L3 — Démon : identifiants d'équipement non assainis dans les chemins — **CORRIGÉ (v1.4.7)**
+- `os.path.join(_data_dir, str(eqLogicId))` — `eqLogicId` provenait des messages socket.
+- `_id_equipement()` / `_dossier_equipement()` (`ProJoted.py`) et `token_secours._chemin()`
+  **refusent** ce qui n'est pas un entier au lieu de le nettoyer : « ../7 » ne devient pas
+  discrètement « 7 ». Les cinq compositions de chemin du démon y passent.
 
-#### L4 — `my_decrypt` (démon) termine le processus sur échec
-- `exit(1)` dans `ProJoted.my_decrypt` : un seul payload indéchiffrable tue tout le démon
-  (disponibilité multi-équipements). *Recommandation : lever une exception traitée par
-  l'appelant, marquer l'équipement en erreur, continuer.*
+#### L4 — `my_decrypt` (démon) termine le processus sur échec — **CORRIGÉ (v1.4.7)**
+- `exit(1)` dans `ProJoted.my_decrypt` : un seul payload indéchiffrable tuait tout le démon,
+  donc la collecte de tous les autres enfants de l'installation.
+- Lève `DechiffrementImpossible` ; `Connect()` et `Connectparent()` la nomment et rendent
+  `None` pour cet équipement seul. Le cycle continue pour les autres.
 
 ### INFO
 
@@ -110,8 +117,9 @@ logging.basicConfig(level=logging.WARNING, ...)
 | CRITICAL | 0 | — | — | 0 |
 | HIGH | 0 | — | — | 0 |
 | MEDIUM | 3 | 2 (M1, M2) | 1 (M3) | 0 |
-| LOW | 4 | 0 | 0 | 4 (durcissements recommandés) |
+| LOW | 4 | 4 (L1–L4, v1.4.7) | 0 | 0 |
 | INFO | 4 | — | — | — |
 
-**Plan recommandé :** traiter L1–L4 dans une prochaine version corrective ; planifier la
-migration AES-GCM (M3) pour une version majeure avec migration transparente des secrets.
+**Plan recommandé :** L1–L4 traités en v1.4.7, couverts par `tests/test_durcissement_secrets.py`.
+Reste la migration AES-256-CBC → AES-256-GCM (M3), planifiée pour la v2.0.0 avec
+re-chiffrement transparent des secrets au premier accès.

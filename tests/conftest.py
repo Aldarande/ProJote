@@ -57,16 +57,22 @@ def _install_stubs():
         data_classes.Grade = Grade
         data_classes.Util = Util
 
-    # Crypto.Cipher.AES (pycryptodome) : utilisé pour le déchiffrement.
+    # Crypto.Cipher.AES (pycryptodome). On privilégie le vrai module quand il est
+    # installé (requirements-dev.txt) : le déchiffrement des secrets Jeedom est
+    # une mécanique de sécurité, l'éprouver contre un faux AES ne prouve rien.
+    # Le stub reste le repli, pour que le reste de la suite tourne sans lui.
     if "Crypto" not in sys.modules:
-        crypto = _register("Crypto")
-        cipher = _register("Crypto.Cipher")
-        crypto.Cipher = cipher
+        try:
+            import Crypto.Cipher.AES  # noqa: F401 - enregistre le vrai module
+        except ImportError:
+            crypto = _register("Crypto")
+            cipher = _register("Crypto.Cipher")
+            crypto.Cipher = cipher
 
-        class AES:  # noqa: D401 - stub
-            MODE_CBC = 2
+            class AES:  # noqa: D401 - stub
+                MODE_CBC = 2
 
-        cipher.AES = AES
+            cipher.AES = AES
 
     # LoginConnect : module local du plugin (connexion Pronote).
     if "LoginConnect" not in sys.modules:

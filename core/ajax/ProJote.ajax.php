@@ -28,6 +28,39 @@
  * - init() : pour récupérer les paramètres envoyés par la requête AJAX.
  */
 
+/**
+ * Charge un équipement ProJote depuis un identifiant reçu du navigateur.
+ *
+ * Les actions chargeaient l'équipement par eqLogic::byId() sans vérifier son
+ * type : l'identifiant d'un équipement d'un autre plugin passait, et l'action
+ * s'appliquait à lui — jusqu'à appeler dessus des méthodes propres à ProJote
+ * (SECURITY-AUDIT.md, finding L2). Le risque restait faible, ces routes étant
+ * réservées aux administrateurs ; rien n'oblige pour autant à laisser la porte
+ * ouverte. L'identifiant est ramené à un entier au passage : c'est la seule
+ * forme que Jeedom émet.
+ *
+ * ajax::error() termine le script (die), le return ne sert qu'à la lisibilité.
+ *
+ * @param mixed $_id identifiant brut tel que reçu par init().
+ * @return ProJote l'équipement ProJote correspondant.
+ */
+function projoteChargerEquipement($_id)
+{
+  $id = intval($_id);
+  $eqLogic = ($id > 0) ? eqLogic::byId($id) : null;
+  if (!is_object($eqLogic)) {
+    ajax::error("Équipement non trouvé pour l'ID : " . $id);
+    return null;
+  }
+  if ($eqLogic->getEqType_name() !== 'ProJote') {
+    log::add('ProJote', 'warning', 'Ajax:: équipement ' . $id . ' refusé : type « '
+      . $eqLogic->getEqType_name() . ' », attendu « ProJote ».');
+    ajax::error("L'équipement " . $id . " n'appartient pas au plugin ProJote.");
+    return null;
+  }
+  return $eqLogic;
+}
+
 //
 // ═════════════════════════════════════════════════════════════════════════════
 // INITIALISATION ET SÉCURITÉ
@@ -127,7 +160,9 @@ try {
 
     // Récupération de l'UUID pour l'identification auprès de Pronote (nécessaire pour certains ENT)
     $eqLogicForUuid = eqLogic::byId($eqLogicId);
-    $uuid = (is_object($eqLogicForUuid)) ? $eqLogicForUuid->getConfiguration('uuid', uniqid('projote-', true)) : uniqid('projote-', true);
+    $uuid = (is_object($eqLogicForUuid) && $eqLogicForUuid->getEqType_name() === 'ProJote')
+      ? $eqLogicForUuid->getConfiguration('uuid', uniqid('projote-', true))
+      : uniqid('projote-', true);
 
     // Chiffrement du mot de passe pour le transport sécurisé vers Python
     $proJote = new ProJote();
@@ -172,7 +207,7 @@ try {
     if ($return_var === 0) {
       // Le script a réussi. Il a normalement créé un fichier contenant les infos du compte.
       // On charge l'équipement pour pouvoir lire ce fichier.
-      $eqLogic = eqLogic::byId($eqLogicId);
+      $eqLogic = projoteChargerEquipement($eqLogicId);
 
       // Cette fonction va lire le fichier "enfant.ProJote.json.txt", le décoder,
       // et retourner les informations (nom de l'élève, classe, liste des enfants, etc.).
@@ -201,7 +236,24 @@ try {
       ajax::error('Vos identifiants sont corrects, mais le serveur Pronote n\'a renvoyé aucun jeton d\'application mobile. '
         . 'ProJote ne conserve jamais votre mot de passe : il a besoin de ce jeton pour se reconnecter tout seul. '
         . 'Inutile de ressaisir vos identifiants. Réessayez plus tard, et si cela persiste, '
-        . 'vérifiez auprès de l\'établissement que l\'application mobile Pronote est autorisée pour ce compte.');
+        . "vérifiez auprès de l'établissement que l'application mobile Pronote est autorisée pour ce compte.");
+    } elseif ($return_var === 9) {
+      // Code 9 = le mot de passe enregistré n'a pas pu être déchiffré (cf.
+      // pronote_errors.py). La clé de chiffrement dérive de la clé API du
+      // plugin : si elle a été régénérée depuis l'enregistrement, l'ancien
+      // secret devient illisible. Auparavant le chiffré brut partait tel quel
+      // vers Pronote, qui le refusait comme un mot de passe erroné — et
+      // l'utilisateur ressaisissait indéfiniment des identifiants corrects.
+      ajax::error("Le mot de passe enregistré n'a pas pu être déchiffré : il a été chiffré avec une autre clé API que celle du plugin aujourd'hui. "
+        . "Ressaisissez vos identifiants dans le formulaire ci-dessus pour le réenregistrer.");
+    } elseif ($return_var === 10) {
+      // Code 10 = Pronote a refusé les identifiants. Ce cas ne renvoyait aucun
+      // code de sortie : le script se terminait sur 0, donc « réussi » ici, et
+      // l'interface annonçait une validation réussie avant d'échouer plus loin
+      // sur un fichier de compte inexistant.
+      ajax::error("Pronote a refusé la connexion. Vérifiez l'identifiant, le mot de passe, "
+        . "l'URL de l'établissement et le mode CAS/ENT (essayez « Aucun » en cas de doute). "
+        . "Aucun compte n'a été enregistré.");
     } else {
       // Le script a échoué. On renvoie un message d'erreur au JavaScript.
       // L'utilisateur verra une notification d'erreur.
@@ -297,7 +349,9 @@ try {
     }
 
     $eqLogicForUuid = eqLogic::byId($eqLogicId);
-    $uuid = (is_object($eqLogicForUuid)) ? $eqLogicForUuid->getConfiguration('uuid', uniqid('projote-', true)) : uniqid('projote-', true);
+    $uuid = (is_object($eqLogicForUuid) && $eqLogicForUuid->getEqType_name() === 'ProJote')
+      ? $eqLogicForUuid->getConfiguration('uuid', uniqid('projote-', true))
+      : uniqid('projote-', true);
 
     // Construction de la commande shell avec les arguments spécifiques au QR Code
     $command = escapeshellarg($pythonBinary) . ' ' . escapeshellarg($qrScript);
@@ -322,7 +376,7 @@ try {
 
     // Analyse du résultat (idem que pour la validation classique)
     if ($return_var === 0) {
-      $eqLogic = eqLogic::byId($eqLogicId);
+      $eqLogic = projoteChargerEquipement($eqLogicId);
       log::add('ProJote', 'debug', 'Ajax:: eqLogicId = ' . $eqLogicId);
 
       // Lecture des informations du compte après connexion réussie
@@ -376,11 +430,7 @@ try {
     $eqLogicId = init('eqlogic');
 
     // On charge l'objet équipement correspondant
-    $eqLogic = eqLogic::byId($eqLogicId);
-    if (!is_object($eqLogic)) {
-      ajax::error('Equipement non trouvé pour l\'ID: ' . $eqLogicId);
-      return;
-    }
+    $eqLogic = projoteChargerEquipement($eqLogicId);
     log::add('ProJote', 'debug', 'Ajax::Changement vers l\'enfant "' . $nomenfant . '" pour eqid : ' . $eqLogicId);
 
     // Étape 1 : Mettre à jour la configuration de l'équipement.
@@ -415,11 +465,7 @@ try {
   } elseif ($action == "GetWidgetData") {
 
     $eqLogicId = init('eqlogic');
-    $eqLogic = eqLogic::byId($eqLogicId);
-    if (!is_object($eqLogic)) {
-      ajax::error('Equipement non trouvé pour l\'ID: ' . $eqLogicId);
-      return;
-    }
+    $eqLogic = projoteChargerEquipement($eqLogicId);
 
     // Lire les données du widget depuis la configuration de l'équipement.
     // Ces données sont mises à jour par jeeProJote.php à chaque callback du démon.
@@ -429,11 +475,7 @@ try {
   } elseif ($action == "GetConfig") {
 
     $eqLogicId = init('eqlogic');
-    $eqLogic = eqLogic::byId($eqLogicId);
-    if (!is_object($eqLogic)) {
-      ajax::error('Equipement non trouvé pour l\'ID: ' . $eqLogicId);
-      return;
-    }
+    $eqLogic = projoteChargerEquipement($eqLogicId);
 
     // On construit un tableau associatif avec les clés et les valeurs de configuration
     // que le JavaScript a besoin de connaître.
@@ -457,11 +499,7 @@ try {
   } elseif ($action == 'UploadManualPhoto') {
 
     $eqLogicId = intval(init('eqlogic'));
-    $eqLogic = eqLogic::byId($eqLogicId);
-    if (!is_object($eqLogic)) {
-      ajax::error('Équipement non trouvé.');
-      return;
-    }
+    $eqLogic = projoteChargerEquipement($eqLogicId);
 
     if (!isset($_FILES['photo']) || $_FILES['photo']['error'] !== UPLOAD_ERR_OK) {
       ajax::error('Fichier non reçu ou erreur d\'upload (code ' . ($_FILES['photo']['error'] ?? -1) . ').');
@@ -505,11 +543,7 @@ try {
   } elseif ($action == 'DeleteManualPhoto') {
 
     $eqLogicId = intval(init('eqlogic'));
-    $eqLogic = eqLogic::byId($eqLogicId);
-    if (!is_object($eqLogic)) {
-      ajax::error('Équipement non trouvé.');
-      return;
-    }
+    $eqLogic = projoteChargerEquipement($eqLogicId);
 
     $filePath = realpath(dirname(__FILE__) . '/../../data') . DIRECTORY_SEPARATOR . $eqLogicId . DIRECTORY_SEPARATOR . 'profile_picture_manual.jpg';
     if (file_exists($filePath)) {

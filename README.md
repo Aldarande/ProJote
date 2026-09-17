@@ -1,6 +1,6 @@
 # 📚 ProJote - Plugin JEEDOM Pronote
 
-![Version](https://img.shields.io/badge/version-1.4.5-blue)
+![Version](https://img.shields.io/badge/version-1.4.7-blue)
 ![License](https://img.shields.io/badge/license-AGPL%20v3-green)
 ![Jeedom](https://img.shields.io/badge/Jeedom-4.4+-orange)
 
@@ -57,8 +57,7 @@
 - Gestion sécurisée des tokens
 
 ✅ **Automatisation**
-- Synchronisation périodique configurable
-- Cron toutes les heures, suspendu de 20h à 7h (droit à la déconnexion)
+- Collecte automatique toutes les heures, suspendue de 20h à 7h (droit à la déconnexion)
 - Commandes d'actualisation manuelles
 - Webhooks pour intégrations externes
 
@@ -72,7 +71,7 @@
 ## 📋 Prérequis
 
 - **Jeedom 4.4** minimum
-- **Python 3.7+** avec environnement virtuel
+- **Python 3.9+** avec environnement virtuel
 - **PronotePy** (installé automatiquement)
 - **PHP 7.4+**
 - Port réseau **55369** disponible (configurable)
@@ -153,9 +152,11 @@ Une fois l'équipement créé :
 
 | Paramètre | Description |
 |-----------|-------------|
-| **Horaire de récupération** | Heure de début des syncs (ex: 6h du matin) |
-| **Intervalle de synchro** | Fréquence de mise à jour (en minutes) |
-| **Actif** | Cochez pour activer la synchronisation |
+| **Actif** | Cochez pour activer la collecte automatique de cet équipement |
+| **Visible** | Affiche l'équipement et son widget sur le dashboard |
+
+La cadence n'est pas réglable équipement par équipement : la collecte suit le
+cron horaire du plugin, décrit ci-dessous.
 
 ---
 
@@ -332,11 +333,14 @@ R: Non. Tout reste en local sur votre Jeedom. Aucune télémétrie.
 **Q: Puis-je utiliser plusieurs comptes?**  
 R: Oui! Créez plusieurs équipements ProJote (parent + enfants, par exemple).
 
-**Q: Quel est l'intervalle de synchro minimum?**  
-R: 1 minute par défaut, mais recommandé 5-10 minutes pour limiter les appels Pronote.
+**Q: À quelle fréquence les données sont-elles mises à jour?**  
+R: Une fois par heure, entre 7h et 20h. En dehors de cette plage, rien n'est
+collecté : la vie scolaire s'arrête le soir, et Pronote est souvent indisponible
+la nuit. La commande **Rafraîchir** reste utilisable à toute heure — c'est une
+action volontaire, pas une sollicitation automatique.
 
 ---
 
-**Version:** 0.8  
-**Dernière mise à jour:** 2024-02  
-**Support:** Jeedom 4.3+
+**Version :** 1.4.7  
+**Dernière mise à jour :** septembre 2026  
+**Support :** Jeedom 4.4+

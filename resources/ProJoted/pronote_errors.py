@@ -44,6 +44,19 @@ IP_SUSPENSION_EXIT_CODE = 7
 # établissement réel. En déduire une règle serait prématuré.
 NO_MOBILE_TOKEN_EXIT_CODE = 8
 
+# Code de sortie renvoyé quand un secret chiffré par Jeedom n'a pas pu être
+# déchiffré (SECURITY-AUDIT.md, findings L1 et L4). Le cas se produit quand la
+# clé API du plugin a changé depuis l'enregistrement : la clé de chiffrement en
+# dérive, l'ancien secret devient illisible. Rien ne sert de retenter, il faut
+# ressaisir les identifiants pour que le secret soit rechiffré.
+DECHIFFREMENT_EXIT_CODE = 9
+
+# Code de sortie renvoyé quand Pronote a refusé les identifiants. Il manquait :
+# la validation par identifiants se terminait sur 0 — donc « réussi » pour
+# ProJote.ajax.php — alors qu'aucun compte n'avait été enregistré. L'interface
+# annonçait une validation réussie, puis « Fichier token JSON introuvable ».
+IDENTIFIANTS_REFUSES_EXIT_CODE = 10
+
 # Codes d'erreur Pronote considérés comme une limitation de débit.
 # 25 = « Exceeded max authorization requests. Please wait before retrying... »
 IP_SUSPENSION_PRONOTE_CODES = (25,)
@@ -81,6 +94,24 @@ class SuspensionIP(BaseException):
     Elle est levée par le garde posé sur ``pronotepy.ClientBase.post`` (voir
     ``ProJoted._installer_garde_suspension``) et rattrapée une seule fois, dans
     ``process_message``, qui ouvre alors la fenêtre de pause.
+    """
+
+
+class DechiffrementImpossible(Exception):
+    """Un secret chiffré par Jeedom n'a pas pu être déchiffré.
+
+    Deux comportements se rejoignent ici, tous deux relevés par l'audit de
+    sécurité (SECURITY-AUDIT.md, findings L1 et L4) :
+
+    * le démon appelait ``exit(1)`` — un seul équipement au secret illisible
+      emportait la collecte de tous les autres enfants de l'installation ;
+    * la validation par identifiants renvoyait le **chiffré brut** en guise de
+      mot de passe, qui partait tel quel vers Pronote : échec garanti, sans que
+      rien n'en dise la cause.
+
+    Les deux chemins lèvent désormais cette exception, que l'appelant nomme pour
+    ce qu'elle est : le secret a été chiffré avec une autre clé API, il faut le
+    ressaisir. Aucun autre équipement n'est affecté.
     """
 
 

@@ -105,7 +105,16 @@ def erreur_de_jeton(exception):
 
 
 def _chemin(datadir, eq_id):
-    return os.path.join(str(datadir), str(eq_id), NOM_FICHIER)
+    """Chemin du jeton de secours, identifiant d'équipement assaini.
+
+    L'identifiant vient du message socket : il ne compose un chemin qu'une fois
+    ramené à l'entier que Jeedom émet (SECURITY-AUDIT.md, finding L3).
+    """
+    try:
+        eq = str(int(str(eq_id).strip()))
+    except (TypeError, ValueError):
+        raise ValueError(f"Identifiant d'équipement invalide : {eq_id!r}")
+    return os.path.join(str(datadir), eq, NOM_FICHIER)
 
 
 def enregistrer(datadir, eq_id, credentials):

@@ -2,3 +2,7 @@
 # Les dépendances runtime du démon sont installées par resources/post-install.sh.
 pytest>=7.0
 ruff>=0.4
+# Le déchiffrement des secrets Jeedom (secret_jeedom.py) est éprouvé pour de
+# bon, pas contre un faux AES : un remplissage PKCS#7 mal vérifié rendait un mot
+# de passe vide en silence (cf. tests/test_durcissement_secrets.py).
+pycryptodome>=3.20

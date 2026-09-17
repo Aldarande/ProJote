@@ -33,8 +33,11 @@ import sys
 
 from pronote_demo import est_serveur_demo
 from pronote_errors import (
+    DECHIFFREMENT_EXIT_CODE,
+    IDENTIFIANTS_REFUSES_EXIT_CODE,
     IP_SUSPENSION_EXIT_CODE,
     NO_MOBILE_TOKEN_EXIT_CODE,
+    DechiffrementImpossible,
     NoMobileTokenError,
     is_ip_suspension_error,
     is_missing_mobile_token,
@@ -70,6 +73,7 @@ try:
     # PRONOTE >= 2026.2.5 ne chiffre plus le challenge d'authentification,
     # ce qui fait échouer TOUS les modes de connexion de pronotepy 2.15.6.
     import pronote_compat
+    import secret_jeedom
 
     pronote_compat.apply()
 
@@ -94,26 +98,24 @@ try:
 
         Audit sécurité (P2c, juin 2026) : dérivation correcte — l'API key Jeedom
         est un secret aléatoire à forte entropie (pas une valeur prévisible),
-        SHA-256 suffit comme KDF dans ce cas. Voir SECURITY-AUDIT.md pour les
-        limites connues (CBC non authentifié, fallback brut en cas d'échec).
+        SHA-256 suffit comme KDF dans ce cas. Voir SECURITY-AUDIT.md pour la
+        limite connue restante (CBC non authentifié).
+
+        Raises:
+            DechiffrementImpossible: le secret est illisible. Renvoyer le
+                chiffré brut, comme le faisait cette fonction, l'envoyait tel
+                quel à Pronote comme mot de passe : l'échec était garanti et
+                muet (SECURITY-AUDIT.md, finding L1).
         """
         if not data:
             return ""
         if passphrase is None:
-            passphrase = hashlib.sha256(apikey.encode()).hexdigest()
+            passphrase = secret_jeedom.cle_depuis_apikey(apikey)
         try:
-            unpad = lambda s: s[: -s[-1]]
-            key = binascii.unhexlify(passphrase)
-            decoded_raw = base64.b64decode(data)
-            encrypted = json.loads(decoded_raw.decode("ascii"))
-            encrypted_data = base64.b64decode(encrypted["data"])
-            iv = base64.b64decode(encrypted["iv"])
-            cipher = AES.new(key, AES.MODE_CBC, iv)
-            decrypted = cipher.decrypt(encrypted_data)
-            return unpad(decrypted).decode("ascii").rstrip()
-        except Exception as e:
-            logging.error("Cannot decrypt datas in LoginConnect: %s", e)
-            return data  # Retourne brut si échec (fallback compatibilité)
+            return secret_jeedom.dechiffrer(data, passphrase)
+        except DechiffrementImpossible as e:
+            logging.error("Déchiffrement impossible dans LoginConnect : %s", e)
+            raise
 
     # Import de l'ENT
     def class_for_name(module_name, class_name):
@@ -194,6 +196,12 @@ try:
 
             return client  # , listenfant
 
+        except DechiffrementImpossible:
+            # Le secret est illisible, pas les identifiants : laisser ce filet
+            # l'avaler donnerait « Connection parent échouée », qui envoie
+            # chercher la panne du mauvais côté. Le gestionnaire global le nomme
+            # et termine sur le code de sortie dédié.
+            raise
         except Exception as e:
             line_number = e.__traceback__.tb_lineno
             logging.error("Connection parent échouée : lig. %s -   %s", line_number, e)
@@ -236,8 +244,19 @@ try:
             if apikey:
                 password = my_decrypt(password, apikey)
             client = pronotepy.Client(pronote_url, login, password, ent)
-            logging.info("Je suis connecté")
+            if client.logged_in:
+                logging.info("Je suis connecté")
+            else:
+                # pronotepy ne lève pas sur un refus d'identifiants : il rend un
+                # client dont logged_in vaut False. Le message « Je suis
+                # connecté » était écrit sans condition, y compris sur un échec.
+                logging.error(
+                    "Pronote a refusé les identifiants du compte élève %s.", login
+                )
             return client
+        except DechiffrementImpossible:
+            # Cf. Connectparent : ce n'est pas un échec d'identifiants.
+            raise
         except Exception as e:
             logging.error("Connection échouée :  %s", e)
 
@@ -616,6 +635,18 @@ try:
                 apikey=ApiKey,
             )
 
+        # Un refus d'identifiants ne lève pas : pronotepy rend un client dont
+        # logged_in vaut False. Sans ce garde, le script se terminait sur le code
+        # 0 — « réussi » pour ProJote.ajax.php — alors que rien n'avait été
+        # enregistré : l'interface annonçait une validation réussie, puis
+        # « Fichier token JSON introuvable » au premier accès.
+        if Account is None or not Account.logged_in:
+            logging.error(
+                "Pronote a refusé la connexion : identifiants, ENT/CAS ou URL "
+                "incorrects. Aucun compte n'a été enregistré."
+            )
+            sys.exit(IDENTIFIANTS_REFUSES_EXIT_CODE)
+
         if Account.logged_in:
             logging.info("LOG : Connecté à Pronote, demande du token QR")
             logging.info("Login : %s", Account.username)
@@ -734,6 +765,16 @@ except Exception as e:
                 "Vos identifiants ne sont pas en cause, inutile de les ressaisir."
             )
             sys.exit(NO_MOBILE_TOKEN_EXIT_CODE)
+        # Secret chiffré illisible (clé API du plugin changée depuis
+        # l'enregistrement). Ressaisir les identifiants rechiffre le secret ;
+        # réessayer tel quel échouera toujours.
+        if isinstance(e, DechiffrementImpossible):
+            logging.error(
+                "Le mot de passe enregistré n'a pas pu être déchiffré : il a été "
+                "chiffré avec une autre clé API que celle du plugin aujourd'hui. "
+                "Ressaisissez vos identifiants pour le réenregistrer."
+            )
+            sys.exit(DECHIFFREMENT_EXIT_CODE)
         # Page de connexion Pronote non reconnue par pronotepy — cf. QRConnect.py :
         # les serveurs PRONOTE 2026 ne publient plus Start({...}) dans l'attribut
         # « onload » du <body>, que pronotepy <= 2.14.6 lisait directement.

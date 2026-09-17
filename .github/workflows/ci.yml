@@ -52,7 +52,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8", "3.11"]
+        # Les versions réellement rencontrées en production, et elles seules :
+        #   3.9  = Debian bullseye, encore majoritaire sur Raspberry Pi. C'est
+        #          la version qui a cassé l'installation en septembre 2026
+        #          (requests 2.33 exige 3.10), et elle n'était pas testée.
+        #   3.10 = Debian bookworm/Ubuntu 22.04, l'autre versant du marqueur
+        #          d'environnement de requirements.txt.
+        #   3.11 = Debian bookworm récent, Jeedom Smart/Luna à jour.
+        # 3.8 a été retirée : plus aucune image Jeedom supportée ne la fournit,
+        # et la tester donnait l'illusion de couvrir le bas de la fourchette.
+        python-version: ["3.9", "3.10", "3.11"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

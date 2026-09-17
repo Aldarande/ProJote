@@ -283,6 +283,44 @@
 
 <h1 id="beta-nouveautes">Nouveautés en cours</h1>
 
+<h2>Durcissement issu de l'audit de sécurité <span class="badge badge-sec">1.4.7</span></h2>
+<p>Les quatre points restés ouverts à l'audit de juin 2026 sont traités. Ils partageaient une
+même racine : un secret devenu illisible n'était traité nulle part comme tel.</p>
+<ul>
+    <li><strong>Un compte illisible n'arrête plus la collecte des autres enfants.</strong> Le démon
+    s'arrêtait net (<code>exit(1)</code>) quand un mot de passe enregistré ne pouvait plus être
+    déchiffré — ce qui arrive après régénération de la clé API de Jeedom. Comme il sert tous les
+    équipements ProJote, toute la fratrie cessait d'être collectée. Seul l'équipement concerné est
+    désormais abandonné, et il est nommé dans le journal.</li>
+    <li><strong>Le message d'erreur dit enfin la vérité.</strong> Dans le même cas, la validation
+    par identifiants envoyait à Pronote le mot de passe encore chiffré : le refus ressemblait à des
+    identifiants erronés, et on les ressaisissait en boucle. L'écran indique maintenant qu'il faut
+    réenregistrer le secret une fois, et pourquoi.</li>
+    <li><strong>Les actions de l'interface vérifient le plugin propriétaire de l'équipement.</strong>
+    Changement d'enfant, lecture du widget, envoi et suppression de photo : un équipement
+    appartenant à un autre plugin est refusé, là où il était accepté sans contrôle.</li>
+    <li><strong>L'identifiant d'équipement est validé avant tout accès disque</strong> — refusé s'il
+    n'est pas un entier, plutôt que nettoyé en silence.</li>
+</ul>
+<p>Éprouver ces correctifs sur le compte de démonstration en a révélé deux autres, traités dans la
+foulée :</p>
+<ul>
+    <li><strong>Un mot de passe illisible devenait un mot de passe vide.</strong> Le remplissage de
+    fin n'était pas vérifié au déchiffrement : avec une mauvaise clé, l'opération rendait une chaîne
+    vide quinze fois sur seize, au lieu d'échouer. Les deux correctifs ci-dessus ne se
+    déclenchaient donc jamais — Pronote refusait un mot de passe vide, et l'écran parlait
+    d'identifiants incorrects.</li>
+    <li><strong>Une connexion refusée était annoncée comme réussie.</strong> Pronote ne renvoie pas
+    d'erreur sur un refus d'identifiants : il rend un compte non connecté. Le script de validation
+    l'ignorait et se terminait normalement.</li>
+</ul>
+<div class="callout callout-info">
+    <strong>Rien à faire de votre côté</strong>
+    Aucun réglage ne change et aucune donnée n'est touchée. Si un compte affichait « mot de passe
+    incorrect » sans raison apparente depuis une régénération de clé API, il suffit de ressaisir ses
+    identifiants une fois.
+</div>
+
 <h2>Bouton de don</h2>
 <p>Un bouton <strong>Don</strong> (<i class="fas fa-mug-hot"></i>) est ajouté dans la page de gestion du plugin, à côté des boutons <em>Ajouter</em> et <em>Configuration</em>. Un clic ouvre une fenêtre modale proposant un don via <a href="https://ko-fi.com/aldarande">Ko-fi</a>.</p>
 <div class="callout callout-info">
