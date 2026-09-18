@@ -45,9 +45,9 @@ from format_pronote import (
     _truncate,
     build_cours_data,
     build_menu_data,
-    cours_affiche_from_lesson,
 )
 from periodes_scolaires import _periodes_couvrantes
+from pronote_errors import est_onglet_non_accessible
 from presence_pronote import (
     _noter_refus_presence,
     _presence_deja_refusee,
@@ -333,6 +333,16 @@ def messages(client):
         logging.info("pronotepy : client.discussions() indisponible — messagerie ignorée.")
         return empty
     except Exception as e:
+        if est_onglet_non_accessible(e):
+            # L'établissement n'a pas ouvert la messagerie à ce compte. Le garde
+            # de pronote_compat refuse la requête sans l'envoyer : réessayer ne
+            # coûte rien, mais l'annoncer en erreur à chaque cycle noyait les
+            # vraies pannes sous une alerte horaire sur un état normal.
+            logging.info(
+                "Messagerie non ouverte à ce compte par l'établissement — "
+                "onglet ignoré."
+            )
+            return empty
         logging.error("Erreur lors de l'accès aux discussions Pronote : %s", e)
         empty["error"] = f"Erreur d'accès à la messagerie : {e}"
         return empty

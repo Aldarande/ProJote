@@ -125,6 +125,28 @@ class NoMobileTokenError(Exception):
     """
 
 
+def est_onglet_non_accessible(exc):
+    """L'erreur dit-elle qu'un onglet n'est pas ouvert à ce compte ?
+
+    Le message vient du garde posé par ``pronote_compat`` : quand un onglet ne
+    figure pas dans ``authorized_onglets``, la requête est refusée **avant**
+    d'être envoyée. Ce n'est pas une panne — l'établissement n'a simplement pas
+    ouvert cette fonctionnalité à ce compte, et cela ne changera pas d'un cycle
+    à l'autre.
+
+    Le distinguer permet de le journaliser pour ce qu'il est. Écrit en ERREUR,
+    comme c'était le cas, il remplissait le journal d'une alerte horaire sur un
+    état parfaitement normal, et noyait les vraies pannes.
+
+    Args:
+        exc: l'exception rattrapée par un collecteur.
+
+    Returns:
+        bool
+    """
+    return "non accessible pour ce compte" in str(exc)
+
+
 def is_ip_suspension_error(exc):
     """Indique si l'exception correspond à une suspension d'IP par Pronote.
 

@@ -71,6 +71,31 @@ import logging
 _applied = False
 
 
+def _reparer_liste_etiquettes(function_name, reponse):
+    """Ajoute une liste d'étiquettes vide quand le serveur l'omet.
+
+    Ne touche qu'à la réponse de ``ListeMessagerie``, et seulement si la clé
+    manque : un serveur qui la renvoie garde la sienne intacte.
+
+    Args:
+        function_name: nom de la fonction PRONOTE appelée.
+        reponse: la réponse déchiffrée, telle que rendue par pronotepy.
+
+    Returns:
+        La réponse, complétée le cas échéant.
+    """
+    if function_name != "ListeMessagerie" or not isinstance(reponse, dict):
+        return reponse
+    donnees = reponse.get("dataSec", {}).get("data")
+    if isinstance(donnees, dict) and "listeEtiquettes" not in donnees:
+        donnees["listeEtiquettes"] = {"V": []}
+        logging.debug(
+            "pronote_compat :: ListeMessagerie sans « listeEtiquettes » — "
+            "liste vide ajoutée (discussions sans étiquette)."
+        )
+    return reponse
+
+
 def apply() -> None:
     """Installe les correctifs. Idempotent : les appels suivants sont ignorés.
 
@@ -190,9 +215,29 @@ def _install() -> None:
                 "Onglet %s non accessible pour ce compte (%s)"
                 % (onglet, function_name)
             )
-        return _original_post(self, function_name, onglet, data)
+        reponse = _original_post(self, function_name, onglet, data)
+        return _reparer_liste_etiquettes(function_name, reponse)
 
     clients.ClientBase.post = _post_sans_reauth_inutile
+
+    # ── Messagerie : étiquettes absentes de la réponse ────────────────────
+    # pronotepy lit les étiquettes de discussion sans précaution :
+    #
+    #     labels = {l["N"]: l["G"]
+    #               for l in discussions["dataSec"]["data"]["listeEtiquettes"]["V"]}
+    #
+    # Tous les serveurs ne renvoient pas cette clé. Relevé le 17 septembre 2026
+    # sur un lycée : la messagerie y échouait à chaque cycle sur un
+    # « KeyError: 'listeEtiquettes' », et l'onglet restait vide pour toujours.
+    # Aucune version publiée de pronotepy ne le corrige — vérifié jusqu'à la
+    # 2.15.7 du 3 septembre 2026.
+    #
+    # La réparation est faite sur la réponse plutôt que sur discussions() :
+    # c'est la forme renvoyée par le serveur qui est en cause, et une liste
+    # d'étiquettes vide donne exactement ce que pronotepy attend — des
+    # discussions sans étiquette, ce qui est le cas.
+    # Réparer la méthode aurait supposé d'en recopier le corps, et de le
+    # maintenir à chaque version.
 
     # ── Compte parent : enfant perdu après réinitialisation de session ────
     # Client.refresh() rejoue toute la connexion quand PRONOTE renvoie « La page
@@ -302,7 +347,9 @@ def _install() -> None:
             return post_data
 
         try:
-            return self.communication.post(function_name, _payload())
+            return _reparer_liste_etiquettes(
+                function_name, self.communication.post(function_name, _payload())
+            )
         except PronoteAPIError as e:
             if type(e).__name__ == "ExpiredObject":
                 raise
@@ -340,6 +387,8 @@ def _install() -> None:
                 self._refreshing = False
             # _payload() est ré-évalué ici : il lit le _selected_child
             # reconstruit par le refresh corrigé ci-dessus.
-            return self.communication.post(function_name, _payload())
+            return _reparer_liste_etiquettes(
+                function_name, self.communication.post(function_name, _payload())
+            )
 
     clients.ParentClient.post = _post_parent_protege
