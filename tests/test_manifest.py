@@ -157,7 +157,7 @@ def test_les_captures_d_apercu_sont_presentes():
     for nom in (
         "apercu-panneau-eleves.png",
         "apercu-widget-messagerie.png",
-        "apercu-widget-absences.png",
+        "apercu-widget-retards.png",
     ):
         chemin = os.path.join(dossier, nom)
         assert os.path.exists(chemin), f"capture manquante : {nom}"
