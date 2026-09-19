@@ -163,3 +163,30 @@ def test_les_captures_d_apercu_sont_presentes():
         assert os.path.exists(chemin), f"capture manquante : {nom}"
         with open(chemin, "rb") as fh:
             assert fh.read(8).startswith(b"\x89PNG"), f"{nom} n'est pas un PNG"
+
+
+def test_les_captures_du_market_suivent_la_convention():
+    """Le Market nomme les captures <id>_screenshotN.png, comme l'icône <id>_icon.png.
+
+    Convention relevée sur le Market lui-même : les images d'une fiche y sont
+    servies depuis filestore/market/plugin/images/<id>_screenshotN.png. Elle
+    prolonge celle de l'icône, que le Market lit bien dans plugin_info/.
+    Un nom qui s'en écarte ne serait simplement jamais repris — sans erreur.
+    """
+    with open(INFO_PATH, encoding="utf-8") as fh:
+        plugin_id = json.load(fh)["id"]
+
+    dossier = os.path.join(ROOT, "plugin_info")
+    captures = sorted(
+        f for f in os.listdir(dossier) if "_screenshot" in f.lower()
+    )
+    assert captures, "aucune capture pour la fiche du Market"
+
+    attendus = [f"{plugin_id}_screenshot{n}.png" for n in range(1, len(captures) + 1)]
+    assert captures == attendus, (
+        f"nommage attendu {attendus}, trouvé {captures} — "
+        "la numérotation doit être continue et commencer à 1"
+    )
+    for nom in captures:
+        with open(os.path.join(dossier, nom), "rb") as fh:
+            assert fh.read(8).startswith(b"\x89PNG"), f"{nom} n'est pas un PNG"
