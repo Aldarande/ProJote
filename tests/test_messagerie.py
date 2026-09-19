@@ -167,3 +167,21 @@ def test_une_vraie_panne_reste_une_erreur(daemon, caplog):
 
     assert "error" in data
     assert [e for e in caplog.records if e.levelno >= logging.ERROR]
+
+
+def test_le_journal_montre_les_cles_du_serveur_pas_les_notres(compat, caplog):
+    """Journaliser les clés après insertion ne renseignait sur rien.
+
+    La ligne affichait « listeEtiquettes, listeMessagerie » — celles qu'on
+    venait d'ajouter — au lieu de ce que le serveur avait réellement envoyé.
+    """
+    import logging
+
+    reponse = _reponse({"parametresChargement": 1})
+    with caplog.at_level(logging.DEBUG):
+        compat._reparer_reponse_messagerie("ListeMessagerie", reponse)
+
+    trace = " ".join(e.getMessage() for e in caplog.records)
+    assert "parametresChargement" in trace
+    # Ce qui suit « réellement reçues » ne doit contenir que les clés du serveur.
+    assert "listeEtiquettes" not in trace.split("réellement reçues")[-1]

@@ -103,16 +103,19 @@ def _reparer_reponse_messagerie(function_name, reponse):
         return reponse
     manquantes = [cle for cle in _LISTES_MESSAGERIE if cle not in donnees]
     if manquantes:
+        # Relevées AVANT l'insertion : journaliser les clés après aurait montré
+        # celles qu'on vient d'ajouter, ce qui ne renseigne sur rien. Ce sont
+        # les clés réellement envoyées par le serveur qui permettent de
+        # distinguer « messagerie vide » d'une réponse de forme inattendue,
+        # sans avoir à rejouer une session sur le compte concerné.
+        recues = sorted(donnees.keys())
         for cle in manquantes:
             donnees[cle] = {"V": []}
-        # Les clés réellement présentes sont journalisées : c'est ce qui permet
-        # de distinguer « messagerie vide » d'une réponse de forme inattendue,
-        # sans avoir à rejouer une session sur le compte concerné.
         logging.debug(
             "pronote_compat :: ListeMessagerie sans %s — liste(s) vide(s) "
-            "ajoutée(s). Clés reçues : %s",
+            "ajoutée(s). Clés réellement reçues : %s",
             ", ".join("« %s »" % c for c in manquantes),
-            sorted(donnees.keys()),
+            recues or "aucune",
         )
     return reponse
 
