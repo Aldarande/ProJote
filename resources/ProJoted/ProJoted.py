@@ -106,7 +106,6 @@ try:
     import json
     import argparse
     import base64
-    import importlib
     import requests
     import threading
 
@@ -712,20 +711,6 @@ def Checkeleve(client, CmdId):
             e,
         )
         return False
-
-
-def class_for_name(module_name, class_name):
-    try:
-        # Load the module, will raise ImportError if module cannot be loaded
-        m = importlib.import_module(module_name)
-        return getattr(m, class_name)
-    except ImportError as e:
-        logging.error("Error importing module %s: %s", module_name, e)
-    except AttributeError as e:
-        logging.error(
-            "Error getting class %s from module %s: %s", class_name, module_name, e
-        )
-    return None
 
 
 def download_image(url, filepath, session=None):

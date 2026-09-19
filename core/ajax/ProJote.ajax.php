@@ -254,6 +254,17 @@ try {
       ajax::error("Pronote a refusé la connexion. Vérifiez l'identifiant, le mot de passe, "
         . "l'URL de l'établissement et le mode CAS/ENT (essayez « Aucun » en cas de doute). "
         . "Aucun compte n'a été enregistré.");
+    } elseif ($return_var === 11) {
+      // Code 11 = l'ENT choisi n'existe plus dans la version de pronotepy
+      // installée. La liste du formulaire est figée ici, alors que pronotepy
+      // retire et renomme les siens d'une version à l'autre. Sans ce cas, le
+      // choix caduc était ignoré en silence et la connexion partait sans ENT —
+      // d'où des erreurs incompréhensibles sur les établissements protégés par
+      // EduConnect.
+      ajax::error("L'ENT sélectionné n'existe plus dans la version installée de la bibliothèque Pronote. "
+        . "Ouvrez la liste « Mode CAS » et choisissez-en un autre : la liste a été mise à jour. "
+        . "Si votre établissement n'utilise pas d'ENT, choisissez « Aucun ». "
+        . "Le journal du plugin énumère les ENT reconnus.");
     } else {
       // Le script a échoué. On renvoie un message d'erreur au JavaScript.
       // L'utilisateur verra une notification d'erreur.

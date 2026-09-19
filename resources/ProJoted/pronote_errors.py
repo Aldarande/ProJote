@@ -57,6 +57,14 @@ DECHIFFREMENT_EXIT_CODE = 9
 # annonçait une validation réussie, puis « Fichier token JSON introuvable ».
 IDENTIFIANTS_REFUSES_EXIT_CODE = 10
 
+# Code de sortie renvoyé quand l'ENT choisi n'existe pas dans pronotepy.
+# La liste des ENT est figée dans la page de configuration ; pronotepy retire ou
+# renomme les siens au fil des versions. Un choix devenu caduc était accepté en
+# silence, la connexion se faisait alors SANS ENT, et l'utilisateur recevait une
+# erreur incompréhensible venue des entrailles de la bibliothèque — « KeyError:
+# 'dataSec' » sur un établissement protégé par EduConnect.
+ENT_INCONNU_EXIT_CODE = 11
+
 # Codes d'erreur Pronote considérés comme une limitation de débit.
 # 25 = « Exceeded max authorization requests. Please wait before retrying... »
 IP_SUSPENSION_PRONOTE_CODES = (25,)

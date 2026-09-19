@@ -34,6 +34,7 @@ import sys
 from pronote_demo import est_serveur_demo
 from pronote_errors import (
     DECHIFFREMENT_EXIT_CODE,
+    ENT_INCONNU_EXIT_CODE,
     IDENTIFIANTS_REFUSES_EXIT_CODE,
     IP_SUSPENSION_EXIT_CODE,
     NO_MOBILE_TOKEN_EXIT_CODE,
@@ -604,11 +605,36 @@ try:
 
         jeedom_utils.set_log_level(_log_level)
 
-        # Je qualifie l'ENT
-        if Ent != "Inconnu" or None:
+        # Je qualifie l'ENT.
+        #
+        # La liste proposée par la page de configuration est figée dans le PHP,
+        # tandis que pronotepy retire et renomme les siens d'une version à
+        # l'autre. Un choix devenu caduc rendait None sans un mot : la connexion
+        # partait alors SANS ENT, et l'utilisateur d'un établissement protégé
+        # par EduConnect recevait un « KeyError: 'dataSec' » venu des entrailles
+        # de la bibliothèque, sans rien qui désigne son réglage.
+        ClassEnt = ""
+        if Ent and Ent != "Inconnu":
             ClassEnt = class_for_name("pronotepy.ent", Ent)
-        else:
-            ClassEnt = ""
+            if ClassEnt is None:
+                try:
+                    import pronotepy.ent as _ent_mod
+
+                    connus = sorted(
+                        n for n in dir(_ent_mod)
+                        if not n.startswith("_") and callable(getattr(_ent_mod, n))
+                    )
+                except Exception:
+                    connus = []
+                logging.error(
+                    "L'ENT « %s » n'existe pas dans la version de pronotepy "
+                    "installée : il a été retiré ou renommé. Choisissez-en un "
+                    "autre dans la configuration de l'équipement. ENT reconnus : "
+                    "%s",
+                    Ent,
+                    ", ".join(connus) or "aucun",
+                )
+                sys.exit(ENT_INCONNU_EXIT_CODE)
 
         # Identification d'un compte parent
         if not Pronote_url.endswith("?login=true"):

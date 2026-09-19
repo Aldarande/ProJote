@@ -842,6 +842,10 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
             </tr>
             <tr>
                 <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>Trois ENT de la liste ne menaient nulle part</strong> — la liste <em>Mode CAS</em> est écrite dans le plugin, tandis que les connecteurs vivent dans la bibliothèque Pronote, qui en retire et en renomme au fil de ses versions. Trois entrées n'existaient plus : <code>pronotepy.ent</code> — qui n'a jamais été un ENT mais le nom du module —, <code>ozecollege_yvelines</code> et <code>pronote_hubeduconnect</code>. Les choisir revenait à se connecter <em>sans</em> ENT, en silence : sur un établissement protégé par EduConnect, l'utilisateur recevait une erreur technique incompréhensible, sans rien qui désigne son réglage. C'est le symptôme signalé depuis Poitiers et Nantes. La liste correspond désormais exactement aux connecteurs disponibles — trois connecteurs oubliés y font d'ailleurs leur entrée (<code>bordeaux</code>, <code>cas_arsene76</code>, <code>cas_ent27</code>) — et un ENT devenu inconnu arrête la validation avec un message qui le nomme, plutôt que de laisser la connexion partir sans lui.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
                 <td><strong>La messagerie ne remontait plus rien sur certains établissements</strong> — la bibliothèque qui dialogue avec Pronote lit, dans la réponse du serveur, deux listes qu'elle suppose toujours présentes : les étiquettes de discussion, puis les discussions elles-mêmes. Certains établissements n'en renvoient aucune des deux — sur ceux-là, la collecte de la messagerie échouait à chaque cycle et l'onglet restait vide indéfiniment. Aucune version publiée de la bibliothèque ne corrige ce point ; le plugin complète donc lui-même la réponse par des listes vides, ce qui correspond exactement à la situation : aucune étiquette, aucune discussion. Un serveur qui renvoie ses listes n'est pas touché.</td>
             </tr>
             <tr>
@@ -1659,6 +1663,33 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
                     Testez vos identifiants directement sur le site Pronote.<br>
                     Vérifiez le type CAS/ENT (essayez <em>Aucun</em> en cas de doute).<br>
                     Pour le QR Code : assurez-vous que le PIN saisi est bien celui utilisé à la génération.
+                </td>
+            </tr>
+            <tr>
+                <td>« Fichier token JSON introuvable » après une validation qui semblait réussir</td>
+                <td>
+                    Corrigé depuis la version 1.4.6. La sauvegarde du compte échouait sur les
+                    élèves <strong>sans photo de profil</strong> : le plugin lisait l'adresse de la
+                    photo sans vérifier qu'il y en avait une, l'écriture s'interrompait, et le
+                    fichier de compte n'était jamais créé.<br>
+                    Le journal montrait alors : <code>Ecriture du fichier échoué … 'NoneType'
+                    object has no attribute 'url'</code>.<br>
+                    <strong>Mettez le plugin à jour</strong>, puis revalidez le compte.
+                </td>
+            </tr>
+            <tr>
+                <td>« 'NoneType' object has no attribute 'logged_in' », ou <code>KeyError: 'dataSec'</code></td>
+                <td>
+                    La connexion a échoué et le plugin poursuivait comme si elle avait réussi —
+                    corrigé depuis la 1.4.7, qui nomme désormais l'échec.<br>
+                    La cause la plus fréquente est un <strong>ENT mal choisi</strong>. Trois entrées
+                    de la liste <em>Mode CAS</em> ne correspondaient plus à rien depuis une mise à
+                    jour de la bibliothèque Pronote ; les choisir revenait à se connecter sans ENT,
+                    ce qui échoue sur un établissement protégé par EduConnect. La liste est corrigée
+                    en 1.7.0, et un ENT inconnu est maintenant refusé avec un message clair.<br>
+                    Vérifiez votre choix — pour l'académie de Nantes, c'est <code>ent_elyco</code>
+                    (e-lyco) ; il n'existe pas d'entrée « ac_nantes ». Si votre établissement
+                    n'utilise pas d'ENT, choisissez <em>Aucun</em>.
                 </td>
             </tr>
             <tr>

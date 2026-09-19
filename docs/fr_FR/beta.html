@@ -284,6 +284,28 @@
 
 <h1 id="beta-nouveautes">Nouveautés en cours</h1>
 
+<h2>ENT : trois entrées qui ne menaient nulle part <span class="badge badge-fix">1.7.0</span></h2>
+<p>La liste <em>Mode CAS</em> est écrite dans le plugin, tandis que les connecteurs ENT vivent dans
+la bibliothèque Pronote, qui en retire et en renomme au fil de ses versions. Trois entrées
+n'existaient plus : <code>pronotepy.ent</code> — le nom du module, jamais un ENT —,
+<code>ozecollege_yvelines</code> et <code>pronote_hubeduconnect</code>.</p>
+<p>Les choisir revenait à se connecter <strong>sans ENT</strong>, sans le moindre message. Sur un
+établissement protégé par EduConnect, la connexion échouait alors sur une erreur technique venue
+des entrailles de la bibliothèque, que rien ne rattachait au réglage fautif — le symptôme signalé
+depuis Poitiers et Nantes.</p>
+<ul>
+    <li>La liste correspond maintenant exactement aux connecteurs disponibles, et trois oubliés
+    y entrent : <code>bordeaux</code>, <code>cas_arsene76</code>, <code>cas_ent27</code>.</li>
+    <li>Un ENT devenu inconnu <strong>arrête la validation</strong> avec un message qui le nomme et
+    énumère les choix valides, au lieu de laisser la connexion partir sans lui.</li>
+    <li>Un test compare la liste du formulaire aux connecteurs réellement installés : les deux ne
+    pourront plus dériver en silence.</li>
+</ul>
+<div class="callout callout-info">
+    <strong>Académie de Nantes</strong>
+    Il n'existe pas d'entrée « ac_nantes » : l'ENT y est e-lyco, soit <code>ent_elyco</code>.
+</div>
+
 <h2>Messagerie réparée <span class="badge badge-fix">1.7.0</span></h2>
 <p>Deux comptes, deux échecs à chaque cycle, deux causes sans rapport.</p>
 <ul>

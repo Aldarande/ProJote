@@ -194,37 +194,39 @@ sendVarToJS('eqLogicId', $eqLogic);
 									<label class="col-sm-4 control-label">{{ENT / CAS}}<i class="fas fa-question-circle tooltips" title="{{Renseignez le CAS ENT qui correspond à ce compte}}"></i></label>
 									<select type="text" class="col-sm-6 eqLogicAttr form-control" data-l1key="configuration" data-l2key="CasEnt">
 										<option value="">{{Aucun}}</option>
-										<option value="pronotepy.ent">{{pronotepy.ent}}</option>
 										<option value="ac_orleans_tours">{{ac_orleans_tours}}</option>
 										<option value="ac_poitiers">{{ac_poitiers}}</option>
-										<option value="ac_reunion">{{ac_reunion}}</option>
 										<option value="ac_reims">{{ac_reims}}</option>
 										<option value="ac_rennes">{{ac_rennes}}</option>
+										<option value="ac_reunion">{{ac_reunion}}</option>
 										<option value="atrium_sud">{{atrium_sud}}</option>
+										<option value="bordeaux">{{bordeaux}}</option>
 										<option value="cas_agora06">{{cas_agora06}}</option>
+										<option value="cas_arsene76">{{cas_arsene76}}</option>
 										<option value="cas_arsene76_edu">{{cas_arsene76_edu}}</option>
 										<option value="cas_cybercolleges42_edu">{{cas_cybercolleges42_edu}}</option>
+										<option value="cas_ent27">{{cas_ent27}}</option>
 										<option value="cas_kosmos">{{cas_kosmos}}</option>
 										<option value="cas_seinesaintdenis_edu">{{cas_seinesaintdenis_edu}}</option>
 										<option value="eclat_bfc">{{eclat_bfc}}</option>
 										<option value="ecollege_haute_garonne_edu">{{ecollege_haute_garonne_edu}}</option>
+										<option value="ent77">{{ent77}}</option>
 										<option value="ent_94">{{ent_94}}</option>
 										<option value="ent_auvergnerhonealpe">{{ent_auvergnerhonealpe}}</option>
 										<option value="ent_creuse">{{ent_creuse}}</option>
 										<option value="ent_creuse_educonnect">{{ent_creuse_educonnect}}</option>
+										<option value="ent_ecollege78">{{ent_ecollege78}}</option>
 										<option value="ent_elyco">{{ent_elyco}}</option>
 										<option value="ent_essonne">{{ent_essonne}}</option>
 										<option value="ent_hdf">{{ent_hdf}}</option>
 										<option value="ent_mayotte">{{ent_mayotte}}</option>
 										<option value="ent_somme">{{ent_somme}}</option>
 										<option value="ent_var">{{ent_var}}</option>
-										<option value="ent77">{{ent77}}</option>
-										<option value="ent_ecollege78">{{ent_ecollege78}}</option>
 										<option value="extranet_colleges_somme">{{extranet_colleges_somme}}</option>
 										<option value="ile_de_france">{{ile_de_france}}</option>
+										<option value="l_normandie">{{l_normandie}}</option>
 										<option value="laclasse_educonnect">{{laclasse_educonnect}}</option>
 										<option value="laclasse_lyon">{{laclasse_lyon}}</option>
-										<option value="l_normandie">{{l_normandie}}</option>
 										<option value="lyceeconnecte_aquitaine">{{lyceeconnecte_aquitaine}}</option>
 										<option value="lyceeconnecte_edu">{{lyceeconnecte_edu}}</option>
 										<option value="monbureaunumerique">{{monbureaunumerique}}</option>
@@ -232,9 +234,7 @@ sendVarToJS('eqLogicId', $eqLogic);
 										<option value="occitanie_montpellier">{{occitanie_montpellier}}</option>
 										<option value="occitanie_montpellier_educonnect">{{occitanie_montpellier_educonnect}}</option>
 										<option value="occitanie_toulouse_edu">{{occitanie_toulouse_edu}}</option>
-										<option value="ozecollege_yvelines">{{ozecollege_yvelines}}</option>
 										<option value="paris_classe_numerique">{{paris_classe_numerique}}</option>
-										<option value="pronote_hubeduconnect">{{pronote_hubeduconnect}}</option>
 										<option value="val_de_marne">{{val_de_marne}}</option>
 										<option value="val_doise">{{val_doise}}</option>
 									</select>
