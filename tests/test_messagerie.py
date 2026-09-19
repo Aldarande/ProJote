@@ -185,3 +185,50 @@ def test_le_journal_montre_les_cles_du_serveur_pas_les_notres(compat, caplog):
     assert "parametresChargement" in trace
     # Ce qui suit « réellement reçues » ne doit contenir que les clés du serveur.
     assert "listeEtiquettes" not in trace.split("réellement reçues")[-1]
+
+
+# ── iCal : un export que l'établissement n'a pas ouvert ─────────────────────
+#
+# Retour d'un bêta-testeur le 19 septembre 2026 :
+#
+#   ERROR - Une erreur est survenue lors de la récupération de l'URL iCal:
+#           ligne 1285 - Could not parse ICal params
+#
+# pronotepy lève cela quand la réponse de PageInfosPerso ne porte aucune entrée
+# iCal : l'établissement n'a pas ouvert l'export de calendrier à ce compte. Un
+# état, pas un incident — et pourtant une alerte à chaque cycle, toutes les
+# heures, qui noyait les vraies pannes. Même famille que l'onglet 131 fermé.
+
+
+class _ClientSansIcal:
+    def export_ical(self):
+        raise Exception("Could not parse ICal params")
+
+
+class _ClientIcalEnPanne:
+    def export_ical(self):
+        raise Exception("Connection timed out")
+
+
+def test_un_export_ical_non_propose_ne_remonte_pas_d_erreur(daemon, caplog):
+    import logging
+
+    import collecteurs
+
+    with caplog.at_level(logging.INFO):
+        url = collecteurs.ical(_ClientSansIcal())
+
+    assert url == ""
+    assert not [e for e in caplog.records if e.levelno >= logging.WARNING]
+    assert any("non proposé par l'établissement" in e.getMessage() for e in caplog.records)
+
+
+def test_une_vraie_panne_ical_reste_une_erreur(daemon, caplog):
+    import logging
+
+    import collecteurs
+
+    with caplog.at_level(logging.INFO):
+        assert collecteurs.ical(_ClientIcalEnPanne()) == ""
+
+    assert [e for e in caplog.records if e.levelno >= logging.ERROR]

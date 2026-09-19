@@ -1289,6 +1289,18 @@ def ical(client):
         logging.warning("Aucune URL iCal n'a été trouvée pour ce compte.")
         return ""
     except Exception as e:
+        # « Could not parse ICal params » : pronotepy lève cela quand la réponse
+        # de PageInfosPerso ne porte aucune entrée iCal — l'établissement n'a
+        # pas ouvert l'export de calendrier à ce compte. C'est un état, pas un
+        # incident : l'écrire en ERREUR remplissait le journal d'une alerte
+        # horaire sur une situation qui ne changera pas, et noyait les vraies
+        # pannes. Retour d'un bêta-testeur le 19 septembre 2026.
+        if "ICal params" in str(e) or "iCal" in str(e):
+            logging.info(
+                "Export iCal non proposé par l'établissement pour ce compte — "
+                "l'URL de calendrier restera vide."
+            )
+            return ""
         line_number = e.__traceback__.tb_lineno if e.__traceback__ else "unknown"
         logging.error(
             "Une erreur est survenue lors de la récupération de l'URL iCal: ligne %s - %s",

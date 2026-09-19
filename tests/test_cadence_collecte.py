@@ -380,3 +380,91 @@ def test_un_collecteur_qui_ne_rend_rien_est_un_echec(collecte, monkeypatch):
     statuts = collecte.collecter(object(), 7, {}, {})
 
     assert statuts["Retards"] == cadence.ECHEC
+
+
+# ── Bruit du journal : une cause, une alerte ────────────────────────────────
+#
+# Retour d'un bêta-testeur le 19 septembre 2026 : quatre lignes ERROR à la même
+# seconde, pour un seul refus de l'onglet Présence.
+#
+#   ERROR - Collecte en erreur pour les absences : … La page a expiré ! (11)
+#   ERROR - Collecte en erreur pour les retards : … La page a expiré ! (11)
+#   ERROR - Collecte en erreur pour les punitions : … La page a expiré ! (11)
+#   ERROR - Collecte en erreur pour les évènements … La page a expiré ! (11)
+#
+# Quatre onglets partagent cet onglet Pronote : le premier refus vaut pour tous.
+# Le répéter en erreur fait passer un incident pour quatre, et noie les pannes
+# réellement distinctes.
+
+
+def _rend(valeur):
+    return lambda _client: valeur
+
+
+def test_une_cause_commune_ne_sonne_qu_une_fois(collecte, monkeypatch, caplog):
+    import logging
+
+    motif = "Onglet Présence (19) inaccessible : La page a expiré ! (11)"
+    _table(
+        collecte,
+        monkeypatch,
+        (
+            ("Absences", "les absences", _rend({"error": motif})),
+            ("Retards", "les retards", _rend({"error": motif})),
+            ("Punitions", "les punitions", _rend({"error": motif})),
+            ("Evenements", "les évènements de vie scolaire", _rend({"error": motif})),
+        ),
+    )
+    with caplog.at_level(logging.INFO):
+        statuts = collecte.collecter(object(), 7, {}, {})
+
+    erreurs = [e for e in caplog.records if e.levelno >= logging.ERROR]
+    assert len(erreurs) == 1, f"{len(erreurs)} alertes pour une seule cause"
+    assert motif in erreurs[0].getMessage()
+
+    # Les trois autres restent signalés, mais sans alarme.
+    rattachements = [
+        e for e in caplog.records
+        if e.levelno == logging.INFO and "même cause" in e.getMessage()
+    ]
+    assert len(rattachements) == 3
+
+    # Et surtout : le statut de chaque onglet est inchangé.
+    assert all(statuts[c] == cadence.ECHEC for c in
+               ("Absences", "Retards", "Punitions", "Evenements"))
+
+
+def test_deux_causes_distinctes_sonnent_chacune(collecte, monkeypatch, caplog):
+    """Le regroupement ne doit pas masquer une seconde panne, bien réelle."""
+    import logging
+
+    _table(
+        collecte,
+        monkeypatch,
+        (
+            ("Absences", "les absences", _rend({"error": "onglet Présence refusé"})),
+            ("Retards", "les retards", _rend({"error": "onglet Présence refusé"})),
+            ("Notes", "les notes", _rend({"error": "serveur injoignable"})),
+        ),
+    )
+    with caplog.at_level(logging.INFO):
+        collecte.collecter(object(), 7, {}, {})
+
+    erreurs = [e.getMessage() for e in caplog.records if e.levelno >= logging.ERROR]
+    assert len(erreurs) == 2
+    assert any("serveur injoignable" in m for m in erreurs)
+
+
+def test_le_repli_sur_valeur_precedente_survit_au_regroupement(collecte, monkeypatch):
+    """Le regroupement ne touche qu'au journal, jamais à la charge."""
+    compteur = {}
+    _table(collecte, monkeypatch,
+           (("Notes", "les notes", _appels(compteur, "Notes", valeur={"note": [1]})),))
+    collecte.collecter(object(), 7, {}, {})
+
+    _table(collecte, monkeypatch, (("Notes", "les notes", _rend({"error": "boum"})),))
+    charge = {}
+    statuts = collecte.collecter(object(), 7, {}, charge)
+
+    assert statuts["Notes"] == cadence.REPLI
+    assert charge["Notes"] == {"note": [1]}

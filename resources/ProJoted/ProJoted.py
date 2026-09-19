@@ -1707,6 +1707,12 @@ def collecter(client, eq_id, message, jsondata):
     with _cache_collecte_lock:
         cache = _cache_collecte.setdefault(eq, {"valeurs": {}, "horodatages": {}})
     statuts = {}
+    # Motifs déjà signalés en ERREUR sur ce cycle. Quatre onglets partagent
+    # l'onglet « Présence » : un seul refus leur faisait écrire quatre erreurs
+    # identiques, à la même seconde, pour une cause unique. Retour d'un
+    # bêta-testeur le 19 septembre 2026. Le premier alerte, les suivants s'y
+    # rattachent sans crier — ils n'apportent aucune information nouvelle.
+    motifs_signales = set()
     # Onglets que l'utilisateur ne suit pas (cases de la page de configuration).
     # Leurs commandes ne sont pas créées côté Jeedom : ne rien envoyer est donc
     # cohérent, et surtout aucune requête n'est faite vers Pronote.
@@ -1756,23 +1762,26 @@ def collecter(client, eq_id, message, jsondata):
         if motif is not None:
             if cle in _ONGLETS_A_ERREUR_REMONTEE:
                 jsondata["error"] = motif
-            if connu is None:
-                statuts[cle] = cadence.ECHEC
-                logging.error(
-                    "Collecte en erreur pour %s : %s. Aucune valeur antérieure, "
-                    "cet onglet sera absent de ce cycle.",
+            deja_dit = motif in motifs_signales
+            motifs_signales.add(motif)
+            suite = (
+                "Aucune valeur antérieure, cet onglet sera absent de ce cycle."
+                if connu is None
+                else "La valeur du relevé précédent est conservée."
+            )
+            if connu is not None:
+                jsondata[cle] = connu
+            statuts[cle] = cadence.ECHEC if connu is None else cadence.REPLI
+            if deja_dit:
+                # Même cause, déjà signalée à l'instant : la répéter en erreur
+                # ferait passer un incident pour quatre.
+                logging.info(
+                    "Collecte en erreur pour %s, même cause que ci-dessus. %s",
                     libelle,
-                    motif,
+                    suite,
                 )
             else:
-                jsondata[cle] = connu
-                statuts[cle] = cadence.REPLI
-                logging.error(
-                    "Collecte en erreur pour %s : %s. La valeur du relevé "
-                    "précédent est conservée.",
-                    libelle,
-                    motif,
-                )
+                logging.error("Collecte en erreur pour %s : %s. %s", libelle, motif, suite)
             continue
 
         jsondata[cle] = valeur
