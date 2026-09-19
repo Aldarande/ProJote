@@ -54,7 +54,11 @@
  * Même exigence pour le widget : `widget_json` est reconstruit ENTIÈREMENT à
  * chaque appel, une clé manquante vide donc la section correspondante. C'est la
  * raison pour laquelle le démon renvoie toujours la dernière valeur connue d'un
- * onglet sauté, plutôt que de l'omettre.
+ * onglet sauté, plutôt que de l'omettre. Pour le seul cas où il ne PEUT pas —
+ * un échec alors qu'il n'a rien en mémoire, après un redémarrage — la table
+ * `$champsParOnglet`, juste avant la sauvegarde de `widget_json`, reconduit ce
+ * que le widget affichait. Un onglet qui y est ajouté doit y figurer aussi,
+ * sans quoi il annoncera « 0 » dès qu'il sera illisible.
  *
  * Sécurité : la clé API Jeedom est vérifiée avant tout traitement.
  */
@@ -607,17 +611,30 @@ try {
     // ── Centre d'alertes (F4, v1.1.0) ──────────────────────────────────────────
     // Génère des événements ProJote en comparant les compteurs courants à ceux du
     // cycle précédent (mémorisés en configuration eqLogic = BDD Jeedom). FIFO de 50.
+    $prevCounters = json_decode($eqLogic->getConfiguration('projote_counters_prev', '{}'), true);
+    if (!is_array($prevCounters)) $prevCounters = array();
+
+    // Un onglet peut être ABSENT de la charge : coupé par l'utilisateur, ou en
+    // échec sans valeur antérieure connue côté démon (cf. l'en-tête). Le lire
+    // comme un 0 aurait deux effets, tous deux faux : le compteur du cycle
+    // suivant repasserait « au-dessus » du précédent et déclencherait une
+    // « Nouvelle absence » qui n'a pas eu lieu ; et l'historique d'alertes
+    // retiendrait un retour à zéro que Pronote n'a jamais annoncé. On reconduit
+    // donc simplement la valeur du cycle précédent.
+    $compteurConserve = function ($onglet, $cle, $prev, $defaut) use ($result, $prevCounters) {
+        if (isset($result[$onglet][$cle])) return $result[$onglet][$cle];
+        if (array_key_exists($prev, $prevCounters)) return $prevCounters[$prev];
+        return $defaut;
+    };
     $newCounters = array(
-        'absences'  => (int)(isset($result['Absences']['nb_absences']) ? $result['Absences']['nb_absences'] : 0),
-        'retards'   => (int)(isset($result['Retards']['nb_retard']) ? $result['Retards']['nb_retard'] : 0),
-        'punitions' => (int)(isset($result['Punitions']['Nb_Punitions']) ? $result['Punitions']['Nb_Punitions'] : 0),
-        'msg_nl'    => (int)(isset($result['Messages']['Nb_messages_non_lus']) ? $result['Messages']['Nb_messages_non_lus'] : 0),
+        'absences'  => (int)$compteurConserve('Absences', 'nb_absences', 'absences', 0),
+        'retards'   => (int)$compteurConserve('Retards', 'nb_retard', 'retards', 0),
+        'punitions' => (int)$compteurConserve('Punitions', 'Nb_Punitions', 'punitions', 0),
+        'msg_nl'    => (int)$compteurConserve('Messages', 'Nb_messages_non_lus', 'msg_nl', 0),
         'ds'        => (string)(isset($result['Devoirs']['prochain_DS_matiere']) ? $result['Devoirs']['prochain_DS_matiere'] : '')
                      . '|' . (string)(isset($result['Devoirs']['prochain_DS_date']) ? $result['Devoirs']['prochain_DS_date'] : ''),
         'meb'       => (string)(isset($result['Notes']['matiere_en_baisse']) ? $result['Notes']['matiere_en_baisse'] : ''),
     );
-    $prevCounters = json_decode($eqLogic->getConfiguration('projote_counters_prev', '{}'), true);
-    if (!is_array($prevCounters)) $prevCounters = array();
     $events = json_decode($eqLogic->getConfiguration('projote_events', '[]'), true);
     if (!is_array($events)) $events = array();
 
@@ -721,6 +738,39 @@ try {
         'URL_Ical'                 => isset($result['Ical'])                                ? $result['Ical']                                : '',
         'last_update'           => date('c'),
     );
+
+    // widget_json est reconstruit ENTIÈREMENT ci-dessus : un onglet absent de la
+    // charge y vaut donc 0 ou liste vide, et le widget affiche « 0 absence » là
+    // où le plugin n'a simplement rien pu lire. C'est le pire des silences pour
+    // un parent qui suit la vie scolaire. On reprend donc, onglet par onglet, ce
+    // que le widget montrait au cycle précédent.
+    //
+    // Le démon ne laisse un onglet absent que lorsqu'il n'a AUCUNE valeur
+    // antérieure en mémoire (statut « echec » ; sinon il renvoie lui-même le
+    // dernier relevé, statut « repli »). Le cas se produit surtout au premier
+    // cycle qui suit un redémarrage du démon — mémoire vide — alors que le
+    // widget, lui, a gardé le dernier état en base.
+    $widgetPrecedent = json_decode($eqLogic->getConfiguration('widget_json', '{}'), true);
+    if (!is_array($widgetPrecedent)) $widgetPrecedent = array();
+    $champsParOnglet = array(
+        'Absences'        => array('nb_absences', 'absences'),
+        'Retards'         => array('nb_retards', 'retards'),
+        'Punitions'       => array('nb_punitions', 'punitions'),
+        'Evenements'      => array('nb_evenements', 'evenements'),
+        'Notes'           => array('notes', 'moyennes_periodes', 'moyenne_generale'),
+        'Devoirs'         => array('devoirs', 'devoirs_demain', 'nb_devoirs_f', 'nb_devoirs_nf'),
+        'Competences'     => array('competences'),
+        'Messages'        => array('Nb_messages', 'Nb_messages_non_lus'),
+    );
+    foreach ($champsParOnglet as $onglet => $champs) {
+        if (isset($result[$onglet])) continue;
+        foreach ($champs as $champ) {
+            if (array_key_exists($champ, $widgetPrecedent)) {
+                $widget_data[$champ] = $widgetPrecedent[$champ];
+            }
+        }
+    }
+
     $eqLogic->setConfiguration('widget_json', json_encode($widget_data));
     log::add('ProJote', 'debug', 'widget_json sauvegardé en configuration pour : ' . $eqLogic->getHumanName());
 

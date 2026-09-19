@@ -245,3 +245,138 @@ def test_identifiant_d_equipement_assaini(collecte, monkeypatch):
     _table(collecte, monkeypatch, ())
     with pytest.raises(ValueError):
         collecte.collecter(object(), "../7", {}, {})
+
+
+# ── Une collecte en erreur est une collecte en échec ─────────────────────
+#
+# Les collecteurs ne lèvent pas : ils rattrapent leurs propres erreurs et rendent
+# une structure vide, assortie d'une clé « error ». Tant que collecter() ne lisait
+# pas cette clé, ces structures vides partaient vers Jeedom comme des données :
+# le 17 septembre 2026 sur l'équipement 20, l'onglet Présence refusé sur un
+# « La page a expiré ! (11) » a fait écrire Nb_absences = 0, Nb_retard = 0 et
+# Nb_punitions = 0, statut « Connecté », sans aucune erreur visible.
+
+
+def test_une_collecte_en_erreur_garde_la_valeur_precedente(collecte, monkeypatch):
+    """Le cas réel : trois absences relevées, puis l'onglet Présence refusé."""
+    compteur = {}
+    releve = {"absence": [1, 2, 3], "nb_absences": 3}
+    _table(
+        collecte,
+        monkeypatch,
+        (("Absences", "les absences", _appels(compteur, "Absences", valeur=releve)),),
+    )
+    collecte.collecter(object(), 7, {}, {})
+
+    refus = {"absence": [], "nb_absences": 0, "error": "Onglet Présence (19) refusé"}
+    _table(
+        collecte,
+        monkeypatch,
+        (("Absences", "les absences", _appels(compteur, "Absences", valeur=refus)),),
+    )
+    charge = {}
+    statuts = collecte.collecter(object(), 7, {}, charge)
+
+    assert statuts["Absences"] == cadence.REPLI
+    assert charge["Absences"]["nb_absences"] == 3
+
+
+def test_une_collecte_en_erreur_ne_devient_pas_la_valeur_de_repli(
+    collecte, monkeypatch
+):
+    """Sinon le zéro trompeur s'installerait : conservé, puis resservi à l'infini."""
+    compteur = {}
+    releve = {"nb_absences": 3}
+    _table(
+        collecte,
+        monkeypatch,
+        (("Absences", "les absences", _appels(compteur, "Absences", valeur=releve)),),
+    )
+    collecte.collecter(object(), 7, {}, {})
+
+    refus = {"nb_absences": 0, "error": "refusé"}
+    _table(
+        collecte,
+        monkeypatch,
+        (("Absences", "les absences", _appels(compteur, "Absences", valeur=refus)),),
+    )
+    collecte.collecter(object(), 7, {}, {})
+    charge = {}
+    collecte.collecter(object(), 7, {}, charge)
+
+    assert charge["Absences"]["nb_absences"] == 3
+
+
+def test_une_collecte_en_erreur_sans_antecedent_est_absente_de_la_charge(
+    collecte, monkeypatch
+):
+    """Rien à conserver : jeeProJote.php laisse alors les commandes en place.
+
+    Un onglet absent de la charge n'y est pas écrit (le `elseif (isset(...))` de
+    jeeProJote.php) : Jeedom garde la valeur qu'il avait en base, plus fiable
+    qu'un zéro fabriqué par un onglet illisible.
+    """
+    compteur = {}
+    refus = {"nb_absences": 0, "error": "refusé"}
+    _table(
+        collecte,
+        monkeypatch,
+        (("Absences", "les absences", _appels(compteur, "Absences", valeur=refus)),),
+    )
+    charge = {}
+    statuts = collecte.collecter(object(), 7, {}, charge)
+
+    assert statuts["Absences"] == cadence.ECHEC
+    assert "Absences" not in charge
+
+
+def test_un_zero_legitime_passe_toujours(collecte, monkeypatch):
+    """Le repli ne doit pas figer un compteur : une absence se régularise."""
+    compteur = {}
+    _table(
+        collecte,
+        monkeypatch,
+        (
+            (
+                "Absences",
+                "les absences",
+                _appels(compteur, "Absences", valeur={"nb_absences": 3}),
+            ),
+        ),
+    )
+    collecte.collecter(object(), 7, {}, {})
+
+    _table(
+        collecte,
+        monkeypatch,
+        (
+            (
+                "Absences",
+                "les absences",
+                _appels(compteur, "Absences", valeur={"nb_absences": 0}),
+            ),
+        ),
+    )
+    charge = {}
+    statuts = collecte.collecter(object(), 7, {}, charge)
+
+    assert statuts["Absences"] == cadence.FRAIS
+    assert charge["Absences"]["nb_absences"] == 0
+
+
+def test_un_collecteur_qui_ne_rend_rien_est_un_echec(collecte, monkeypatch):
+    """Aucun collecteur ne rend None en marche normale.
+
+    C'est la trace d'un `except` de dernier recours qui a laissé la fonction
+    retomber sans valeur — `retards()` et `notifications()` en ont un.
+    """
+    compteur = {}
+
+    def _muet(_client):
+        compteur["Retards"] = compteur.get("Retards", 0) + 1
+        return None
+
+    _table(collecte, monkeypatch, (("Retards", "les retards", _muet),))
+    statuts = collecte.collecter(object(), 7, {}, {})
+
+    assert statuts["Retards"] == cadence.ECHEC

@@ -223,7 +223,10 @@ try:
     )
     from periodes_scolaires import _periodes_couvrantes, periodes  # noqa: F401
     from presence_pronote import (  # noqa: F401 - façade
+        _erreur_de_refus,
+        _motif_de_refus,
         _noter_refus_presence,
+        _oublier_refus_presence,
         _presence_deja_refusee,
         _presence_refusee,
         _refus_de_presence,
@@ -1612,6 +1615,34 @@ _cache_collecte_lock = threading.Lock()
 _ONGLETS_A_ERREUR_REMONTEE = ("Emploi_du_temps", "Notes")
 
 
+def _echec_rendu(valeur):
+    """Motif de l'échec que ce rendu de collecteur porte, ou None s'il est bon.
+
+    Les collecteurs ne lèvent pas : ils rattrapent leurs propres erreurs et
+    rendent une structure vide, assortie d'une clé ``error``. Sans lecture de
+    cette clé, un onglet illisible était indiscernable d'un onglet vide —
+    l'onglet « Présence » refusé écrivait ``Nb_absences = 0``, ``Nb_retard = 0``,
+    ``Nb_punitions = 0`` et des listes vides, statut « Connecté », sans qu'aucun
+    scénario branché sur ces compteurs puisse se déclencher. Le 17 septembre
+    2026 sur l'équipement 20, quatre commandes sont ainsi passées à zéro sur un
+    simple « La page a expiré ! (11) ».
+
+    Un rendu ``None`` compte aussi : aucun collecteur n'en rend en marche
+    normale, c'est la trace d'un ``except`` de dernier recours qui a laissé la
+    fonction retomber sans valeur.
+
+    Une structure sans ``error`` est prise pour argent comptant, y compris
+    vide : c'est ce qui permet à un compteur de redescendre légitimement à zéro
+    — une absence régularisée, une punition purgée — au lieu d'être figé par le
+    repli.
+    """
+    if valeur is None:
+        return "aucune donnée rendue par le collecteur"
+    if isinstance(valeur, dict) and "error" in valeur:
+        return valeur["error"]
+    return None
+
+
 def _collecteurs(message):
     """Table des onglets : clé de la charge, libellé de journal, appel.
 
@@ -1651,6 +1682,13 @@ def collecter(client, eq_id, message, jsondata):
       reçoit toujours une charge complète — indispensable, car jeeProJote.php
       reconstruit le widget entièrement à partir d'elle, et une clé manquante
       viderait la section correspondante.
+    * **Un onglet qui rend une erreur est un onglet en échec**, au même titre
+      qu'un onglet qui lève : même repli sur la valeur du relevé précédent. Les
+      collecteurs ne lèvent pas, ils rendent une structure vide accompagnée d'un
+      ``error`` (cf. ``_echec_rendu``) ; sans cette lecture, un onglet Présence
+      refusé faisait écrire à Jeedom quatre compteurs à zéro parfaitement
+      silencieux. Un rendu **sans** ``error`` reste pris tel quel, vide ou non :
+      un compteur doit pouvoir redescendre à zéro pour de bon.
 
     ``SuspensionIP`` hérite de ``BaseException`` : elle traverse ce filet sans
     être rattrapée, comme prévu, pour arrêter le cycle immédiatement.
@@ -1714,16 +1752,33 @@ def collecter(client, eq_id, message, jsondata):
             logging.debug("Traceback complet : %s", traceback.format_exc())
             continue
 
+        motif = _echec_rendu(valeur)
+        if motif is not None:
+            if cle in _ONGLETS_A_ERREUR_REMONTEE:
+                jsondata["error"] = motif
+            if connu is None:
+                statuts[cle] = cadence.ECHEC
+                logging.error(
+                    "Collecte de %s en erreur : %s. Aucune valeur antérieure, "
+                    "cet onglet sera absent de ce cycle.",
+                    libelle,
+                    motif,
+                )
+            else:
+                jsondata[cle] = connu
+                statuts[cle] = cadence.REPLI
+                logging.error(
+                    "Collecte de %s en erreur : %s. La valeur du relevé "
+                    "précédent est conservée.",
+                    libelle,
+                    motif,
+                )
+            continue
+
         jsondata[cle] = valeur
         statuts[cle] = cadence.FRAIS
         cache["valeurs"][cle] = valeur
         cache["horodatages"][cle] = maintenant
-        if (
-            cle in _ONGLETS_A_ERREUR_REMONTEE
-            and isinstance(valeur, dict)
-            and "error" in valeur
-        ):
-            jsondata["error"] = valeur["error"]
 
     _resume = {}
     for statut in statuts.values():
@@ -2247,7 +2302,7 @@ def _worker_loop():
             _worker_eq_id = eq_id
             _worker_eq_start = time.time()
         # Nouveau cycle : on réessaie l'onglet Présence, un droit a pu être accordé.
-        _presence_refusee.discard(str(eq_id))
+        _oublier_refus_presence(eq_id)
         logging.info(
             "=== Début traitement équipement %s (file restante : %d) ===",
             eq_id,

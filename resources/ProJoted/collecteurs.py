@@ -11,7 +11,10 @@ expliquent la forme du code :
 
 * **Aucune ne lève.** Un onglet en panne ne doit coûter que lui-même : chacune
   rattrape ses propres erreurs et rend une structure vide, complétée d'une clé
-  ``error`` quand la cause mérite d'être remontée. Seule ``SuspensionIP``
+  ``error``. Cette clé n'est pas décorative : ``ProJoted.collecter()`` la lit et
+  traite la collecte comme un échec, conservant la valeur du relevé précédent
+  plutôt que de laisser passer des zéros. Une collecte qui a réussi ne doit donc
+  jamais la poser. Seule ``SuspensionIP``
   traverse — elle hérite de ``BaseException`` justement pour cela, chaque
   requête supplémentaire prolongeant le blocage côté Pronote.
 * **Les clés de sortie sont un contrat.** ``jeeProJote.php`` et le widget les
@@ -21,9 +24,13 @@ expliquent la forme du code :
   champs d'une version à l'autre, et les serveurs Pronote ne répondent pas tous
   la même chose : les accès passent par ``getattr`` ou par ``_safe_attr``.
 
-Absences, retards et punitions partagent l'onglet « Présence » de Pronote, d'où
-leur passage par ``presence_pronote`` : un refus est retenu le temps du cycle
-pour ne pas provoquer trois ré-authentifications inutiles.
+Absences, retards, punitions et évènements de vie scolaire partagent l'onglet
+« Présence » de Pronote, d'où leur passage par ``presence_pronote`` : un refus
+est retenu le temps du cycle pour ne pas provoquer quatre ré-authentifications
+inutiles. Les quatre rendent alors une structure vide **assortie d'un
+``error``** : sans lui, Jeedom recevait quatre compteurs à zéro sans rien qui
+distingue « aucune absence » de « absences illisibles », et un scénario d'alerte
+branché dessus ne pouvait pas se déclencher.
 
 Extrait de ProJoted.py en v1.6.0, sans modification du code.
 """
@@ -49,6 +56,7 @@ from format_pronote import (
 from periodes_scolaires import _periodes_couvrantes
 from pronote_errors import est_onglet_non_accessible
 from presence_pronote import (
+    _erreur_de_refus,
     _noter_refus_presence,
     _presence_deja_refusee,
     _refus_de_presence,
@@ -1032,6 +1040,7 @@ def retards(client):
                 "Collecte des retards ignorée : l'onglet Présence a déjà été refusé "
                 "sur ce cycle."
             )
+            data["error"] = _erreur_de_refus(eq_id, "les retards")
             return data
 
         all_retards_map = {}
@@ -1042,6 +1051,7 @@ def retards(client):
             except Exception as e:
                 if _refus_de_presence(e):
                     _noter_refus_presence(eq_id, "retards", e)
+                    data["error"] = _erreur_de_refus(eq_id, "les retards")
                     break
                 logging.warning(
                     f"Impossible de lire les retards de la période {getattr(period, 'name', '?')} : {e}"
@@ -1095,6 +1105,7 @@ def absences(client):
                 "Collecte des absences ignorée : l'onglet Présence a déjà été refusé "
                 "sur ce cycle."
             )
+            data["error"] = _erreur_de_refus(eq_id, "les absences")
             return data
 
         all_absences_map = {}
@@ -1105,6 +1116,7 @@ def absences(client):
             except Exception as e:
                 if _refus_de_presence(e):
                     _noter_refus_presence(eq_id, "absences", e)
+                    data["error"] = _erreur_de_refus(eq_id, "les absences")
                     break
                 logging.warning(
                     f"Impossible de lire les absences de la période {getattr(period, 'name', '?')} : {e}"
@@ -1158,6 +1170,7 @@ def punitions(client):
                 "Collecte des punitions ignorée : l'onglet Présence a déjà été refusé "
                 "sur ce cycle."
             )
+            data["error"] = _erreur_de_refus(eq_id, "les punitions")
             return data
 
         all_punitions_map = {}
@@ -1168,6 +1181,7 @@ def punitions(client):
             except Exception as e:
                 if _refus_de_presence(e):
                     _noter_refus_presence(eq_id, "punitions", e)
+                    data["error"] = _erreur_de_refus(eq_id, "les punitions")
                     break
                 logging.warning(
                     f"Impossible de lire les punitions de la période {getattr(period, 'name', '?')} : {e}"
@@ -1400,6 +1414,7 @@ def evenements_vie_scolaire(client):
             "Collecte des évènements ignorée : l'onglet Présence a déjà été refusé "
             "sur ce cycle."
         )
+        data["error"] = _erreur_de_refus(eq_id, "les évènements de vie scolaire")
         return data
 
     # Déduplication par identifiant : les découpages de périodes se recouvrent,
@@ -1425,6 +1440,9 @@ def evenements_vie_scolaire(client):
         except Exception as e:
             if _refus_de_presence(e):
                 _noter_refus_presence(eq_id, "évènements", e)
+                data["error"] = _erreur_de_refus(
+                    eq_id, "les évènements de vie scolaire"
+                )
                 return data
             logging.warning(
                 "Évènements de vie scolaire non récupérés pour « %s » : %s",

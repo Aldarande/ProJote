@@ -1,10 +1,10 @@
 """Tests du garde-fou sur l'onglet « Présence ».
 
-Absences, retards et punitions passent tous par l'onglet 19. Certains comptes le
-voient déclaré accessible par Pronote — il figure dans `authorized_onglets` —
-mais la requête est refusée. pronotepy répond à ce refus par une
-ré-authentification complète avant de rejouer, qui échoue à son tour : trois
-collectes, trois authentifications, aucune donnée.
+Absences, retards, punitions et évènements de vie scolaire passent tous par
+l'onglet 19. Certains comptes le voient déclaré accessible par Pronote — il
+figure dans `authorized_onglets` — mais la requête est refusée. pronotepy répond
+à ce refus par une ré-authentification complète avant de rejouer, qui échoue à
+son tour : quatre collectes, quatre authentifications, aucune donnée.
 
 Le refus est donc retenu le temps du cycle. La portée est volontairement courte :
 le refus peut être temporaire — début d'année scolaire, page non encore
@@ -99,7 +99,7 @@ class TestPropagationDansLeCycle:
         cycle_neuf.absences(_Client(_Periode()))
         assert cycle_neuf._presence_deja_refusee(4) is True
 
-        cycle_neuf._presence_refusee.discard("4")  # ce que fait le démon au cycle suivant
+        cycle_neuf._oublier_refus_presence(4)  # ce que fait le démon au cycle suivant
         periode = _Periode()
         cycle_neuf.absences(_Client(periode))
 
@@ -115,3 +115,50 @@ class TestPropagationDansLeCycle:
         cycle_neuf.absences(_Client(periode))
 
         assert periode.appels == 1
+
+
+class TestLeRefusSeVoitDansLaCharge:
+    """Un onglet illisible ne doit pas ressembler à un onglet vide.
+
+    Sans clause ``error``, les quatre collectes rendaient ``nb_absences: 0``,
+    ``nb_retard: 0``, ``Nb_Punitions: 0`` et des listes vides. Jeedom écrivait
+    donc quatre commandes à zéro, statut « Connecté » : pour un parent qui suit
+    la vie scolaire, un zéro rassurant là où le plugin n'avait rien pu lire, et
+    aucun scénario d'alerte branché sur ces compteurs ne pouvait se déclencher.
+    """
+
+    def test_le_collecteur_qui_essuie_le_refus_le_rapporte(self, cycle_neuf):
+        rendu = cycle_neuf.absences(_Client(_Periode()))
+
+        assert "error" in rendu
+        assert "Présence" in rendu["error"]
+
+    def test_les_collecteurs_qui_s_abstiennent_le_rapportent_aussi(self, cycle_neuf):
+        """Ils n'ont pas vu l'erreur passer, mais la cause est la même."""
+        cycle_neuf.absences(_Client(_Periode()))
+
+        for rendu in (
+            cycle_neuf.retards(_Client(_Periode())),
+            cycle_neuf.punitions(_Client(_Periode())),
+        ):
+            assert "error" in rendu
+
+    def test_le_motif_pronote_est_conserve(self, cycle_neuf):
+        """C'est lui qui distingue un droit manquant d'une session expirée."""
+        cycle_neuf.absences(_Client(_Periode()))
+
+        assert "Accès refusé" in cycle_neuf._motif_de_refus(4)
+        assert "Accès refusé" in cycle_neuf.retards(_Client(_Periode()))["error"]
+
+    def test_une_collecte_qui_reussit_ne_porte_pas_d_erreur(self, cycle_neuf):
+        """Le zéro légitime doit continuer de passer : aucun repli ne doit le figer."""
+
+        class _PeriodeVide:
+            name = "Année continue"
+            id = "P1"
+            absences = []
+
+        rendu = cycle_neuf.absences(_Client(_PeriodeVide()))
+
+        assert rendu["nb_absences"] == 0
+        assert "error" not in rendu
