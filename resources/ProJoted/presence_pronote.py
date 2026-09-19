@@ -102,7 +102,7 @@ def _erreur_de_refus(eq_id, quoi):
     zéro d'un même cycle ont une cause unique, et c'est elle qu'il faut lire
     dans le journal Jeedom.
     """
-    return "Onglet Présence (19) inaccessible, %s non relevés : %s" % (
+    return "Onglet Présence (19) inaccessible, rien n'a pu être relevé pour %s : %s" % (
         quoi,
         _motif_de_refus(eq_id) or "motif inconnu",
     )

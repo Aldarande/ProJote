@@ -1759,7 +1759,7 @@ def collecter(client, eq_id, message, jsondata):
             if connu is None:
                 statuts[cle] = cadence.ECHEC
                 logging.error(
-                    "Collecte de %s en erreur : %s. Aucune valeur antérieure, "
+                    "Collecte en erreur pour %s : %s. Aucune valeur antérieure, "
                     "cet onglet sera absent de ce cycle.",
                     libelle,
                     motif,
@@ -1768,7 +1768,7 @@ def collecter(client, eq_id, message, jsondata):
                 jsondata[cle] = connu
                 statuts[cle] = cadence.REPLI
                 logging.error(
-                    "Collecte de %s en erreur : %s. La valeur du relevé "
+                    "Collecte en erreur pour %s : %s. La valeur du relevé "
                     "précédent est conservée.",
                     libelle,
                     motif,
