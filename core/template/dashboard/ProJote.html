@@ -1526,12 +1526,39 @@
             var fillEl = el('pjwnbf' + ID);
             var trendEl = el('pjwtrend' + ID);
 
-            // Utilisation de la moyenne officielle Pronote si disponible
-            // Pronote retourne "-1" comme sentinelle quand la moyenne n'est pas calculée
-            var officialAvg = (d.moyennes_periodes && d.moyennes_periodes.length > 0)
-                ? d.moyennes_periodes[d.moyennes_periodes.length - 1].moyenne_eleve
-                : null;
-            if (officialAvg !== null && (parseFloat(String(officialAvg).replace(',', '.')) < 0 || String(officialAvg).trim() === '')) officialAvg = null;
+            // Moyenne officielle Pronote, celle de la PÉRIODE EN COURS.
+            //
+            // On prenait auparavant la dernière entrée du tableau. Pronote en
+            // ajoute une pour « Hors période » — un fourre-tout qui arrive en
+            // queue de liste et n'a rien à voir avec le trimestre courant. Sur
+            // le compte de démonstration, le tableau de bord affichait ainsi la
+            // moyenne de ce fourre-tout au lieu de celle du trimestre.
+            //
+            // À défaut de connaître la période en cours (charge d'une version
+            // antérieure), on retient la dernière entrée réellement numérique
+            // plutôt que la dernière tout court.
+            var officialAvg = null;
+            if (d.moyennes_periodes && d.moyennes_periodes.length) {
+                var estNombre = function (v) {
+                    var s = String(v === undefined || v === null ? '' : v).replace(',', '.').trim();
+                    return s !== '' && isFinite(parseFloat(s)) && parseFloat(s) >= 0;
+                };
+                var courante = String(d.periode_courante || '').trim();
+                var choisie = null;
+                if (courante) {
+                    d.moyennes_periodes.forEach(function (p) {
+                        if (String(p.periode || '').trim() === courante && estNombre(p.moyenne_eleve)) {
+                            choisie = p;
+                        }
+                    });
+                }
+                if (!choisie) {
+                    d.moyennes_periodes.forEach(function (p) {
+                        if (estNombre(p.moyenne_eleve)) { choisie = p; }
+                    });
+                }
+                if (choisie) { officialAvg = choisie.moyenne_eleve; }
+            }
 
             if (!officialAvg && (!notes || !Array.isArray(notes) || !notes.length)) {
                 if (moyEl) moyEl.textContent = '–';

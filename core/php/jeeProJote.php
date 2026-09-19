@@ -698,6 +698,10 @@ try {
         'photo'                 => $resolvedPhoto,
         'pronote_photo'         => $pronotePhotoUrl ?? '',
         'moyenne_generale'         => isset($result['Notes']['moyenne_generale'])         ? $result['Notes']['moyenne_generale']         : '',
+        // Nom de la période en cours : sans lui, le widget ne peut que deviner
+        // laquelle des moyennes par période afficher, et prenait la dernière —
+        // souvent « Hors période », un fourre-tout sans rapport.
+        'periode_courante'         => isset($result['Periodes']['periode_courante'])      ? $result['Periodes']['periode_courante']      : '',
         'matiere_en_baisse'        => isset($result['Notes']['matiere_en_baisse'])        ? $result['Notes']['matiere_en_baisse']        : '',
         'matiere_en_baisse_detail' => isset($result['Notes']['matiere_en_baisse_detail']) ? $result['Notes']['matiere_en_baisse_detail'] : array(),
         'notifications'            => isset($result['Notifications']['Notification'])      ? $result['Notifications']['Notification']      : array(),

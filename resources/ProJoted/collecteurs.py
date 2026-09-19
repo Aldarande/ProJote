@@ -556,6 +556,51 @@ def evaluations(client):
         )
 
 
+def _moyenne_utilisable(brute, periode, qui):
+    """Rend la moyenne si c'en est une, une chaîne vide sinon.
+
+    Deux valeurs sortent de PRONOTE sans être des moyennes :
+
+    * ``"-1"``, sa sentinelle pour « pas de moyenne calculée » ;
+    * des chaînes qui ne sont pas des nombres du tout. Relevé le 19 septembre
+      2026 sur le compte de démonstration : la période « Hors période » renvoie
+      ``"|5"``. Laissée passer, cette valeur traversait toute la chaîne et
+      s'affichait telle quelle sur le tableau de bord — « |5/20 » en guise de
+      moyenne générale, ce qu'on prend d'abord pour un défaut d'affichage.
+
+    Le filtre est volontairement strict : mieux vaut ne rien afficher qu'un
+    nombre dont on n'est pas sûr, s'agissant d'une moyenne scolaire.
+
+    Args:
+        brute: la valeur telle que rendue par pronotepy.
+        periode: nom de la période, pour le journal.
+        qui: « élève » ou « classe », pour le journal.
+
+    Returns:
+        str: la valeur d'origine si elle est numérique, sinon "".
+    """
+    valeur = str(brute or "").strip()
+    if not valeur:
+        return ""
+    if valeur == "-1":
+        logging.debug(
+            "Moyenne %s ignorée (sentinelle -1) — période=%s", qui, periode
+        )
+        return ""
+    try:
+        float(valeur.replace(",", "."))
+    except ValueError:
+        logging.info(
+            "Moyenne %s ignorée pour la période « %s » : PRONOTE renvoie %r, "
+            "qui n'est pas un nombre.",
+            qui,
+            periode,
+            valeur,
+        )
+        return ""
+    return brute
+
+
 def notes(client):
     """
     Récupère toutes les notes de l'année scolaire (toutes périodes) et les formate en JSON.
@@ -590,15 +635,8 @@ def notes(client):
                     "Moyenne brute Pronote — période=%s  élève=%r  classe=%r",
                     period_name, moy_eleve_raw, moy_classe_raw,
                 )
-                moy_eleve = moy_eleve_raw
-                moy_classe = moy_classe_raw
-                # Pronote retourne "-1" comme sentinelle quand la moyenne n'est pas disponible
-                if str(moy_eleve).strip() == "-1":
-                    logging.debug("Moyenne élève ignorée (sentinelle -1) — période=%s", period_name)
-                    moy_eleve = ""
-                if str(moy_classe).strip() == "-1":
-                    logging.debug("Moyenne classe ignorée (sentinelle -1) — période=%s", period_name)
-                    moy_classe = ""
+                moy_eleve = _moyenne_utilisable(moy_eleve_raw, period_name, "élève")
+                moy_classe = _moyenne_utilisable(moy_classe_raw, period_name, "classe")
                 if moy_eleve or moy_classe:
                     logging.debug(
                         "Moyenne retenue — période=%s  élève=%s  classe=%s",

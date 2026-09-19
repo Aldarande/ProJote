@@ -450,3 +450,63 @@ def test_aucune_attente_residuelle_dans_les_collecteurs():
     with open(chemin, encoding="utf-8") as f:
         source = f.read()
     assert "time.sleep(5)" not in source
+
+
+# ── Moyennes par période : ce que PRONOTE renvoie qui n'est pas un nombre ───
+#
+# Relevé le 19 septembre 2026 sur le compte de démonstration : la période
+# « Hors période » — un fourre-tout que PRONOTE ajoute en queue de liste —
+# renvoie « |5 » comme moyenne, pour l'élève comme pour la classe. Laissée
+# passer, cette valeur traversait le démon, le PHP et le widget, et s'affichait
+# telle quelle sur le tableau de bord : « |5/20 » en guise de moyenne générale.
+# On la prend d'abord pour un caractère rogné, alors que c'est la donnée.
+
+
+@pytest.mark.parametrize(
+    "brute, attendu",
+    [
+        ("14.87", "14.87"),
+        ("12,5", "12,5"),
+        ("0", "0"),
+        ("20", "20"),
+        # Sentinelle documentée de PRONOTE.
+        ("-1", ""),
+        # Le cas réellement rencontré.
+        ("|5", ""),
+        ("", ""),
+        ("   ", ""),
+        (None, ""),
+        ("Non noté", ""),
+        ("N/A", ""),
+    ],
+)
+def test_seules_les_vraies_moyennes_passent(brute, attendu):
+    import collecteurs as module_collecteurs
+
+    assert (
+        module_collecteurs._moyenne_utilisable(brute, "Trimestre 1", "élève") == attendu
+    )
+
+
+class _PeriodeAvecMoyenne:
+    def __init__(self, nom, eleve, classe):
+        self.name = nom
+        self.overall_average = eleve
+        self.class_overall_average = classe
+        self.grades = []
+        self.start = datetime.datetime(2026, 9, 1)
+        self.end = datetime.datetime(2026, 12, 20)
+
+
+def test_la_periode_fourre_tout_n_entre_pas_dans_la_charge(collecteurs):
+    """Le tableau transmis à Jeedom ne doit porter que des moyennes exploitables."""
+    client = _Client([
+        _PeriodeAvecMoyenne("Trimestre 1", "14.87", "11.65"),
+        _PeriodeAvecMoyenne("Hors période", "|5", "|5"),
+    ])
+    data = collecteurs.notes(client)
+
+    periodes = {m["periode"]: m for m in data["moyennes_periodes"]}
+    assert "Trimestre 1" in periodes
+    assert periodes["Trimestre 1"]["moyenne_eleve"] == "14.87"
+    assert "Hors période" not in periodes, "une moyenne non numérique a été transmise"
