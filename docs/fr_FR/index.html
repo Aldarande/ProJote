@@ -300,7 +300,11 @@
 
 
     <!-- ── Aperçu ─────────────────────────────
-         Les images vivent dans docs/picture/ et sont servies avec la doc.
+         Les images vivent dans docs/images/, sous le nom <id>_screenshotN.png :
+         c'est de là, et sous ce nom, que le Market Jeedom prend les captures de
+         la fiche du plugin. Vérifié sur le plugin officiel Enedis, dont seul
+         enedis_screenshot1.png se retrouve dans le magasin du Market — les
+         autres images du même dossier, non.
          Elles sont volontairement de largeur naturelle : le panneau est large,
          les widgets étroits, et les forcer à la même taille les rendrait
          illisibles.
@@ -315,7 +319,7 @@
     <p>Accessible par une icône sous le menu <em>Accueil</em>, avec un onglet par enfant :
     identité, compteurs de vie scolaire, emploi du temps du jour et du lendemain, dernières
     notes, devoirs, punitions et lien d'abonnement au calendrier.</p>
-    <p><img src="../picture/apercu-panneau-eleves.png"
+    <p><img src="../images/ProJote_screenshot1.png"
             alt="Panneau ProJote : un onglet par enfant, identité, statistiques, emploi du temps, notes, devoirs et calendrier"
             style="max-width:100%;border:1px solid #e0e8e4;border-radius:6px;"></p>
 
@@ -326,7 +330,7 @@
 
     <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;">
         <figure style="margin:0;max-width:461px;">
-            <img src="../picture/apercu-widget-messagerie.png"
+            <img src="../images/ProJote_screenshot2.png"
                  alt="Widget ProJote, onglet Messagerie : discussions Pronote avec expéditeur, date et extrait"
                  style="max-width:100%;border:1px solid #e0e8e4;border-radius:6px;">
             <figcaption style="font-size:12px;color:#6b7a75;margin-top:6px;">
@@ -335,7 +339,7 @@
             </figcaption>
         </figure>
         <figure style="margin:0;max-width:457px;">
-            <img src="../picture/apercu-widget-retards.png"
+            <img src="../images/ProJote_screenshot3.png"
                  alt="Widget ProJote, onglet Retards : moyenne générale, puis chaque retard avec sa date, sa durée et la mention justifié ou non"
                  style="max-width:100%;border:1px solid #e0e8e4;border-radius:6px;">
             <figcaption style="font-size:12px;color:#6b7a75;margin-top:6px;">
@@ -380,7 +384,7 @@
     <!-- ── Connexion ──────────────────────── -->
     <h1 id="connexion">Connexion</h1>
     <p>Deux méthodes sont disponibles. La méthode <strong>QR Code</strong> est recommandée car elle ne nécessite pas de stocker votre mot de passe.</p>
-    <img src="../picture/Image - connexion.png" alt="Sélection de la méthode de connexion" style="max-width:480px;">
+    <img src="../images/Image - connexion.png" alt="Sélection de la méthode de connexion" style="max-width:480px;">
 
     <h2 id="login">Par identifiants (Login)</h2>
     <p>Renseignez les informations suivantes dans la configuration de l'équipement :</p>
@@ -399,7 +403,7 @@ https://demo.index-education.net/pronote/eleve.html
 
 # Compte parent
 https://xxxxx.index-education.net/pronote/parent.html</code></pre>
-    <img src="../picture/Image - Login.png" alt="Formulaire de connexion par identifiants" style="max-width:480px;">
+    <img src="../images/Image - Login.png" alt="Formulaire de connexion par identifiants" style="max-width:480px;">
     <p>Cliquez sur <strong>Valider</strong>. Le plugin se connecte, génère un token persistant et sauvegarde les données.</p>
 
     <h2 id="qrcode">Par QR Code</h2>
@@ -411,7 +415,7 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
         <li>Choisissez un <strong>code PIN à 4 chiffres</strong> de votre choix.</li>
         <li>Cliquez sur <strong>Générer</strong>.</li>
     </ol>
-    <img src="../picture/Image - Gen QR CODE Pronote.png" alt="Génération QR Code Pronote" style="max-width:400px;">
+    <img src="../images/Image - Gen QR CODE Pronote.png" alt="Génération QR Code Pronote" style="max-width:400px;">
 
     <h3>2 — Capturer le QR Code</h3>
     <p>Sous Windows, utilisez la capture d'écran clavier pour copier le QR Code :</p>
@@ -425,7 +429,7 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
         <li>Saisissez le PIN à 4 chiffres choisi précédemment.</li>
         <li>Cliquez sur <strong>Valider</strong>.</li>
     </ol>
-    <img src="../picture/Image - PRojote Qrcode target.png" alt="Zone de dépôt du QR Code" style="max-width:400px;">
+    <img src="../images/Image - PRojote Qrcode target.png" alt="Zone de dépôt du QR Code" style="max-width:400px;">
 
     <div class="callout callout-info">
         <strong>Token backup automatique</strong>

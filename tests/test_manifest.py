@@ -153,11 +153,11 @@ def test_les_images_de_la_doc_existent(page):
 
 def test_les_captures_d_apercu_sont_presentes():
     """Les trois captures de la section « Aperçu », qui servent aussi au Market."""
-    dossier = os.path.join(ROOT, "docs", "picture")
+    dossier = os.path.join(ROOT, "docs", "images")
     for nom in (
-        "apercu-panneau-eleves.png",
-        "apercu-widget-messagerie.png",
-        "apercu-widget-retards.png",
+        "ProJote_screenshot1.png",
+        "ProJote_screenshot2.png",
+        "ProJote_screenshot3.png",
     ):
         chemin = os.path.join(dossier, nom)
         assert os.path.exists(chemin), f"capture manquante : {nom}"
@@ -176,10 +176,12 @@ def test_les_captures_du_market_suivent_la_convention():
     with open(INFO_PATH, encoding="utf-8") as fh:
         plugin_id = json.load(fh)["id"]
 
-    dossier = os.path.join(ROOT, "plugin_info")
+    dossier = os.path.join(ROOT, "docs", "images")
     captures = sorted(
         f for f in os.listdir(dossier) if "_screenshot" in f.lower()
     )
+    # docs/images/ contient aussi les illustrations de la documentation ; seules
+    # celles qui portent « _screenshot » intéressent le Market.
     assert captures, "aucune capture pour la fiche du Market"
 
     attendus = [f"{plugin_id}_screenshot{n}.png" for n in range(1, len(captures) + 1)]
