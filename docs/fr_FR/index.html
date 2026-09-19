@@ -251,6 +251,7 @@
         <a href="#qrcode" class="sub">Par QR Code</a>
 
         <div class="sidebar-section">Référence</div>
+        <a href="#apercu">Aperçu</a>
         <a href="#prerequis">Prérequis</a>
         <a href="#utilisation">Commandes disponibles</a>
         <a href="#cadence">Cadence de collecte</a>
@@ -295,6 +296,53 @@
     <div class="callout callout-info">
         <strong>Compatibilité</strong>
         Jeedom 4.4+ · Python 3.8+ · Debian 11/12 · Comptes élèves et parents.
+    </div>
+
+
+    <!-- ── Aperçu ─────────────────────────────
+         Les images vivent dans docs/picture/ et sont servies avec la doc.
+         Elles sont volontairement de largeur naturelle : le panneau est large,
+         les widgets étroits, et les forcer à la même taille les rendrait
+         illisibles.
+    ───────────────────────────────────────── -->
+    <h1 id="apercu">Aperçu</h1>
+
+    <p>Trois écrans suffisent à montrer ce que le plugin ajoute à Jeedom. Les captures
+    ci-dessous proviennent du site de démonstration de Pronote : aucune donnée réelle
+    d'élève n'y figure.</p>
+
+    <h2>Le panneau, pour suivre toute la fratrie</h2>
+    <p>Accessible par une icône sous le menu <em>Accueil</em>, avec un onglet par enfant :
+    identité, compteurs de vie scolaire, emploi du temps du jour et du lendemain, dernières
+    notes, devoirs, punitions et lien d'abonnement au calendrier.</p>
+    <p><img src="../picture/apercu-panneau-eleves.png"
+            alt="Panneau ProJote : un onglet par enfant, identité, statistiques, emploi du temps, notes, devoirs et calendrier"
+            style="max-width:100%;border:1px solid #e0e8e4;border-radius:6px;"></p>
+
+    <h2>Le widget, sur le tableau de bord</h2>
+    <p>Un équipement par élève, avec ses onglets — devoirs, notes, absences, retards,
+    punitions, menu de la cantine, messagerie et statistiques. Les pastilles rouges
+    signalent ce qui demande votre attention.</p>
+
+    <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;">
+        <figure style="margin:0;max-width:461px;">
+            <img src="../picture/apercu-widget-messagerie.png"
+                 alt="Widget ProJote, onglet Messagerie : discussions Pronote avec expéditeur, date et extrait"
+                 style="max-width:100%;border:1px solid #e0e8e4;border-radius:6px;">
+            <figcaption style="font-size:12px;color:#6b7a75;margin-top:6px;">
+                Onglet <strong>Messagerie</strong> — les discussions Pronote, expéditeur et extrait,
+                avec le nombre de messages non lus.
+            </figcaption>
+        </figure>
+        <figure style="margin:0;max-width:457px;">
+            <img src="../picture/apercu-widget-absences.png"
+                 alt="Widget ProJote, onglet Absences : liste des absences avec dates, durée et statut justifié ou non"
+                 style="max-width:100%;border:1px solid #e0e8e4;border-radius:6px;">
+            <figcaption style="font-size:12px;color:#6b7a75;margin-top:6px;">
+                Onglet <strong>Absences</strong> — chaque absence avec sa plage horaire, sa durée
+                et la mention <em>justifiée</em> ou non.
+            </figcaption>
+        </figure>
     </div>
 
     <!-- ── Prérequis ──────────────────────── -->

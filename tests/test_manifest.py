@@ -121,3 +121,45 @@ def test_les_commandes_riches_ont_un_gabarit_mobile(commandes):
         and not cmd["mobile"].startswith("ProJote::")
     ]
     assert not sans_mobile, f"gabarit dashboard riche mais mobile en badge : {sans_mobile}"
+
+
+# ── Images de la documentation ───────────────────────────────────────────────
+#
+# Les pages de doc référencent leurs images en relatif (« ../picture/… »).
+# Rien ne signale une image absente : la page se publie, et le lecteur voit un
+# cadre vide. Quatre d'entre elles ont ainsi disparu d'un commit intitulé
+# « test » en juillet 2025 et sont restées manquantes plus d'un an.
+
+IMAGE_RE = re.compile(r'src="(?P<chemin>\.\./[^"]+\.(?:png|jpg|jpeg|gif|webp|svg))"')
+
+
+@pytest.mark.parametrize("page", ["index.html", "beta.html", "dev.html"])
+def test_les_images_de_la_doc_existent(page):
+    chemin_page = os.path.join(ROOT, "docs", "fr_FR", page)
+    if not os.path.exists(chemin_page):
+        pytest.skip(f"{page} absent")
+    with open(chemin_page, encoding="utf-8") as fh:
+        references = IMAGE_RE.findall(fh.read())
+
+    manquantes = [
+        ref
+        for ref in references
+        if not os.path.exists(
+            os.path.normpath(os.path.join(ROOT, "docs", "fr_FR", ref))
+        )
+    ]
+    assert not manquantes, f"images référencées mais absentes dans {page} : {manquantes}"
+
+
+def test_les_captures_d_apercu_sont_presentes():
+    """Les trois captures de la section « Aperçu », qui servent aussi au Market."""
+    dossier = os.path.join(ROOT, "docs", "picture")
+    for nom in (
+        "apercu-panneau-eleves.png",
+        "apercu-widget-messagerie.png",
+        "apercu-widget-absences.png",
+    ):
+        chemin = os.path.join(dossier, nom)
+        assert os.path.exists(chemin), f"capture manquante : {nom}"
+        with open(chemin, "rb") as fh:
+            assert fh.read(8).startswith(b"\x89PNG"), f"{nom} n'est pas un PNG"
