@@ -286,11 +286,12 @@
 <h2>Messagerie réparée <span class="badge badge-fix">1.7.0</span></h2>
 <p>Deux comptes, deux échecs à chaque cycle, deux causes sans rapport.</p>
 <ul>
-    <li><strong>Une liste d'étiquettes que tous les serveurs ne renvoient pas.</strong> La
-    bibliothèque qui dialogue avec Pronote la suppose toujours présente ; sur les établissements qui
-    l'omettent, la messagerie échouait à chaque cycle et l'onglet restait vide pour toujours. Aucune
-    version publiée ne corrige ce point — le plugin complète donc la réponse par une liste vide, ce
-    qui correspond à la situation réelle : des discussions sans étiquette.</li>
+    <li><strong>Deux listes que tous les serveurs ne renvoient pas.</strong> La bibliothèque qui
+    dialogue avec Pronote suppose toujours présentes les étiquettes de discussion, puis les
+    discussions elles-mêmes ; certains établissements n'en renvoient aucune des deux. Sur ceux-là,
+    la messagerie échouait à chaque cycle et l'onglet restait vide pour toujours. Aucune version
+    publiée ne corrige ce point — le plugin complète donc la réponse par des listes vides, ce qui
+    correspond à la situation réelle : aucune étiquette, aucune discussion.</li>
     <li><strong>Une messagerie que l'établissement n'a pas ouverte.</strong> Ce n'est pas une panne,
     et c'était pourtant écrit en erreur toutes les heures. C'est désormais noté sans alarme.</li>
 </ul>

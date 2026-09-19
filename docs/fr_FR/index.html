@@ -793,7 +793,7 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
             </tr>
             <tr>
                 <td><span class="badge badge-fix">Correctif</span></td>
-                <td><strong>La messagerie ne remontait plus rien sur certains établissements</strong> — la bibliothèque qui dialogue avec Pronote lit, dans la réponse du serveur, une liste d'étiquettes de discussion qu'elle suppose toujours présente. Tous les serveurs ne la renvoient pas : sur ceux-là, la collecte de la messagerie échouait à chaque cycle et l'onglet restait vide indéfiniment. Aucune version publiée de la bibliothèque ne corrige ce point ; le plugin complète donc lui-même la réponse par une liste vide, ce qui correspond exactement à la situation — des discussions sans étiquette. Un serveur qui renvoie ses étiquettes n'est pas touché.</td>
+                <td><strong>La messagerie ne remontait plus rien sur certains établissements</strong> — la bibliothèque qui dialogue avec Pronote lit, dans la réponse du serveur, deux listes qu'elle suppose toujours présentes : les étiquettes de discussion, puis les discussions elles-mêmes. Certains établissements n'en renvoient aucune des deux — sur ceux-là, la collecte de la messagerie échouait à chaque cycle et l'onglet restait vide indéfiniment. Aucune version publiée de la bibliothèque ne corrige ce point ; le plugin complète donc lui-même la réponse par des listes vides, ce qui correspond exactement à la situation : aucune étiquette, aucune discussion. Un serveur qui renvoie ses listes n'est pas touché.</td>
             </tr>
             <tr>
                 <td><span class="badge badge-perf">Fiabilité</span></td>

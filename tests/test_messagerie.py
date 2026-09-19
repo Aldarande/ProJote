@@ -7,8 +7,11 @@ relevés le 17 septembre 2026 dans le journal du Jeedom de développement :
     Erreur lors de l'accès aux discussions Pronote : Onglet 131 non accessible
       pour ce compte (ListeMessagerie)
 
-Le premier est un défaut : pronotepy lit une clé que tous les serveurs ne
-renvoient pas, et la messagerie de ce compte restait vide pour toujours.
+Le premier est un défaut : pronotepy lit deux listes — « listeEtiquettes » puis
+« listeMessagerie » — que tous les serveurs ne renvoient pas, et la messagerie
+de ce compte restait vide pour toujours. Ne réparer que la première faisait
+simplement échouer sur la seconde, constaté le 18 septembre en conditions
+réelles.
 Le second n'en est pas un : l'établissement n'a pas ouvert la messagerie à ce
 compte. Le journaliser en erreur remplissait le journal d'une alerte horaire sur
 un état parfaitement normal — et noyait les vraies pannes.
@@ -40,29 +43,54 @@ def test_liste_etiquettes_ajoutee_quand_le_serveur_l_omet(compat):
     étiquette, ce qui est le cas sur ces serveurs.
     """
     reponse = _reponse({"listeMessagerie": {"V": []}})
-    repare = compat._reparer_liste_etiquettes("ListeMessagerie", reponse)
+    repare = compat._reparer_reponse_messagerie("ListeMessagerie", reponse)
     assert repare["dataSec"]["data"]["listeEtiquettes"] == {"V": []}
 
 
-def test_les_etiquettes_du_serveur_ne_sont_pas_ecrasees(compat):
+def test_liste_messagerie_ajoutee_aussi(compat):
+    """Réparer la première clé faisait simplement échouer sur la suivante.
+
+    Constaté sur le compte concerné le 18 septembre 2026 : une fois
+    « listeEtiquettes » complétée, pronotepy tombait sur
+    « KeyError: 'listeMessagerie' ». Ce serveur omet les deux.
+    """
+    reponse = _reponse({"listeEtiquettes": {"V": []}})
+    repare = compat._reparer_reponse_messagerie("ListeMessagerie", reponse)
+    assert repare["dataSec"]["data"]["listeMessagerie"] == {"V": []}
+
+
+def test_les_deux_listes_absentes_a_la_fois(compat):
+    """Le cas réellement rencontré : la réponse ne porte ni l'une ni l'autre."""
+    reponse = _reponse({"autreChose": 1})
+    repare = compat._reparer_reponse_messagerie("ListeMessagerie", reponse)
+    donnees = repare["dataSec"]["data"]
+    assert donnees["listeEtiquettes"] == {"V": []}
+    assert donnees["listeMessagerie"] == {"V": []}
+    assert donnees["autreChose"] == 1, "le reste de la réponse est intact"
+
+
+def test_les_listes_du_serveur_ne_sont_pas_ecrasees(compat):
     etiquettes = {"V": [{"N": "1", "G": 2}]}
-    reponse = _reponse({"listeEtiquettes": etiquettes, "listeMessagerie": {"V": []}})
-    repare = compat._reparer_liste_etiquettes("ListeMessagerie", reponse)
+    discussions = {"V": [{"N": "d1"}]}
+    reponse = _reponse({"listeEtiquettes": etiquettes, "listeMessagerie": discussions})
+    repare = compat._reparer_reponse_messagerie("ListeMessagerie", reponse)
     assert repare["dataSec"]["data"]["listeEtiquettes"] is etiquettes
+    assert repare["dataSec"]["data"]["listeMessagerie"] is discussions
 
 
 def test_seule_la_messagerie_est_reparee(compat):
     """Aucune autre réponse ne doit se voir ajouter une clé qu'elle n'a pas."""
     reponse = _reponse({"listeAbsences": {"V": []}})
-    compat._reparer_liste_etiquettes("PagePresence", reponse)
+    compat._reparer_reponse_messagerie("PagePresence", reponse)
     assert "listeEtiquettes" not in reponse["dataSec"]["data"]
+    assert "listeMessagerie" not in reponse["dataSec"]["data"]
 
 
 @pytest.mark.parametrize(
     "reponse", [None, "pas un dictionnaire", {}, {"dataSec": {}}, {"dataSec": {"data": None}}]
 )
 def test_une_reponse_inattendue_traverse_sans_dommage(compat, reponse):
-    assert compat._reparer_liste_etiquettes("ListeMessagerie", reponse) is reponse
+    assert compat._reparer_reponse_messagerie("ListeMessagerie", reponse) is reponse
 
 
 def test_la_reparation_est_posee_sur_les_deux_chemins():
@@ -79,7 +107,7 @@ def test_la_reparation_est_posee_sur_les_deux_chemins():
     with open(chemin, encoding="utf-8") as f:
         source = f.read()
     # Une définition, un appel côté client de base, deux côté client parent.
-    assert source.count("_reparer_liste_etiquettes") == 4
+    assert source.count("_reparer_reponse_messagerie") == 4
 
 
 # ── Onglet non ouvert à ce compte ───────────────────────────────────────────

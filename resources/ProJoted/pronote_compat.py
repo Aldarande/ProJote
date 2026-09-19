@@ -71,11 +71,23 @@ import logging
 _applied = False
 
 
-def _reparer_liste_etiquettes(function_name, reponse):
-    """Ajoute une liste d'étiquettes vide quand le serveur l'omet.
+# Listes que pronotepy lit sans précaution dans la réponse de ListeMessagerie.
+# Une liste vide dit exactement ce que leur absence signifie : aucune étiquette,
+# aucune discussion.
+_LISTES_MESSAGERIE = ("listeEtiquettes", "listeMessagerie")
 
-    Ne touche qu'à la réponse de ``ListeMessagerie``, et seulement si la clé
-    manque : un serveur qui la renvoie garde la sienne intacte.
+
+def _reparer_reponse_messagerie(function_name, reponse):
+    """Complète les listes que le serveur omet dans la réponse de messagerie.
+
+    pronotepy lit ``listeEtiquettes["V"]`` puis ``listeMessagerie["V"]`` sans
+    vérifier leur présence. Tous les serveurs ne les renvoient pas : sur un
+    lycée éprouvé le 18 septembre 2026, les deux manquaient, et la messagerie
+    échouait à chaque cycle — d'abord sur l'une, puis sur l'autre une fois la
+    première réparée.
+
+    Ne touche qu'à la réponse de ``ListeMessagerie``, et seulement aux clés
+    absentes : un serveur qui les renvoie garde les siennes intactes.
 
     Args:
         function_name: nom de la fonction PRONOTE appelée.
@@ -87,11 +99,20 @@ def _reparer_liste_etiquettes(function_name, reponse):
     if function_name != "ListeMessagerie" or not isinstance(reponse, dict):
         return reponse
     donnees = reponse.get("dataSec", {}).get("data")
-    if isinstance(donnees, dict) and "listeEtiquettes" not in donnees:
-        donnees["listeEtiquettes"] = {"V": []}
+    if not isinstance(donnees, dict):
+        return reponse
+    manquantes = [cle for cle in _LISTES_MESSAGERIE if cle not in donnees]
+    if manquantes:
+        for cle in manquantes:
+            donnees[cle] = {"V": []}
+        # Les clés réellement présentes sont journalisées : c'est ce qui permet
+        # de distinguer « messagerie vide » d'une réponse de forme inattendue,
+        # sans avoir à rejouer une session sur le compte concerné.
         logging.debug(
-            "pronote_compat :: ListeMessagerie sans « listeEtiquettes » — "
-            "liste vide ajoutée (discussions sans étiquette)."
+            "pronote_compat :: ListeMessagerie sans %s — liste(s) vide(s) "
+            "ajoutée(s). Clés reçues : %s",
+            ", ".join("« %s »" % c for c in manquantes),
+            sorted(donnees.keys()),
         )
     return reponse
 
@@ -216,7 +237,7 @@ def _install() -> None:
                 % (onglet, function_name)
             )
         reponse = _original_post(self, function_name, onglet, data)
-        return _reparer_liste_etiquettes(function_name, reponse)
+        return _reparer_reponse_messagerie(function_name, reponse)
 
     clients.ClientBase.post = _post_sans_reauth_inutile
 
@@ -347,7 +368,7 @@ def _install() -> None:
             return post_data
 
         try:
-            return _reparer_liste_etiquettes(
+            return _reparer_reponse_messagerie(
                 function_name, self.communication.post(function_name, _payload())
             )
         except PronoteAPIError as e:
@@ -387,7 +408,7 @@ def _install() -> None:
                 self._refreshing = False
             # _payload() est ré-évalué ici : il lit le _selected_child
             # reconstruit par le refresh corrigé ci-dessus.
-            return _reparer_liste_etiquettes(
+            return _reparer_reponse_messagerie(
                 function_name, self.communication.post(function_name, _payload())
             )
 
