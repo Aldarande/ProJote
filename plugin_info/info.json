@@ -3,7 +3,7 @@
 	"name": "ProJote",
 	"pluginVersion": "1.7.0",
 	"description": {
-		"fr_FR": "Plugin destiné à récupérer les informations de Pronote"
+		"fr_FR": "Récupérez les données de Pronote et intégrez-les à Jeedom. ProJote interroge Pronote automatiquement et transforme ce qu'il y trouve en commandes Jeedom : notes, emploi du temps, devoirs, absences, retards, punitions, évènements du carnet, menu de la cantine et messagerie. Ces commandes s'utilisent comme toutes les autres dans vos scénarios — être prévenu d'une nouvelle note, rappeler les devoirs du lendemain, alerter sur une absence. Un widget par enfant sur le tableau de bord, un panneau qui réunit toute la fratrie, et un calendrier iCal à abonner depuis votre agenda. Connexion par QR Code ou par identifiants (ENT/CAS), comptes élève comme parent, plusieurs enfants et plusieurs établissements. Vos données restent sur votre Jeedom : aucune télémétrie, aucun intermédiaire. Gratuit et open source (AGPL v3)."
 	},
 	"licence": "AGPL v3",
 	"author": "Aldarande",
