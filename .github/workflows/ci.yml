@@ -16,6 +16,10 @@ jobs:
         with:
           python-version: "3.11"
       - name: Installer ruff
+        # Volontairement non épinglé : le jeu de règles est déclaré dans
+        # ruff.toml, donc une nouvelle version de ruff ne peut plus élargir le
+        # lint toute seule — ce qui faisait échouer ce job à chaque poussée
+        # depuis la sortie de ruff 0.16.
         run: pip install ruff
       - name: Erreurs critiques (tout le dépôt)
         # E9 = syntaxe ; F63/F7/F82 = noms indéfinis, comparaisons douteuses…

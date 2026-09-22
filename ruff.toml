@@ -7,3 +7,21 @@ extend-exclude = [
     "resources/ProJoted/jeedom",
     "resources/python_venv",
 ]
+
+# Le jeu de règles est déclaré ici, et non hérité du défaut de ruff.
+#
+# Il l'était jusqu'au 22 septembre 2026, et ruff 0.16 a élargi son défaut :
+# fuseaux horaires obligatoires sur les datetime, tri des imports, exceptions
+# maison, formatage… 59 manquements sont apparus dans tests/ sans qu'une seule
+# ligne du dépôt ait bougé, et la CI — qui installe le ruff du jour — est
+# tombée en échec à chaque poussée. Le projet choisit désormais ses règles :
+# une montée de version de ruff ne peut plus changer le sens du lint sans
+# qu'on l'ait voulu.
+#
+# Ce sont les quatre familles du défaut historique :
+#   E4  imports mal placés
+#   E7  comparaisons douteuses, définitions suspectes
+#   E9  erreurs de syntaxe
+#   F   noms indéfinis, imports inutilisés, f-strings sans champ
+[lint]
+select = ["E4", "E7", "E9", "F"]
