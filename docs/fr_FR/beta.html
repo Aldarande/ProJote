@@ -284,6 +284,32 @@
 
 <h1 id="beta-nouveautes">Nouveautés en cours</h1>
 
+<h2>Reprise après expiration de session <span class="badge badge-fix">1.7.0</span></h2>
+<p>Pronote est une application à état : l'identifiant d'une période — un trimestre, un semestre —
+ne vaut que pour la session qui l'a émis. Quand la session expire en cours de relevé, la
+bibliothèque se reconnecte d'elle-même et rejoue la requête, mais <strong>avec le même
+identifiant</strong>, désormais périmé. Le rejeu échoue donc exactement comme la tentative.</p>
+<p>Le plugin en concluait que l'onglet <em>Présence</em> lui était refusé, et abandonnait les
+quatre relevés du cycle — absences, retards, punitions, évènements — là où relire la liste des
+périodes aurait suffi. Relevé chez un bêta-testeur le 19 septembre :</p>
+<pre><code>ERROR - Collecte en erreur pour les absences : Onglet Présence (19)
+        inaccessible … Unknown error from pronote: 20 | La page a expiré ! (11)</code></pre>
+<ul>
+    <li><strong>Les deux messages ne sont plus confondus.</strong> « Accès refusé » est un droit
+    non accordé : c'est définitif, insister ne sert à rien. « La page a expiré » est une session
+    morte : les objets sont à relire. Ils appelaient jusqu'ici la même réaction — l'abandon.</li>
+    <li><strong>Une reprise, et une seule par cycle.</strong> Les périodes sont relues et le relevé
+    recommencé. La limite est délibérée : chaque reprise passe par une authentification complète,
+    et leur accumulation a déjà valu une suspension d'adresse IP par Pronote. Mieux vaut un cycle
+    sans absences qu'une adresse bloquée une heure.</li>
+    <li><strong>Écrit une fois pour les trois relevés.</strong> Absences, retards et punitions
+    partageaient la même boucle recopiée trois fois ; elle est maintenant unique. Trois copies
+    d'une reprise, ce sont trois façons de diverger.</li>
+</ul>
+<p>Onze tests couvrent le chemin : le cas nominal qui ne doit rien coûter, la reprise qui aboutit,
+la seconde reprise refusée, l'expiration qui persiste, et le droit refusé qu'aucune reprise ne
+doit venir masquer.</p>
+
 <h2>ENT : trois entrées qui ne menaient nulle part <span class="badge badge-fix">1.7.0</span></h2>
 <p>La liste <em>Mode CAS</em> est écrite dans le plugin, tandis que les connecteurs ENT vivent dans
 la bibliothèque Pronote, qui en retire et en renomme au fil de ses versions. Trois entrées

@@ -60,6 +60,9 @@ from presence_pronote import (
     _noter_refus_presence,
     _presence_deja_refusee,
     _refus_de_presence,
+    noter_reprise,
+    reprise_deja_tentee,
+    session_expiree,
 )
 
 
@@ -1043,21 +1046,11 @@ def retards(client):
             data["error"] = _erreur_de_refus(eq_id, "les retards")
             return data
 
-        all_retards_map = {}
-        for period in _periodes_couvrantes(all_periods):
-            try:
-                for d in period.delays or []:
-                    all_retards_map[d.id] = d
-            except Exception as e:
-                if _refus_de_presence(e):
-                    _noter_refus_presence(eq_id, "retards", e)
-                    data["error"] = _erreur_de_refus(eq_id, "les retards")
-                    break
-                logging.warning(
-                    f"Impossible de lire les retards de la période {getattr(period, 'name', '?')} : {e}"
-                )
-
-        all_retards = list(all_retards_map.values())
+        all_retards, motif = _relever_sur_periodes(
+            client, eq_id, "delays", "retards", periodes=all_periods
+        )
+        if motif:
+            data["error"] = motif
         if all_retards:
             all_retards = sorted(
                 all_retards, key=lambda delay: delay.date, reverse=True
@@ -1085,6 +1078,113 @@ def retards(client):
         )
 
 
+def _relever_sur_periodes(client, eq_id, attribut, quoi, periodes=None):
+    """Parcourt les périodes couvrantes et rend les éléments, dédoublonnés.
+
+    Les trois collectes de l'onglet « Présence » — absences, retards,
+    punitions — faisaient la même boucle, au nom de l'attribut près. Elle est
+    écrite ici une fois, parce que la reprise de session qu'elle porte doit être
+    identique pour les trois : trois copies d'une reprise, c'est trois façons de
+    diverger.
+
+    **La reprise.** PRONOTE est une application à état : l'identifiant d'une
+    période ne vaut que pour la session qui l'a émise. Quand la session meurt en
+    cours de cycle, pronotepy se ré-authentifie tout seul et rejoue la
+    requête — mais avec le MÊME objet période, dont l'identifiant appartient à
+    la session morte. Le rejeu échoue donc exactement comme la tentative, et le
+    plugin en concluait que l'onglet lui était refusé : quatre onglets vides
+    pour une session à renouveler.
+
+    On relit donc ``client.periods`` — que ``refresh()`` a reconstruit avec des
+    identifiants neufs — et on recommence. Une seule fois par cycle : chaque
+    reprise coûte une authentification complète, et leur accumulation a déjà
+    valu une suspension d'adresse IP.
+
+    Args:
+        client: client pronotepy connecté.
+        eq_id: identifiant de l'équipement, pour la mémoire des refus.
+        attribut: nom de l'attribut de période à lire (``absences``,
+            ``delays``, ``punishments``).
+        quoi: libellé pour les journaux (« absences », « retards »…).
+        periodes: liste déjà lue par l'appelant, employée au premier passage.
+            ``client.periods`` est relu de toute façon si une reprise devient
+            nécessaire — c'est tout l'objet de la manœuvre.
+
+    Returns:
+        tuple: (liste des éléments dédoublonnés par id, motif d'erreur ou None).
+    """
+
+    def _parcourir(periodes):
+        """Un passage complet sur les périodes couvrantes.
+
+        Returns:
+            tuple: (éléments trouvés par id, exception d'expiration ou None,
+            motif de refus ou None). Les trois cas sont distincts : on peut
+            rendre des éléments ET une raison de s'arrêter.
+        """
+        trouves = {}
+        for period in _periodes_couvrantes(periodes):
+            try:
+                for element in getattr(period, attribut) or []:
+                    trouves[element.id] = element
+            except Exception as e:
+                if _refus_de_presence(e):
+                    _noter_refus_presence(eq_id, quoi, e)
+                    return trouves, None, _erreur_de_refus(eq_id, "les " + quoi)
+                if session_expiree(e):
+                    return trouves, e, None
+                logging.warning(
+                    "Impossible de lire les %s de la période %s : %s",
+                    quoi,
+                    getattr(period, "name", "?"),
+                    e,
+                )
+        return trouves, None, None
+
+    trouves, expiree, erreur = _parcourir(
+        client.periods if periodes is None else periodes
+    )
+    if expiree is None:
+        return list(trouves.values()), erreur
+
+    # Session morte. pronotepy s'est déjà ré-authentifié sous le capot ; ce qui
+    # manque, ce sont des objets période de la nouvelle session.
+    if reprise_deja_tentee(eq_id):
+        logging.warning(
+            "Session PRONOTE expirée pendant la collecte des %s, et la reprise "
+            "du cycle a déjà été employée : %s",
+            quoi,
+            expiree,
+        )
+        return list(trouves.values()), (
+            "Session PRONOTE expirée (%s) et reprise déjà tentée sur ce cycle" % expiree
+        )
+
+    noter_reprise(eq_id)
+    logging.info(
+        "Session PRONOTE expirée pendant la collecte des %s (%s) : relecture des "
+        "périodes et nouvelle tentative.",
+        quoi,
+        expiree,
+    )
+    try:
+        periodes_neuves = client.periods
+    except Exception as e:
+        logging.error("Relecture des périodes impossible après expiration : %s", e)
+        return list(trouves.values()), "Session PRONOTE expirée, périodes illisibles : %s" % e
+
+    trouves, encore, erreur = _parcourir(periodes_neuves)
+    if encore is not None:
+        logging.error(
+            "Session PRONOTE de nouveau expirée pour les %s après reprise : %s",
+            quoi,
+            encore,
+        )
+        return list(trouves.values()), "Session PRONOTE expirée malgré une reprise : %s" % encore
+    logging.info("Reprise réussie, %s : %d éléments.", quoi, len(trouves))
+    return list(trouves.values()), erreur
+
+
 def absences(client):
     try:
         data = {"absence": [], "nb_absences": 0, "derniere_absence": []}
@@ -1108,21 +1208,11 @@ def absences(client):
             data["error"] = _erreur_de_refus(eq_id, "les absences")
             return data
 
-        all_absences_map = {}
-        for period in _periodes_couvrantes(all_periods):
-            try:
-                for a in period.absences or []:
-                    all_absences_map[a.id] = a
-            except Exception as e:
-                if _refus_de_presence(e):
-                    _noter_refus_presence(eq_id, "absences", e)
-                    data["error"] = _erreur_de_refus(eq_id, "les absences")
-                    break
-                logging.warning(
-                    f"Impossible de lire les absences de la période {getattr(period, 'name', '?')} : {e}"
-                )
-
-        all_absences = list(all_absences_map.values())
+        all_absences, motif = _relever_sur_periodes(
+            client, eq_id, "absences", "absences", periodes=all_periods
+        )
+        if motif:
+            data["error"] = motif
         if all_absences:
             all_absences = sorted(all_absences, key=lambda a: a.from_date, reverse=True)
             for absence in all_absences:
@@ -1173,19 +1263,12 @@ def punitions(client):
             data["error"] = _erreur_de_refus(eq_id, "les punitions")
             return data
 
-        all_punitions_map = {}
-        for period in _periodes_couvrantes(all_periods):
-            try:
-                for p in period.punishments or []:
-                    all_punitions_map[p.id] = p
-            except Exception as e:
-                if _refus_de_presence(e):
-                    _noter_refus_presence(eq_id, "punitions", e)
-                    data["error"] = _erreur_de_refus(eq_id, "les punitions")
-                    break
-                logging.warning(
-                    f"Impossible de lire les punitions de la période {getattr(period, 'name', '?')} : {e}"
-                )
+        all_punitions, motif = _relever_sur_periodes(
+            client, eq_id, "punishments", "punitions", periodes=all_periods
+        )
+        if motif:
+            data["error"] = motif
+        all_punitions_map = {p.id: p for p in all_punitions}
 
         import datetime as _dt
 

@@ -51,16 +51,56 @@ def cycle_neuf(daemon, monkeypatch):
 
 
 class TestDetectionDuRefus:
+    """« Accès refusé » et « La page a expiré » ne disent pas la même chose.
+
+    Les confondre — ce que faisait le code jusqu'au 20 septembre 2026 — fait
+    abandonner les quatre collectes de l'onglet pour tout le cycle, alors qu'une
+    session expirée se répare en relisant les périodes. Un bêta-testeur y a
+    perdu ses absences, retards, punitions et évènements sur un simple
+    « La page a expiré ! (11) ».
+    """
+
     @pytest.mark.parametrize(
         "message",
         [
             "Unknown error from pronote: 3 | Accès refusé",
+            "Acces refuse",
+        ],
+    )
+    def test_un_droit_non_accorde_est_un_refus(self, daemon, message):
+        assert daemon._refus_de_presence(RuntimeError(message)) is True
+
+    @pytest.mark.parametrize(
+        "message",
+        [
             "Unknown error from pronote: 20 | La page a expiré ! (11)",
             "Unknown error from pronote: 8 | La page a expiré ! (1)",
         ],
     )
-    def test_signatures_du_refus(self, daemon, message):
-        assert daemon._refus_de_presence(RuntimeError(message)) is True
+    def test_une_session_morte_n_est_pas_un_refus(self, daemon, message):
+        """C'est réparable : la traiter comme un refus interdit la reprise."""
+        import presence_pronote
+
+        assert daemon._refus_de_presence(RuntimeError(message)) is False
+        assert presence_pronote.session_expiree(RuntimeError(message)) is True
+
+    def test_l_exception_dediee_de_pronotepy_est_reconnue(self):
+        """pronotepy réserve ExpiredObject (erreur G=22) au cas qu'il nomme."""
+        import presence_pronote
+
+        class ExpiredObject(Exception):
+            pass
+
+        assert presence_pronote.session_expiree(ExpiredObject("objet expiré")) is True
+
+    @pytest.mark.parametrize(
+        "message",
+        ["Connection timed out", "Your IP address is suspended.", "boum"],
+    )
+    def test_ni_refus_ni_expiration(self, daemon, message):
+        import presence_pronote
+
+        assert presence_pronote.session_expiree(RuntimeError(message)) is False
 
     @pytest.mark.parametrize(
         "message",

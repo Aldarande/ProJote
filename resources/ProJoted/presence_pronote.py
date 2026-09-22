@@ -49,16 +49,45 @@ _presence_refusee = {}
 
 
 def _refus_de_presence(exception):
-    """Pronote refuse-t-il l'accès à l'onglet Présence ?
+    """Pronote refuse-t-il l'accès à l'onglet Présence, faute de droit ?
 
-    Le refus initial est « Accès refusé » ; après la ré-authentification que
-    pronotepy déclenche, le rejeu échoue sur « La page a expiré ». Les deux
-    signatures traduisent la même impasse.
+    « Accès refusé » et « La page a expiré » étaient traités ici comme une même
+    impasse. Ce sont deux choses opposées, et les confondre coûtait cher :
+
+    ===========================  ==========================  =================
+    Message PRONOTE              Ce que c'est                Bonne réponse
+    ===========================  ==========================  =================
+    ``Accès refusé``             un droit non accordé        s'abstenir, c'est
+                                                             définitif
+    ``La page a expiré``         la session est morte        relire les objets
+                                                             et réessayer
+    ===========================  ==========================  =================
+
+    Une session expirée prise pour un refus de droit fait abandonner les quatre
+    collectes de l'onglet pour tout le cycle, là où relire les périodes aurait
+    suffi. Relevé chez un bêta-testeur le 19 septembre 2026 : quatre onglets
+    vides sur un simple « La page a expiré ! (11) ».
     """
     message = str(exception).lower()
-    return "accès refusé" in message or "acces refuse" in message or (
-        "page a expiré" in message
-    )
+    return "accès refusé" in message or "acces refuse" in message
+
+
+def session_expiree(exception):
+    """La session PRONOTE est-elle morte ?
+
+    PRONOTE est une application à état : les identifiants de ressources — de
+    membre comme de période — ne valent que pour la session qui les a émis. En
+    présenter un issu d'une session close fait répondre « La page a expiré »,
+    sous des codes qui varient (G=8 « (1) », G=20 « (11) »), que pronotepy ne
+    nomme pas — d'où les « Unknown error from pronote: 20 » du journal.
+
+    pronotepy réserve ``ExpiredObject`` (erreur G=22) au cas où il le reconnaît
+    lui-même ; on l'accepte des deux façons, par le type comme par le message.
+    """
+    if type(exception).__name__ == "ExpiredObject":
+        return True
+    message = str(exception).lower()
+    return "page a expiré" in message or "page a expire" in message
 
 
 def _presence_deja_refusee(eq_id):
@@ -74,6 +103,25 @@ def _motif_de_refus(eq_id):
     return _presence_refusee.get(str(eq_id))
 
 
+# Équipements pour lesquels une reprise après expiration a déjà été tentée sur
+# le cycle en cours. Une seule par cycle, et c'est délibéré : chaque reprise
+# passe par une authentification complète, et leur accumulation a déjà valu une
+# suspension d'adresse IP par PRONOTE — 415 authentifications en quelques
+# secondes le 13 septembre 2026, suspension dont la durée double à chaque
+# récidive. Mieux vaut un cycle sans absences qu'une adresse bloquée une heure.
+_reprise_tentee = set()
+
+
+def reprise_deja_tentee(eq_id):
+    """Une reprise a-t-elle déjà été tentée pour cet équipement sur ce cycle ?"""
+    return str(eq_id) in _reprise_tentee
+
+
+def noter_reprise(eq_id):
+    """Retient qu'on vient de dépenser la reprise du cycle."""
+    _reprise_tentee.add(str(eq_id))
+
+
 def _oublier_refus_presence(eq_id):
     """Ouvre un nouveau cycle pour cet équipement : le refus est réessayé.
 
@@ -82,6 +130,7 @@ def _oublier_refus_presence(eq_id):
     entre-temps doit être pris en compte dès le cycle suivant.
     """
     _presence_refusee.pop(str(eq_id), None)
+    _reprise_tentee.discard(str(eq_id))
 
 
 def _noter_refus_presence(eq_id, quoi, exception):
