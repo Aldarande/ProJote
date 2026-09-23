@@ -122,6 +122,34 @@ def noter_reprise(eq_id):
     _reprise_tentee.add(str(eq_id))
 
 
+def noter_presence_hors_dusage(eq_id, quoi, motif):
+    """Retient que l'onglet Présence est inutilisable pour le reste du cycle.
+
+    À n'appeler qu'une fois la reprise épuisée. La distinction entre « Accès
+    refusé » (un droit non accordé, définitif) et « La page a expiré » (une
+    session morte, qu'une relecture des périodes répare) reste entière : elle
+    porte sur ce qu'il faut TENTER. Une fois la tentative faite et perdue, les
+    deux mènent au même endroit — l'onglet ne répondra pas d'ici la fin du
+    cycle — et les trois autres collectes qui en dépendent n'ont aucune raison
+    de le redécouvrir chacune à son tour.
+
+    Le coût de cet oubli était lourd et invisible. Relevé chez un bêta-testeur
+    le 22 septembre 2026 : absences, retards, punitions et évènements
+    refaisaient chacun une requête, une ré-authentification complète et un rejeu
+    perdu d'avance — cinq authentifications par cycle, à chaque cycle. C'est le
+    régime qui avait valu une suspension d'adresse IP le 13 septembre, dont la
+    durée double à chaque récidive.
+    """
+    _presence_refusee[str(eq_id)] = motif
+    logging.warning(
+        "Onglet Présence hors d'usage pour ce cycle après la collecte des %s : "
+        "%s. Les autres collectes qui en dépendent sont ignorées — chacune "
+        "coûterait une ré-authentification pour rien.",
+        quoi,
+        motif,
+    )
+
+
 def _oublier_refus_presence(eq_id):
     """Ouvre un nouveau cycle pour cet équipement : le refus est réessayé.
 

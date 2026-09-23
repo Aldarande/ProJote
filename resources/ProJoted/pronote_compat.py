@@ -150,6 +150,114 @@ def apply() -> None:
     )
 
 
+
+def _periode_de_la_session(client, data):
+    """Rend ``data`` avec l'identifiant de période de la session EN COURS.
+
+    PRONOTE est une application à état : l'identifiant d'une période ne vaut que
+    pour la session qui l'a émis, exactement comme celui d'une ressource
+    d'enfant. ``refresh()`` reconstruit ``client.periods`` avec des identifiants
+    neufs, mais le ``data`` d'une requête déjà formée porte encore celui d'avant.
+    Rejouée telle quelle, elle ne peut que se faire répondre « La page a
+    expiré » — et l'on a dépensé une authentification complète pour rien.
+
+    Seul le nom (« L ») traverse une réinitialisation : on s'en sert pour
+    retrouver la période dans la session neuve, et l'on n'en reprend que
+    l'identifiant. Le reste de ``data`` — les bornes de dates notamment — est
+    recopié tel quel.
+
+    Ne lève jamais, et rend l'objet d'origine dès qu'il n'y a rien à corriger :
+    pas de période dans la charge, pas de nom exploitable, pas de
+    correspondance, ou identifiant déjà bon. Sans correction on retombe
+    simplement sur le comportement d'avant, un rejeu qui échoue — ce qui vaut
+    toujours mieux qu'une exception de plus.
+    """
+    if not isinstance(data, dict):
+        return data
+    periode = data.get("periode")
+    if not isinstance(periode, dict) or not periode.get("L"):
+        return data
+    try:
+        for p in client.periods:
+            if getattr(p, "name", None) != periode["L"]:
+                continue
+            if p.id == periode.get("N"):
+                return data
+            logging.debug(
+                "pronote_compat :: période « %s » : identifiant %s hérité d'une "
+                "session close, remplacé par %s.",
+                periode["L"],
+                periode.get("N"),
+                p.id,
+            )
+            frais = dict(data)
+            frais["periode"] = dict(periode, N=p.id)
+            return frais
+    except Exception as e:
+        logging.debug(
+            "pronote_compat :: périodes non relues (%s: %s) — rejeu en l'état.",
+            type(e).__name__,
+            e,
+        )
+    return data
+
+
+def _poster_avec_reprise(self, function_name, payload, PronoteAPIError):
+    """Poste, et sur échec réinitialise la session avant de rejouer une fois.
+
+    ``payload`` est une fonction et non un dictionnaire : elle est ré-évaluée
+    APRÈS la réinitialisation, pour que le rejeu porte les identifiants de la
+    session neuve — celui de l'enfant comme celui de la période.
+
+    C'était tout le défaut du rejeu d'origine, côté pronotepy comme dans notre
+    propre correctif : il repostait la charge formée avant la réinitialisation,
+    donc des identifiants morts. Le rejeu ne pouvait pas réussir, et chaque
+    expiration de session coûtait une authentification complète pour une requête
+    perdue d'avance. Relevé chez un bêta-testeur le 22 septembre 2026 : quatre
+    collectes de l'onglet Présence, quatre authentifications, quatre
+    « La page a expiré ! (11) ».
+    """
+    try:
+        return _reparer_reponse_messagerie(
+            function_name, self.communication.post(function_name, payload())
+        )
+    except PronoteAPIError as e:
+        if type(e).__name__ == "ExpiredObject":
+            raise
+
+        # Garde anti-récursion, repris de ClientBase.post (« prevent refresh
+        # recursion »). Sans lui, la réparation se mord la queue : refresh()
+        # appelle _login(), qui poste « Identification » — donc cette fonction.
+        # Si le serveur refuse cette Identification à son tour, on relance un
+        # refresh, qui repose Identification, indéfiniment. Un seul cycle a
+        # produit 415 ré-authentifications en quelques secondes le
+        # 13 septembre 2026, jusqu'à ce que PRONOTE suspende l'adresse IP —
+        # suspension dont la durée double à chaque récidive.
+        if getattr(self, "_refreshing", False):
+            raise
+
+        # Le libellé PRONOTE est journalisé avec le code : sans lui, on ne peut
+        # pas savoir si une réinitialisation était la bonne réponse, et l'on
+        # paie une authentification complète à l'aveugle.
+        logging.debug(
+            "pronote_compat :: %s refusé (G=%s « %s ») — réinitialisation puis "
+            "rejeu avec les identifiants à jour.",
+            function_name,
+            getattr(e, "pronote_error_code", None),
+            getattr(e, "pronote_error_msg", None) or e,
+        )
+        self._refreshing = True
+        try:
+            self.refresh()
+        finally:
+            # `finally` et non simple affectation : si refresh() lève, le drapeau
+            # resterait armé et bloquerait toute réparation future sur ce client.
+            self._refreshing = False
+        return _reparer_reponse_messagerie(
+            function_name, self.communication.post(function_name, payload())
+        )
+
+
 def _install() -> None:
     """Pose effectivement le correctif sur les classes de pronotepy."""
     from pronotepy import clients
@@ -228,8 +336,6 @@ def _install() -> None:
     # Le coût n'est pas nul : chaque authentification fait tourner le jeton de
     # connexion, et leur accumulation a valu une suspension d'adresse IP par
     # Pronote. On lève donc l'erreur avant d'entrer dans ce mécanisme.
-    _original_post = clients.ClientBase.post
-
     def _post_sans_reauth_inutile(self, function_name, onglet=None, data=None):
         autorises = getattr(
             getattr(self, "communication", None), "authorized_onglets", None
@@ -239,8 +345,20 @@ def _install() -> None:
                 "Onglet %s non accessible pour ce compte (%s)"
                 % (onglet, function_name)
             )
-        reponse = _original_post(self, function_name, onglet, data)
-        return _reparer_reponse_messagerie(function_name, reponse)
+
+        # On ne délègue plus à ClientBase.post : son rejeu reposte la charge
+        # formée AVANT la réinitialisation, donc un identifiant de période mort
+        # (cf. _poster_avec_reprise). La charge est reconstruite ici à chaque
+        # tentative, ce que seule une fonction permet.
+        def _payload():
+            post_data = {}
+            if onglet:
+                post_data["Signature"] = {"onglet": onglet}
+            if data:
+                post_data["data"] = _periode_de_la_session(self, data)
+            return post_data
+
+        return _poster_avec_reprise(self, function_name, _payload, PronoteAPIError)
 
     clients.ClientBase.post = _post_sans_reauth_inutile
 
@@ -367,52 +485,12 @@ def _install() -> None:
                     "membre": {"N": self._selected_child.id, "G": 4},
                 }
             if data:
-                post_data["data"] = data
+                post_data["data"] = _periode_de_la_session(self, data)
             return post_data
 
-        try:
-            return _reparer_reponse_messagerie(
-                function_name, self.communication.post(function_name, _payload())
-            )
-        except PronoteAPIError as e:
-            if type(e).__name__ == "ExpiredObject":
-                raise
-
-            # Garde anti-récursion, repris de ClientBase.post (« prevent refresh
-            # recursion ») que cette redéfinition avait laissé tomber.
-            #
-            # Sans lui, la réparation se mord la queue : refresh() appelle
-            # _login(), qui poste « Identification » — donc cette méthode. Si le
-            # serveur refuse cette Identification à son tour, on relance un
-            # refresh, qui repose Identification, indéfiniment. Un seul cycle a
-            # produit 415 ré-authentifications en quelques secondes le
-            # 13 septembre 2026, jusqu'à ce que PRONOTE suspende l'adresse IP —
-            # suspension dont la durée double à chaque récidive.
-            if getattr(self, "_refreshing", False):
-                raise
-
-            # Le libellé PRONOTE est journalisé avec le code : sans lui, on ne
-            # peut pas savoir si une réinitialisation de session était la bonne
-            # réponse, et l'on paie une authentification complète à l'aveugle.
-            logging.debug(
-                "pronote_compat :: %s refusé (G=%s « %s ») — réinitialisation "
-                "puis rejeu avec l'identifiant d'enfant à jour.",
-                function_name,
-                getattr(e, "pronote_error_code", None),
-                getattr(e, "pronote_error_msg", None) or e,
-            )
-            self._refreshing = True
-            try:
-                self.refresh()
-            finally:
-                # `finally` et non simple affectation : si refresh() lève, le
-                # drapeau resterait armé et bloquerait toute réparation future
-                # sur ce client.
-                self._refreshing = False
-            # _payload() est ré-évalué ici : il lit le _selected_child
-            # reconstruit par le refresh corrigé ci-dessus.
-            return _reparer_reponse_messagerie(
-                function_name, self.communication.post(function_name, _payload())
-            )
+        # _payload() est ré-évalué au rejeu : il relit le _selected_child
+        # reconstruit par le refresh corrigé plus haut, ET l'identifiant de
+        # période de la session neuve.
+        return _poster_avec_reprise(self, function_name, _payload, PronoteAPIError)
 
     clients.ParentClient.post = _post_parent_protege

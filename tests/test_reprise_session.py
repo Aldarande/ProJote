@@ -254,3 +254,100 @@ def test_les_trois_collecteurs_reprennent(collecteur, cle, monkeypatch):
     client = _Client([])
     data = collecteur(client)
     assert cle in data
+
+
+# ── Une fois la reprise perdue, l'onglet est clos pour le cycle ─────────────
+#
+# La distinction entre « Accès refusé » et « La page a expiré » porte sur ce
+# qu'il faut TENTER : le premier est définitif, la seconde se répare en relisant
+# les périodes. Une fois la tentative faite et perdue, les deux mènent au même
+# endroit — l'onglet ne répondra plus de ce cycle.
+#
+# Tant que l'expiration ne l'était pas retenue, chacune des quatre collectes
+# redécouvrait la panne pour son compte : une requête, une ré-authentification
+# complète et un rejeu perdu d'avance, quatre fois. Relevé chez un bêta-testeur
+# le 22 septembre 2026, à raison d'un cycle sur un :
+#
+#     11:02:27 ERROR … pour les absences : Session PRONOTE expirée malgré une reprise
+#     11:02:28 ERROR … pour les retards  : … et reprise déjà tentée sur ce cycle
+#
+# C'est le régime exact qui avait valu la suspension d'adresse IP du
+# 13 septembre, dont la durée double à chaque récidive.
+
+
+class _ClientTetu(_Client):
+    """Session qui remeurt aussitôt renouvelée : la reprise ne peut pas aboutir."""
+
+    @property
+    def periods(self):
+        self.lectures_periodes += 1
+        session = _Session()
+        session.morte = True
+        return [_Periode(session, self._elements)]
+
+
+def test_une_expiration_qui_survit_a_la_reprise_clot_l_onglet():
+    client = _ClientTetu([_Element(1)])
+
+    collecteurs._relever_sur_periodes(client, 7, "absences", "absences")
+
+    assert presence_pronote._presence_deja_refusee(7), (
+        "les trois autres collectes vont refaire la panne pour leur compte"
+    )
+
+
+def test_les_collectes_suivantes_ne_touchent_plus_le_reseau():
+    """Le vrai gain : de cinq authentifications par cycle à deux."""
+    client = _ClientTetu([_Element(1)])
+    collecteurs._relever_sur_periodes(client, 7, "absences", "absences")
+    lectures_apres_absences = client.lectures_periodes
+
+    collecteurs.retards(client)
+    collecteurs.punitions(client)
+    collecteurs.evenements_vie_scolaire(client)
+
+    # Chaque collecteur lit `client.periods` une fois pour son contrôle d'accès,
+    # puis s'arrête net : aucune ne redescend vers PRONOTE.
+    assert client.lectures_periodes == lectures_apres_absences + 3
+
+
+def test_les_collectes_suivantes_rapportent_la_cause():
+    """Un onglet illisible ne doit jamais ressembler à un onglet vide."""
+    client = _ClientTetu([_Element(1)])
+    collecteurs._relever_sur_periodes(client, 7, "absences", "absences")
+
+    data = collecteurs.retards(client)
+
+    assert data["nb_retard"] == 0
+    assert "error" in data
+    assert "Présence" in data["error"]
+
+
+def test_une_reprise_deja_depensee_clot_aussi_l_onglet():
+    """Le premier collecteur a dépensé la reprise sans le dire : on le dit ici."""
+    presence_pronote.noter_reprise(7)
+    client = _Client([_Element(1)], meurt_apres=1)
+
+    collecteurs._relever_sur_periodes(client, 7, "delays", "retards")
+
+    assert presence_pronote._presence_deja_refusee(7)
+
+
+def test_une_reprise_reussie_ne_clot_rien():
+    """Le cas nominal du correctif : on ne doit pénaliser personne."""
+    client = _Client([_Element(1)], meurt_apres=1)
+
+    _, motif = collecteurs._relever_sur_periodes(client, 7, "absences", "absences")
+
+    assert motif is None
+    assert not presence_pronote._presence_deja_refusee(7)
+
+
+def test_le_cycle_suivant_repart_de_zero():
+    client = _ClientTetu([_Element(1)])
+    collecteurs._relever_sur_periodes(client, 7, "absences", "absences")
+
+    presence_pronote._oublier_refus_presence(7)  # ce que fait le worker
+
+    assert not presence_pronote._presence_deja_refusee(7)
+    assert not presence_pronote.reprise_deja_tentee(7)

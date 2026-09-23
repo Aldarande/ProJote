@@ -81,8 +81,19 @@ def faux_pronotepy(monkeypatch):
             if signature:
                 if signature["onglet"] not in journal["onglets_autorises"]:
                     raise PronoteAPIError("onglet refusé")
-                if not signature["membre"]["N"].endswith(f"-s{journal['sessions']}"):
+                membre = signature.get("membre")
+                if membre and not membre["N"].endswith(f"-s{journal['sessions']}"):
                     raise PronoteAPIError("La page a expiré")
+            # L'identifiant de période est lié à la session au même titre que
+            # celui du membre : c'est ce que PRONOTE sanctionne par
+            # « Unknown error from pronote: 20 | La page a expiré ! (11) ».
+            periode = (post_data.get("data") or {}).get("periode")
+            if periode and not str(periode.get("N", "")).endswith(
+                f"-s{journal['sessions']}"
+            ):
+                raise PronoteAPIError(
+                    "Unknown error from pronote: 20 | La page a expiré ! (11)"
+                )
             return {"ok": True}
 
     class ClientInfo:
@@ -100,9 +111,18 @@ def faux_pronotepy(monkeypatch):
             parent restaurée, ni children ni _selected_child reconstruits."""
             self._nouvelle_session()
 
+        @property
+        def periods(self):
+            """Ce que `refresh()` reconstruit : des périodes de la session neuve."""
+            return self.periods_
+
         def _nouvelle_session(self):
             journal["sessions"] += 1
             s = journal["sessions"]
+            self.periods_ = [
+                types.SimpleNamespace(name="Trimestre 1", id=f"P1-s{s}"),
+                types.SimpleNamespace(name="Trimestre 2", id=f"P2-s{s}"),
+            ]
             self.parametres_utilisateur = {
                 "dataSec": {
                     "data": {
@@ -200,6 +220,7 @@ def faux_pronotepy(monkeypatch):
         Client=Client,
         ParentClient=ParentClient,
         ClientInfo=ClientInfo,
+        Communication=Communication,
         journal=journal,
     )
     ClientBase._login = original_login
@@ -305,8 +326,24 @@ class TestOngletsNonAccessibles:
     """
 
     def _client(self, faux_pronotepy, onglets):
+        """Client de base dont la communication journalise les requêtes.
+
+        Le correctif ne délègue plus à ``ClientBase.post`` : celui de pronotepy
+        rejoue la charge formée AVANT la réinitialisation de session, donc des
+        identifiants morts. La requête part désormais par
+        ``communication.post``, et c'est là qu'on la relève.
+        """
+        journal = faux_pronotepy.journal
+
+        def _post(function_name, post_data):
+            onglet = (post_data.get("Signature") or {}).get("onglet")
+            journal["posts"].append((function_name, onglet))
+            return {"ok": True}
+
         client = faux_pronotepy.ClientBase()
-        client.communication = types.SimpleNamespace(authorized_onglets=onglets)
+        client.communication = types.SimpleNamespace(
+            authorized_onglets=onglets, post=_post
+        )
         return client
 
     def test_onglet_interdit_leve_sans_appel(self, faux_pronotepy):
@@ -515,3 +552,111 @@ class TestPostParent:
             parent.post("PageCahierDeTexte", 88)
 
         assert getattr(parent, "_refreshing", False) is False
+
+
+class TestPeriodeApresReinitialisation:
+    """Le rejeu doit porter l'identifiant de période de la session neuve.
+
+    PRONOTE est une application à état : l'identifiant d'une période ne vaut
+    que pour la session qui l'a émis, exactement comme celui d'une ressource
+    d'enfant. `refresh()` reconstruit `client.periods` avec des identifiants
+    neufs, mais la charge d'une requête déjà formée porte encore celui d'avant :
+    rejouée telle quelle, elle ne peut que se faire répondre « La page a
+    expiré ! (11) ».
+
+    Le rejeu était donc perdu d'avance, et il coûtait une authentification
+    complète. Relevé chez un bêta-testeur le 22 septembre 2026 : les quatre
+    collectes de l'onglet Présence échouant l'une après l'autre, chacune avec sa
+    ré-authentification — le régime exact qui avait valu une suspension
+    d'adresse IP le 13 septembre.
+    """
+
+    CHARGE = {
+        "periode": {"N": "P1-s1", "L": "Trimestre 1", "G": 2},
+        "DateDebut": {"_T": 7, "V": "01/09/2026 00:00:00"},
+    }
+
+    def _perimer(self, faux_pronotepy, client):
+        """Périme la session du client sans qu'il le sache, comme le vrai serveur."""
+        client._nouvelle_session()
+        client.set_child(client.children[0])
+        faux_pronotepy.journal["sessions"] += 1
+        faux_pronotepy.journal["reseau"].clear()
+
+    def test_le_rejeu_parent_porte_la_periode_de_la_nouvelle_session(
+        self, faux_pronotepy
+    ):
+        faux_pronotepy.module.apply()
+        parent = faux_pronotepy.ParentClient()
+        charge = dict(self.CHARGE, periode=dict(self.CHARGE["periode"]))
+        charge["periode"]["N"] = f"P1-s{faux_pronotepy.journal['sessions']}"
+        self._perimer(faux_pronotepy, parent)
+
+        assert parent.post("PagePresence", 88, charge) == {"ok": True}
+
+        rejeu = faux_pronotepy.journal["reseau"][-1][1]
+        attendu = f"-s{faux_pronotepy.journal['sessions']}"
+        assert rejeu["data"]["periode"]["N"].endswith(attendu)
+
+    def test_la_charge_de_l_appelant_n_est_pas_modifiee(self, faux_pronotepy):
+        """Les collecteurs réutilisent leurs dictionnaires : on ne touche pas au leur."""
+        faux_pronotepy.module.apply()
+        parent = faux_pronotepy.ParentClient()
+        charge = dict(self.CHARGE, periode=dict(self.CHARGE["periode"]))
+        charge["periode"]["N"] = f"P1-s{faux_pronotepy.journal['sessions']}"
+        avant = charge["periode"]["N"]
+        self._perimer(faux_pronotepy, parent)
+
+        parent.post("PagePresence", 88, charge)
+
+        assert charge["periode"]["N"] == avant
+
+    def test_une_periode_deja_a_jour_n_est_pas_touchee(self, faux_pronotepy):
+        """Le cas courant : ne rien réécrire, et surtout ne rien recopier."""
+        faux_pronotepy.module.apply()
+        parent = faux_pronotepy.ParentClient()
+        charge = dict(self.CHARGE, periode=dict(self.CHARGE["periode"]))
+        charge["periode"]["N"] = f"P1-s{faux_pronotepy.journal['sessions']}"
+        faux_pronotepy.journal["reseau"].clear()
+
+        assert parent.post("PagePresence", 88, charge) == {"ok": True}
+
+        envoye = faux_pronotepy.journal["reseau"][-1][1]
+        assert envoye["data"] is charge
+
+    def test_un_nom_de_periode_inconnu_laisse_la_charge_en_l_etat(
+        self, faux_pronotepy
+    ):
+        """Aucune correspondance : on rejoue tel quel plutôt que de lever.
+
+        Sans correction on retombe sur le comportement d'avant — un rejeu qui
+        échoue — ce qui vaut mieux qu'une exception de plus.
+        """
+        faux_pronotepy.module.apply()
+        parent = faux_pronotepy.ParentClient()
+        charge = {"periode": {"N": "P9-s0", "L": "Période fantôme", "G": 2}}
+        faux_pronotepy.journal["reseau"].clear()
+
+        with pytest.raises(faux_pronotepy.PronoteAPIError):
+            parent.post("PagePresence", 88, charge)
+
+        assert charge["periode"]["N"] == "P9-s0"
+
+    def test_un_compte_eleve_est_couvert_aussi(self, faux_pronotepy):
+        """`ClientBase.post` ne délègue plus à pronotepy, qui a le même défaut."""
+        faux_pronotepy.module.apply()
+        eleve = faux_pronotepy.Client()
+        eleve.communication = faux_pronotepy.Communication()
+        eleve._nouvelle_session()
+        charge = dict(self.CHARGE, periode=dict(self.CHARGE["periode"]))
+        charge["periode"]["N"] = f"P1-s{faux_pronotepy.journal['sessions']}"
+        # On périme la session sans prévenir le client, comme le vrai serveur.
+        faux_pronotepy.journal["sessions"] += 1
+        faux_pronotepy.journal["reseau"].clear()
+
+        assert eleve.post("PageCahierDeTexte", 88, charge) == {"ok": True}
+
+        rejeu = faux_pronotepy.journal["reseau"][-1][1]
+        assert rejeu["data"]["periode"]["N"].endswith(
+            f"-s{faux_pronotepy.journal['sessions']}"
+        )

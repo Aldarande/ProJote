@@ -334,10 +334,25 @@ périodes aurait suffi. Relevé chez un bêta-testeur le 19 septembre :</p>
     <li><strong>Écrit une fois pour les trois relevés.</strong> Absences, retards et punitions
     partageaient la même boucle recopiée trois fois ; elle est maintenant unique. Trois copies
     d'une reprise, ce sont trois façons de diverger.</li>
+    <li><strong>Le rejeu porte enfin des identifiants vivants.</strong> La reconnexion automatique
+    de la bibliothèque rejouait la requête telle qu'elle avait été formée <em>avant</em> :
+    l'identifiant de période y était celui de la session morte, et le rejeu ne pouvait pas
+    réussir. Il est désormais reconstruit à chaque tentative — la période est retrouvée par son
+    nom, seul repère qui traverse une reconnexion. Le correctif vaut pour les comptes parent
+    comme pour les comptes élève, les deux ayant le même défaut.</li>
+    <li><strong>Une panne constatée ne se redécouvre plus quatre fois.</strong> Quand la reprise
+    échoue malgré tout, l'onglet est noté hors d'usage pour le reste du cycle : les trois relevés
+    suivants s'abstiennent au lieu de refaire chacun une requête, une reconnexion et un rejeu.
+    Chez un bêta-testeur, le 22 septembre, l'onglet coûtait cinq reconnexions par cycle, à chaque
+    cycle — le régime même qui avait valu la suspension d'adresse IP du 13 septembre. Il en coûte
+    deux au pire.</li>
 </ul>
-<p>Onze tests couvrent le chemin : le cas nominal qui ne doit rien coûter, la reprise qui aboutit,
-la seconde reprise refusée, l'expiration qui persiste, et le droit refusé qu'aucune reprise ne
-doit venir masquer.</p>
+<pre><code>11:02:27 ERROR … pour les absences : Session PRONOTE expirée malgré une reprise
+11:02:28 ERROR … pour les retards  : … et reprise déjà tentée sur ce cycle</code></pre>
+<p>Vingt-trois tests couvrent le chemin : le cas nominal qui ne doit rien coûter, la reprise qui
+aboutit, la seconde reprise refusée, l'expiration qui persiste, le droit refusé qu'aucune reprise
+ne doit venir masquer, le rejeu dont on vérifie qu'il porte bien la période de la session neuve —
+et la charge de l'appelant, qu'on ne doit pas modifier au passage.</p>
 
 <h2>ENT : trois entrées qui ne menaient nulle part <span class="badge badge-fix">1.7.0</span></h2>
 <p>La liste <em>Mode CAS</em> est écrite dans le plugin, tandis que les connecteurs ENT vivent dans

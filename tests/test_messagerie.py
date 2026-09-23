@@ -97,6 +97,10 @@ def test_la_reparation_est_posee_sur_les_deux_chemins():
     """Le client parent redéfinit post() et court-circuite celui du client de base.
 
     Sans la réparation sur les deux, un compte parent aurait continué d'échouer.
+    Depuis le 23 septembre 2026 les deux chemins partagent la même reprise de
+    session (``_poster_avec_reprise``), où la réparation est appliquée une fois
+    pour la tentative et une fois pour le rejeu : c'est ce partage qui garantit
+    désormais qu'aucun des deux ne puisse l'oublier.
     """
     import os
 
@@ -106,8 +110,10 @@ def test_la_reparation_est_posee_sur_les_deux_chemins():
     )
     with open(chemin, encoding="utf-8") as f:
         source = f.read()
-    # Une définition, un appel côté client de base, deux côté client parent.
-    assert source.count("_reparer_reponse_messagerie") == 4
+    # Une définition, et les deux appels de la reprise partagée.
+    assert source.count("_reparer_reponse_messagerie") == 3
+    # Un branchement depuis chacun des deux chemins, et pas un de moins.
+    assert source.count("return _poster_avec_reprise(self,") == 2
 
 
 # ── Onglet non ouvert à ce compte ───────────────────────────────────────────

@@ -60,6 +60,7 @@ from presence_pronote import (
     _noter_refus_presence,
     _presence_deja_refusee,
     _refus_de_presence,
+    noter_presence_hors_dusage,
     noter_reprise,
     reprise_deja_tentee,
     session_expiree,
@@ -1156,9 +1157,11 @@ def _relever_sur_periodes(client, eq_id, attribut, quoi, periodes=None):
             quoi,
             expiree,
         )
-        return list(trouves.values()), (
+        motif = (
             "Session PRONOTE expirée (%s) et reprise déjà tentée sur ce cycle" % expiree
         )
+        noter_presence_hors_dusage(eq_id, quoi, motif)
+        return list(trouves.values()), motif
 
     noter_reprise(eq_id)
     logging.info(
@@ -1171,7 +1174,9 @@ def _relever_sur_periodes(client, eq_id, attribut, quoi, periodes=None):
         periodes_neuves = client.periods
     except Exception as e:
         logging.error("Relecture des périodes impossible après expiration : %s", e)
-        return list(trouves.values()), "Session PRONOTE expirée, périodes illisibles : %s" % e
+        motif = "Session PRONOTE expirée, périodes illisibles : %s" % e
+        noter_presence_hors_dusage(eq_id, quoi, motif)
+        return list(trouves.values()), motif
 
     trouves, encore, erreur = _parcourir(periodes_neuves)
     if encore is not None:
@@ -1180,7 +1185,9 @@ def _relever_sur_periodes(client, eq_id, attribut, quoi, periodes=None):
             quoi,
             encore,
         )
-        return list(trouves.values()), "Session PRONOTE expirée malgré une reprise : %s" % encore
+        motif = "Session PRONOTE expirée malgré une reprise : %s" % encore
+        noter_presence_hors_dusage(eq_id, quoi, motif)
+        return list(trouves.values()), motif
     logging.info("Reprise réussie, %s : %d éléments.", quoi, len(trouves))
     return list(trouves.values()), erreur
 
