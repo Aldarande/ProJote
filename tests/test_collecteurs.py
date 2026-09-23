@@ -510,3 +510,85 @@ def test_la_periode_fourre_tout_n_entre_pas_dans_la_charge(collecteurs):
     assert "Trimestre 1" in periodes
     assert periodes["Trimestre 1"]["moyenne_eleve"] == "14.87"
     assert "Hors période" not in periodes, "une moyenne non numérique a été transmise"
+
+
+# ── Une note, une seule entrée ──────────────────────────────────────────────
+#
+# PRONOTE publie plusieurs découpages qui se recouvrent — trimestres, semestres,
+# « Année continue » — et rend la même note sous chacun de ceux qui la
+# contiennent. Relevé le 23 septembre 2026 sur un compte de démonstration :
+# 104 entrées pour 53 notes réelles, chacune affichée deux fois dans le widget,
+# et le compteur de nouveautés qui comptait double.
+
+
+class _Note:
+    def __init__(self, identifiant, matiere="FRANCAIS", valeur="14"):
+        self.id = identifiant
+        self.grade = valeur
+        self.out_of = "20"
+        self.coefficient = "1"
+        self.average = "11.72"
+        self.max = "18"
+        self.min = "5"
+        self.date = datetime.date(2026, 9, 18)
+        self.comment = ""
+        self.is_bonus = False
+        self.is_optionnal = False
+        self.subject = type("M", (), {"name": matiere})()
+
+
+class _PeriodeAvecNotes:
+    def __init__(self, nom, notes):
+        self.name = nom
+        self.grades = notes
+        self.overall_average = None
+        self.class_overall_average = None
+        self.start = datetime.datetime(2026, 9, 1)
+        self.end = datetime.datetime(2026, 12, 20)
+
+
+def test_une_note_rendue_par_deux_periodes_n_apparait_qu_une_fois(collecteurs):
+    """Le cas réel : la même note sous « Trimestre 1 » et sous « Année continue »."""
+    note = _Note("33#une-note")
+    client = _Client([
+        _PeriodeAvecNotes("Trimestre 1", [note]),
+        _PeriodeAvecNotes("Année continue", [note]),
+    ])
+
+    data = collecteurs.notes(client)
+
+    assert len(data["note"]) == 1, "la note est comptée deux fois"
+
+
+def test_la_periode_retenue_est_la_plus_precise(collecteurs):
+    """`client.periods` liste les trimestres avant les regroupements larges."""
+    note = _Note("33#une-note")
+    client = _Client([
+        _PeriodeAvecNotes("Trimestre 1", [note]),
+        _PeriodeAvecNotes("Année continue", [note]),
+    ])
+
+    data = collecteurs.notes(client)
+
+    assert data["note"][0]["periode"] == "Trimestre 1"
+
+
+def test_deux_notes_distinctes_restent_deux(collecteurs):
+    """Le dédoublonnage ne doit pas avaler des notes réellement différentes."""
+    client = _Client([
+        _PeriodeAvecNotes("Trimestre 1", [_Note("33#a"), _Note("33#b", valeur="9")]),
+    ])
+
+    data = collecteurs.notes(client)
+
+    assert len(data["note"]) == 2
+
+
+def test_une_note_sans_identifiant_passe_quand_meme(collecteurs):
+    """Mieux vaut un doublon qu'une note perdue si PRONOTE n'expose pas d'id."""
+    sans_id = _Note(None)
+    client = _Client([_PeriodeAvecNotes("Trimestre 1", [sans_id])])
+
+    data = collecteurs.notes(client)
+
+    assert len(data["note"]) == 1

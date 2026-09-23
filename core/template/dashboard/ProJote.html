@@ -195,7 +195,7 @@
 
     .pjw-#id# .ph-school {
         font-size: 0.83em;
-        opacity: .5;
+        opacity: .62;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -205,7 +205,7 @@
     /* 10px */
     .pjw-#id# .ph-ts {
         font-size: 0.75em;
-        opacity: .28;
+        opacity: .62;
     }
 
     /* 9px */
@@ -231,7 +231,7 @@
         /* 11px */
         text-transform: uppercase;
         letter-spacing: .6px;
-        opacity: .5;
+        opacity: .62;
         margin-bottom: 2px;
     }
 
@@ -455,8 +455,17 @@
         margin-top: 2px;
     }
 
+    /* `wrap` et non `nowrap` : la barre fait ~650 px avec ses onze onglets,
+       or la largeur par défaut d'une tuile ProJote est de 360 px. Sans retour
+       à la ligne, les derniers onglets sortaient simplement du cadre — ni
+       visibles, ni défilables, donc inatteignables. Mesuré sur une tuile de
+       368 px : cinq onglets sur onze hors d'atteinte, dont les compétences.
+       Le défilement horizontal aurait aussi marché, mais il cache la moitié
+       de la navigation derrière un geste que rien n'annonce. */
     .pjw-#id# .tab-btns {
         display: flex;
+        flex-wrap: wrap;
+        row-gap: 2px;
         margin-bottom: 10px;
         background: rgba(var(--contrast-color), .07);
         border-radius: 8px;
@@ -468,12 +477,15 @@
         font-size: 0.83em;
         font-weight: 600;
         /* 10px */
-        padding: 4px 4px;
+        /* 6px vertical plutôt que 4 : la cible faisait 20 px de haut, sous le
+           minimum de 24 px recommandé pour un appui au doigt. */
+        padding: 6px 5px;
+        min-height: 24px;
         border: none;
         background: transparent;
         cursor: pointer;
         color: inherit;
-        opacity: .45;
+        opacity: .62;
         border-radius: 6px;
         display: flex;
         align-items: center;
@@ -562,7 +574,7 @@
         /* 9px */
         text-transform: uppercase;
         letter-spacing: .8px;
-        opacity: .4;
+        opacity: .62;
         margin: 6px 0 4px;
     }
 
@@ -839,7 +851,7 @@
 
     .pjw-#id# .vs-row2 {
         font-size: 0.75em;
-        opacity: .45;
+        opacity: .62;
         /* 9px */
         white-space: nowrap;
         overflow: hidden;
@@ -865,7 +877,9 @@
         text-align: center;
         padding: 8px 0;
         font-size: 0.83em;
-        opacity: .28;
+        /* « Aucun devoir », « Aucune punition » : c'est une information, pas une
+           absence d'information. A 0.28 le rapport de contraste tombait a 1.99. */
+        opacity: .62;
         /* 10px */
         letter-spacing: .3px;
     }

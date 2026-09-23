@@ -445,12 +445,22 @@ sendVarToJS('eqLogicId', $eqLogic);
 							<div class="form-group">
 								<label class="col-sm-6 control-label">{{Onglet par défaut}}</label>
 								<div class="col-sm-5">
+									<!-- Les valeurs sont les identifiants des panneaux du widget
+									     (core/template/dashboard/ProJote.html) : tout onglet ajouté
+									     là-bas doit apparaître ici, sinon il reste inaccessible comme
+									     choix d'ouverture. La liste s'était arrêtée aux punitions. -->
 									<select class="eqLogicAttr form-control" data-l1key="display" data-l2key="parameters_default_tab">
 										<option value="dv" selected>{{Devoirs}}</option>
 										<option value="notes">{{Notes}}</option>
 										<option value="abs">{{Absences}}</option>
 										<option value="ret">{{Retards}}</option>
 										<option value="pun">{{Punitions}}</option>
+										<option value="evt">{{Carnet}}</option>
+										<option value="menu">{{Menu}}</option>
+										<option value="msg">{{Messagerie}}</option>
+										<option value="stats">{{Statistiques}}</option>
+										<option value="alertes">{{Alertes}}</option>
+										<option value="comp">{{Compétences}}</option>
 									</select>
 								</div>
 							</div>

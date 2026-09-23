@@ -864,6 +864,26 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
                 <td><span class="badge badge-fix">Correctif</span></td>
                 <td><strong>La même « Nouvelle note » était annoncée à chaque cycle</strong> — le plugin retient ce qu'il a déjà vu pour ne signaler que les nouveautés, et il le retenait par l'identifiant que Pronote attribue à chaque note. Or cet identifiant ne vaut que pour la session qui l'a émis : il change à chaque connexion. Mesuré sur un compte réel, deux cycles consécutifs n'avaient plus un seul identifiant en commun. Toutes les notes paraissaient donc neuves toutes les heures, et le centre d'alertes répétait la même ligne indéfiniment ; les absences subissaient le même sort, un compte de démonstration les annonçant toutes les seize comme nouvelles. Notes et absences sont désormais reconnues à leur contenu — matière, date, valeur pour une note ; dates de début et de fin pour une absence — ce que faisaient déjà les devoirs, seuls épargnés jusqu'ici. Le commentaire du professeur est volontairement exclu : ajouté après coup, il aurait fait réapparaître la note comme neuve. Aucune action de votre part : au premier cycle qui suit la mise à jour, le plugin repose sa référence en silence et ne signale rien.</td>
             </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>La moitié des onglets du widget était hors d'atteinte sur une tuile étroite</strong> — la barre d'onglets fait environ 650 px avec ses onze entrées, alors que la largeur par défaut d'une tuile ProJote est de 360 px. Elle ne revenait pas à la ligne et ne défilait pas : les derniers onglets sortaient simplement du cadre. Mesuré sur une tuile de 368 px, cinq onglets sur onze étaient inaccessibles — Menu, Messagerie, Statistiques, Alertes et Compétences, cette dernière contenant vingt-deux évaluations. La barre passe désormais à la ligne, et la hauteur des onglets est portée de 20 à 24 px, minimum recommandé pour un appui au doigt.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>Chaque note apparaissait deux fois</strong> — Pronote publie plusieurs découpages de l'année qui se recouvrent, et rend la même note sous chacun de ceux qui la contiennent. Le plugin les empilait sans les reconnaître : sur un compte à trois trimestres, <strong>104 entrées pour 53 notes réelles</strong>. La liste des notes les affichait toutes, et le compteur de nouveautés comptait double. Une note n'est désormais retenue qu'une fois, sous sa période la plus précise.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>Sept textes du widget étaient trop pâles pour être lus</strong> — mesurés sur le rendu, avec un rapport de contraste allant de 1,99 à 3,98 là où 4,5 est le minimum pour du texte de cette taille. Le plus gênant était l'heure de dernière mise à jour, à 1,99 : c'est pourtant elle qui dit si le widget est à jour. Sont aussi concernés les onglets inactifs, le nom de l'établissement, les titres de colonnes de l'emploi du temps, les sous-lignes de devoirs et les mentions « Aucun devoir », « Aucune punition ». Tous sont remontés à 5,88.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-new">Nouveauté</span></td>
+                <td><strong>Le panneau respire et affiche le carnet</strong> — une section sans contenu occupait un bloc entier pour dire qu'il n'y avait rien : chez un élève sans cours du jour, près d'un quart de la page. Elle se replie maintenant sur une seule ligne, la mention « Pas de cours » à droite de son titre, et reste visible. Les bandeaux de section, tous d'un vert plein identique, sont allégés — seule la carte d'identité garde l'accent fort, ce qui redonne un point d'entrée à l'œil. Le carnet de vie scolaire fait son entrée : un compteur parmi les statistiques et sa propre section.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>Les onglets récents manquaient dans « Onglet par défaut »</strong> — la liste de l'onglet <em>Affichage</em> de l'équipement s'arrêtait aux punitions. Menu, Messagerie, Statistiques, Alertes, Compétences et le nouveau Carnet ne pouvaient donc pas être choisis comme onglet d'ouverture du widget, bien qu'ils existent. Les onze sont désormais proposés.</td>
+            </tr>
         </tbody>
     </table>
 

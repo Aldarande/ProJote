@@ -75,15 +75,38 @@ $jsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APO
     #pj-panel .pj-grid {
         display:grid; grid-template-columns:repeat(auto-fill, minmax(290px, 1fr));
         gap:16px; margin-bottom:16px;
+        /* Sans `start`, une carte repliee s'etire a la hauteur de la plus haute
+           de sa rangee : « Devoirs — Aucun devoir » occupait 596 px pour une
+           ligne de texte, alignee sur la liste des notes. */
+        align-items:start;
     }
     #pj-panel .pj-card {
         border:1px solid rgba(128,128,128,.22); border-radius:12px; overflow:hidden;
         background:rgba(127,127,127,.04); box-shadow:0 2px 6px rgba(0,0,0,.06);
     }
+    /* Les huit sections d'un élève portaient toutes le même bandeau vert plein :
+       « Identité » pesait autant que « Emploi du temps », et l'œil n'avait aucun
+       point d'entrée. Le bandeau courant est maintenant une teinte légère avec
+       un filet d'accent ; seule la carte d'identité garde le vert plein. */
     #pj-panel .pj-card-h {
-        background:var(--pj-green); color:#fff; padding:9px 14px; font-weight:700;
+        background:rgba(148,201,4,.16); color:inherit; padding:9px 14px; font-weight:700;
         font-size:.85em; display:flex; align-items:center; gap:8px;
+        border-left:3px solid var(--pj-green);
     }
+    #pj-panel .pj-card-h i { color:var(--pj-green-d); }
+    #pj-panel .pj-card-h-fort {
+        background:var(--pj-green); color:#fff; border-left-color:var(--pj-green-d);
+    }
+    #pj-panel .pj-card-h-fort i { color:#fff; }
+
+    /* Section sans contenu : le bandeau seul, avec la mention à droite. Elle
+       occupait jusqu'ici un bloc entier — quatre sections vides sur huit chez un
+       élève sans cours du jour, soit près d'un quart de la page à dire qu'il n'y
+       a rien. On la garde visible, mais elle ne coûte plus qu'une ligne. */
+    #pj-panel .pj-vide {
+        margin-left:auto; font-weight:500; font-style:italic; font-size:.92em; opacity:.75;
+    }
+    #pj-panel .pj-card-repliee { background:transparent; box-shadow:none; }
     #pj-panel .pj-card-b { padding:14px; }
     #pj-panel .pj-span2 { grid-column:span 2; }
 
@@ -162,9 +185,24 @@ $jsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APO
     function fmtH(h) { return h ? String(h).slice(0, 5) : '--'; }
     function asArray(v) { return Array.isArray(v) ? v : []; }
 
+    /* Rend une carte. `corps` vide → carte repliée sur son bandeau, la mention
+       `vide` s'affichant à droite du titre. C'est ce qui évite qu'une section
+       sans contenu coûte autant qu'une section pleine. */
+    function carte(icone, titre, corps, vide, suffixeTitre, classes) {
+        var replie = !corps;
+        return '<div class="pj-card' + (replie ? ' pj-card-repliee' : '') +
+               (classes ? ' ' + classes : '') + '">' +
+               '<div class="pj-card-h"><i class="fas ' + icone + '"></i> ' + titre +
+               (suffixeTitre || '') +
+               (replie ? '<span class="pj-vide">' + vide + '</span>' : '') +
+               '</div>' +
+               (replie ? '' : '<div class="pj-card-b">' + corps + '</div>') +
+               '</div>';
+    }
+
     function edtTable(courses) {
         courses = asArray(courses);
-        if (!courses.length) return '<div class="pj-empty">{{Pas de cours}}</div>';
+        if (!courses.length) return '';
         var h = '<table class="pj-edt"><thead><tr><th>{{Horaire}}</th><th>{{Cours}}</th><th>{{Salle}}</th></tr></thead><tbody>';
         courses.forEach(function (c) {
             var cancel = c.annulation ? ' class="pj-cancel"' : '';
@@ -179,7 +217,7 @@ $jsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APO
 
     function notesList(notes) {
         notes = asArray(notes);
-        if (!notes.length) return '<div class="pj-empty">{{Aucune note}}</div>';
+        if (!notes.length) return '';
         var h = '<ul class="pj-list">';
         notes.slice(0, 10).forEach(function (n) {
             var mat = (n.cours || '–'); if (mat.indexOf(' > ') !== -1) mat = mat.split(' > ').pop();
@@ -193,7 +231,7 @@ $jsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APO
 
     function homeworkList(d) {
         var list = asArray(d.devoirs).concat(asArray(d.devoirs_demain));
-        if (!list.length) return '<div class="pj-empty">{{Aucun devoir}}</div>';
+        if (!list.length) return '';
         var h = '<ul class="pj-list">';
         list.slice(0, 15).forEach(function (dv) {
             var done = !!dv.done;
@@ -207,7 +245,7 @@ $jsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APO
 
     function punitionsList(list) {
         list = asArray(list);
-        if (!list.length) return '<div class="pj-empty">{{Aucune punition}}</div>';
+        if (!list.length) return '';
         var h = '<ul class="pj-list">';
         list.slice(0, 10).forEach(function (p) {
             h += '<li><strong>' + esc(p.nature || p.type || 'Punition') + '</strong>' +
@@ -217,12 +255,29 @@ $jsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APO
         return h + '</ul>';
     }
 
+    /* Observations, défauts de carnet et mesures conservatoires. Collectés
+       depuis la v1.7.0, affichés dans le widget depuis la v1.7.1, ils
+       manquaient encore ici. */
+    function carnetList(list) {
+        list = asArray(list);
+        if (!list.length) return '';
+        var h = '<ul class="pj-list">';
+        list.slice(0, 10).forEach(function (e) {
+            var jour = String(e.date || '').split(' ')[0];
+            var meme = String(e.libelle || '').toLowerCase() === String(e.categorie || '').toLowerCase();
+            h += '<li><strong>' + esc(e.categorie || '--') + '</strong>' +
+                 (e.libelle && !meme ? ' — ' + esc(e.libelle) : '') +
+                 (jour ? ' <small class="meta">(' + esc(jour) + ')</small>' : '') + '</li>';
+        });
+        return h + '</ul>';
+    }
+
     function renderStudent(s) {
         var d = s.data || {};
         var h = '<div class="pj-grid">';
 
         // Identité
-        h += '<div class="pj-card pj-span2"><div class="pj-card-h"><i class="fas fa-user-graduate"></i> {{Identité}}</div>';
+        h += '<div class="pj-card pj-span2"><div class="pj-card-h pj-card-h-fort"><i class="fas fa-user-graduate"></i> {{Identité}}</div>';
         h += '<div class="pj-card-b"><div class="pj-id">';
         if (d.photo) {
             h += '<img class="pj-photo" src="' + esc(d.photo) + '" onerror="this.outerHTML=\'<div class=&quot;pj-photo&quot;><i class=&quot;fas fa-user-graduate&quot;></i></div>\'">';
@@ -240,6 +295,7 @@ $jsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APO
              '<div class="pj-stat warn"><span class="n">' + (d.nb_absences || 0) + '</span><span class="l">{{Absences}}</span></div>' +
              '<div class="pj-stat warn"><span class="n">' + (d.nb_retards || 0) + '</span><span class="l">{{Retards}}</span></div>' +
              '<div class="pj-stat bad"><span class="n">' + (d.nb_punitions || 0) + '</span><span class="l">{{Punitions}}</span></div>' +
+             '<div class="pj-stat warn"><span class="n">' + (d.nb_evenements || 0) + '</span><span class="l">{{Carnet}}</span></div>' +
              '</div></div></div>';
 
         // Prochain DS
@@ -252,20 +308,23 @@ $jsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APO
         }
         h += '</div>'; // grid
 
-        // EDT aujourd'hui
-        h += '<div class="pj-card" style="margin-bottom:16px"><div class="pj-card-h"><i class="fas fa-calendar-day"></i> {{Emploi du temps — aujourd\'hui}}</div>';
-        h += '<div class="pj-card-b">' + edtTable(d.edt_aujourdhui) + '</div></div>';
+        // EDT aujourd'hui puis prochain jour
+        h += '<div style="margin-bottom:16px">' +
+             carte('fa-calendar-day', '{{Emploi du temps — aujourd\'hui}}',
+                   edtTable(d.edt_aujourdhui), '{{Pas de cours}}') + '</div>';
 
-        // EDT prochain jour
-        h += '<div class="pj-card" style="margin-bottom:16px"><div class="pj-card-h"><i class="fas fa-calendar-alt"></i> {{Emploi du temps — prochain jour}}';
-        if (d.edt_prochainjour_date) h += ' <small style="opacity:.85">(' + esc(d.edt_prochainjour_date) + ')</small>';
-        h += '</div><div class="pj-card-b">' + edtTable(d.edt_prochainjour) + '</div></div>';
+        var quand = d.edt_prochainjour_date
+            ? ' <small style="opacity:.85">(' + esc(d.edt_prochainjour_date) + ')</small>' : '';
+        h += '<div style="margin-bottom:16px">' +
+             carte('fa-calendar-alt', '{{Emploi du temps — prochain jour}}',
+                   edtTable(d.edt_prochainjour), '{{Pas de cours}}', quand) + '</div>';
 
-        // Notes / Devoirs / Punitions
+        // Notes / Devoirs / Punitions / Carnet
         h += '<div class="pj-grid">';
-        h += '<div class="pj-card"><div class="pj-card-h"><i class="fas fa-star"></i> {{Dernières notes}}</div><div class="pj-card-b">' + notesList(d.notes) + '</div></div>';
-        h += '<div class="pj-card"><div class="pj-card-h"><i class="fas fa-book"></i> {{Devoirs}}</div><div class="pj-card-b">' + homeworkList(d) + '</div></div>';
-        h += '<div class="pj-card"><div class="pj-card-h"><i class="fas fa-exclamation-triangle"></i> {{Punitions}}</div><div class="pj-card-b">' + punitionsList(d.punitions) + '</div></div>';
+        h += carte('fa-star', '{{Dernières notes}}', notesList(d.notes), '{{Aucune note}}');
+        h += carte('fa-book', '{{Devoirs}}', homeworkList(d), '{{Aucun devoir}}');
+        h += carte('fa-exclamation-triangle', '{{Punitions}}', punitionsList(d.punitions), '{{Aucune punition}}');
+        h += carte('fa-clipboard-list', '{{Carnet}}', carnetList(d.evenements), '{{Aucun évènement}}');
 
         // ICAL
         if (d.URL_Ical || d.ical) {

@@ -284,6 +284,40 @@
 
 <h1 id="beta-nouveautes">Nouveautés en cours</h1>
 
+<h2>Revue d'ergonomie du widget et du panneau <span class="badge badge-new">1.7.1</span></h2>
+<p>Cinq points relevés en mesurant le rendu réel des trois comptes d'essai, puis corrigés.</p>
+<ul>
+    <li><strong>Cinq onglets sur onze étaient hors d'atteinte.</strong> La barre fait ~650 px avec
+    ses onze entrées ; la largeur par défaut d'une tuile ProJote est de 360 px. En
+    <code>nowrap</code> et sans défilement, les derniers onglets sortaient du cadre — ni visibles,
+    ni accessibles. Sur une tuile de 368 px : Menu, Messagerie, Statistiques, Alertes et
+    Compétences (vingt-deux évaluations) perdus. La barre revient à la ligne, et les onglets
+    passent de 20 à 24 px de haut, minimum recommandé pour le doigt.</li>
+    <li><strong>Chaque note comptait double.</strong> Pronote rend la même note sous chacun des
+    découpages qui la contiennent : <strong>104 entrées pour 53 notes réelles</strong> sur un
+    compte à trois trimestres. Une note n'est plus retenue qu'une fois, sous sa période la plus
+    précise — ce que les absences faisaient déjà.</li>
+    <li><strong>Sept textes sous le seuil de contraste.</strong> Mesures sur le rendu :</li>
+</ul>
+<pre><code>Màj (heure de mise à jour)   1,99  →  5,88
+Onglet inactif               3,35  →  5,88
+Sous-ligne de devoir         3,35  →  5,88
+« Aucun devoir »             1,99  →  5,88
+Établissement                3,98  →  5,88
+Titre de colonne EDT         3,98  →  5,88
+Titre de section devoirs     2,85  →  5,88      (seuil AA : 4,5)</code></pre>
+<ul>
+    <li><strong>Le panneau ne gaspille plus sa hauteur.</strong> Une section vide occupait un bloc
+    entier — jusqu'à 596 px pour « Aucun devoir », étirée sur la hauteur de la liste des notes
+    voisine. Elle se replie sur une ligne de 37 px, mention à droite du titre, et reste visible.</li>
+    <li><strong>Une hiérarchie dans le panneau.</strong> Les huit sections portaient le même
+    bandeau vert plein : « Identité » pesait autant que « Emploi du temps ». Le bandeau courant est
+    désormais une teinte légère avec un filet d'accent, et seule la carte d'identité garde le vert
+    plein. Le carnet de vie scolaire y fait son entrée, en compteur et en section.</li>
+</ul>
+<p>Enfin, la liste <em>Onglet par défaut</em> de l'onglet <em>Affichage</em> s'arrêtait aux
+punitions : six onglets existants n'y figuraient pas, dont le Carnet. Les onze sont proposés.</p>
+
 <h2>Nouveautés : ne plus crier à chaque cycle <span class="badge badge-fix">1.7.1</span></h2>
 <p>Le centre d'alertes affichait la même ligne heure après heure :</p>
 <pre><code>23/09/2026 12:01  Nouvelle note — MATHEMATIQUES : Absent / 20

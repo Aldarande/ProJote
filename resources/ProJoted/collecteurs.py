@@ -626,12 +626,31 @@ def notes(client):
             logging.error(f"Erreur lors de l'accès aux périodes : {e}")
             return {"note": [], "derniere_note": [], "error": str(e)}
 
+        # PRONOTE publie plusieurs découpages qui se recouvrent — trimestres,
+        # semestres, « Année continue », « Hors période » — et rend la même note
+        # sous chacun de ceux qui la contiennent. Sans dédoublonnage, un compte à
+        # trois trimestres affichait chaque note deux fois : 104 entrées pour
+        # 53 notes réelles, relevé le 23 septembre 2026. Le compteur de
+        # nouveautés comptait double par la même occasion.
+        #
+        # On retient la première occurrence : `client.periods` liste les
+        # trimestres avant les regroupements plus larges, donc la période
+        # conservée est la plus précise. Les absences suivent déjà cette règle
+        # (cf. _relever_sur_periodes), au détail près qu'elles limitent aussi le
+        # nombre de requêtes — ici on ne peut pas, chaque période ayant ses
+        # propres notes.
         all_grades = []
+        vues = set()
         for period in all_periods:
             try:
                 period_grades = period.grades
                 period_name = getattr(period, "name", "")
                 for grade in period_grades or []:
+                    identifiant = getattr(grade, "id", None)
+                    if identifiant is not None:
+                        if identifiant in vues:
+                            continue
+                        vues.add(identifiant)
                     all_grades.append((grade, period_name))
             except Exception as e:
                 logging.warning(
