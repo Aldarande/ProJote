@@ -860,6 +860,10 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
                 <td><span class="badge badge-fix">Correctif</span></td>
                 <td><strong>La durée d'une absence était affichée deux fois mal</strong> — le widget annonçait « 2j 6h00h ». L'unité des heures était doublée : Pronote renvoie déjà « 6h00 », le widget y ajoutait un « h ». Quant aux « 2j », ils ne désignaient pas des jours : le champ que Pronote nomme <code>NbrJours</code> compte en réalité des <strong>demi-journées</strong> — une absence d'une seule journée en vaut 2, et une absence du mardi au lundi suivant en vaut 9, soit cinq jours ouvrés moins le mercredi après-midi. La durée se lit maintenant « 2 demi-j · 6h00 ».</td>
             </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>La même « Nouvelle note » était annoncée à chaque cycle</strong> — le plugin retient ce qu'il a déjà vu pour ne signaler que les nouveautés, et il le retenait par l'identifiant que Pronote attribue à chaque note. Or cet identifiant ne vaut que pour la session qui l'a émis : il change à chaque connexion. Mesuré sur un compte réel, deux cycles consécutifs n'avaient plus un seul identifiant en commun. Toutes les notes paraissaient donc neuves toutes les heures, et le centre d'alertes répétait la même ligne indéfiniment ; les absences subissaient le même sort, un compte de démonstration les annonçant toutes les seize comme nouvelles. Notes et absences sont désormais reconnues à leur contenu — matière, date, valeur pour une note ; dates de début et de fin pour une absence — ce que faisaient déjà les devoirs, seuls épargnés jusqu'ici. Le commentaire du professeur est volontairement exclu : ajouté après coup, il aurait fait réapparaître la note comme neuve. Aucune action de votre part : au premier cycle qui suit la mise à jour, le plugin repose sa référence en silence et ne signale rien.</td>
+            </tr>
         </tbody>
     </table>
 

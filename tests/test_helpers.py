@@ -524,47 +524,154 @@ class TestNewItemLabels:
 
 
 class TestComputeDeltas:
-    def _note(self, id, cours="Maths", note="15"):
-        return {"id": id, "cours": cours, "date": "01/03", "note": note, "sur": "20",
-                "note_sur": note + "/20", "commentaire": ""}
+    """Détection des nouveautés d'un cycle à l'autre.
+
+    Tout repose sur la signature d'un item : si elle change alors que l'item n'a
+    pas bougé, l'index « déjà vu » ne reconnaît plus rien et le centre d'alertes
+    réannonce l'historique complet à chaque cycle. C'est exactement ce qui se
+    passait tant que la signature reposait sur l'identifiant PRONOTE — il ne vaut
+    que pour la session qui l'a émis.
+    """
+
+    VERSION = 2
+
+    def _note(self, id=None, cours="Maths", note="15", date="01/03"):
+        return {"id": id, "periode": "Trimestre 1", "cours": cours, "date": date,
+                "note": note, "sur": "20", "note_sur": note + "/20", "commentaire": ""}
+
+    def _index(self, **kinds):
+        """Index « déjà vu » au format courant."""
+        base = {"notes": [], "devoirs": [], "punitions": [], "absences": [],
+                "version": self.VERSION}
+        base.update(kinds)
+        return base
+
+    def _sig(self, daemon, item, kind):
+        """Signature telle que le démon la calculera, sans la recopier ici.
+
+        La recopier figerait le format dans le test : il passerait encore le
+        jour où la signature changerait sans que l'index soit versionné.
+        """
+        import analyse_scolaire
+
+        return analyse_scolaire._sig_of(item, kind)
 
     def test_first_run_no_deltas(self, daemon):
-        notes = [self._note(1), self._note(2)]
+        notes = [self._note(1), self._note(2, cours="Histoire")]
         deltas, index = daemon.compute_deltas({}, notes, [], [], [])
         assert deltas["nouvelles_notes"] == 0
         assert deltas["derniere_nouvelle_note"] == ""
-        # La baseline est enregistrée pour le prochain passage.
+        # La baseline est enregistrée pour le prochain passage, avec sa version.
         assert len(index["notes"]) == 2
+        assert index["version"] == self.VERSION
 
     def test_detects_new_note(self, daemon):
-        seen = {"notes": ["1"], "devoirs": [], "punitions": [], "absences": []}
-        notes = [self._note(2, cours="Histoire", note="17"), self._note(1)]
-        deltas, index = daemon.compute_deltas(seen, notes, [], [], [])
+        vue = self._note(1)
+        seen = self._index(notes=[self._sig(daemon, vue, "notes")])
+        notes = [self._note(2, cours="Histoire", note="17"), vue]
+        deltas, _ = daemon.compute_deltas(seen, notes, [], [], [])
         assert deltas["nouvelles_notes"] == 1
         assert deltas["derniere_nouvelle_note"] == "Histoire : 17/20"
-        assert set(index["notes"]) == {"1", "2"}
 
     def test_no_new_when_all_seen(self, daemon):
-        seen = {"notes": ["1", "2"], "devoirs": [], "punitions": [], "absences": []}
-        notes = [self._note(1), self._note(2)]
+        notes = [self._note(1), self._note(2, cours="Histoire")]
+        seen = self._index(notes=[self._sig(daemon, n, "notes") for n in notes])
         deltas, _ = daemon.compute_deltas(seen, notes, [], [], [])
         assert deltas["nouvelles_notes"] == 0
         assert deltas["derniere_nouvelle_note"] == ""
 
+    # ── Le cœur du correctif ────────────────────────────────────────────
+
+    def test_un_id_pronote_qui_tourne_ne_cree_pas_de_nouveaute(self, daemon):
+        """Mesuré sur un compte réel : les trois id changent à chaque cycle.
+
+        Tant que la signature les reprenait, la même « Nouvelle note » était
+        annoncée d'heure en heure.
+        """
+        avant = [self._note("33#VCQp0sBVDaM9"), self._note("33#eQc2PEWI", cours="Histoire")]
+        seen = self._index(notes=[self._sig(daemon, n, "notes") for n in avant])
+        # Mêmes notes, identifiants renouvelés par une nouvelle session.
+        apres = [self._note("33#pddQAfJ1EmFs"), self._note("33#ZA1NMDEJbjj", cours="Histoire")]
+
+        deltas, _ = daemon.compute_deltas(seen, apres, [], [], [])
+
+        assert deltas["nouvelles_notes"] == 0
+        assert deltas["derniere_nouvelle_note"] == ""
+
+    def test_une_absence_ne_depend_plus_de_son_id(self, daemon):
+        """Un compte de démonstration annonçait ses 16 absences comme neuves."""
+        avant = [{"id": "1#ancien", "date_debut": "18/09/26 08:30",
+                  "date_fin": "18/09/26 15:35", "raison": "Maladie"}]
+        seen = self._index(absences=[self._sig(daemon, a, "absences") for a in avant])
+        apres = [dict(avant[0], id="1#renouvele")]
+
+        deltas, _ = daemon.compute_deltas(seen, [], [], [], apres)
+
+        assert deltas["nouvelles_absences"] == 0
+
+    def test_une_vraie_nouvelle_absence_est_toujours_vue(self, daemon):
+        """Le correctif ne doit pas rendre la détection aveugle."""
+        vue = {"id": "1#a", "date_debut": "18/09/26 08:30", "date_fin": "18/09/26 15:35"}
+        seen = self._index(absences=[self._sig(daemon, vue, "absences")])
+        apres = [vue, {"id": "1#b", "date_debut": "20/09/26 08:00",
+                       "date_fin": "20/09/26 12:00"}]
+
+        deltas, _ = daemon.compute_deltas(seen, [], [], [], apres)
+
+        assert deltas["nouvelles_absences"] == 1
+
+    def test_un_commentaire_ajoute_apres_coup_ne_cree_pas_de_nouveaute(self, daemon):
+        """Le professeur complète sa note : ce n'est pas une note de plus."""
+        vue = self._note(1)
+        seen = self._index(notes=[self._sig(daemon, vue, "notes")])
+        enrichie = dict(vue, commentaire="DS chapitre 3")
+
+        deltas, _ = daemon.compute_deltas(seen, [enrichie], [], [], [])
+
+        assert deltas["nouvelles_notes"] == 0
+
+    # ── Migration de l'index ────────────────────────────────────────────
+
+    def test_un_index_d_un_format_anterieur_repose_une_baseline(self, daemon):
+        """Sans cela, la mise à jour sortirait tout l'historique en nouveautés."""
+        ancien = {"notes": ["33#identifiant-de-l-ancien-format"], "devoirs": [],
+                  "punitions": [], "absences": []}  # pas de clé « version »
+        notes = [self._note(1), self._note(2, cours="Histoire")]
+
+        deltas, index = daemon.compute_deltas(ancien, notes, [], [], [])
+
+        assert deltas["nouvelles_notes"] == 0
+        assert deltas["derniere_nouvelle_note"] == ""
+        assert index["version"] == self.VERSION
+
+    def test_le_cycle_suivant_la_migration_detecte_normalement(self, daemon):
+        ancien = {"notes": ["33#ancien-format"], "devoirs": [], "punitions": [],
+                  "absences": []}
+        notes = [self._note(1)]
+        _, index = daemon.compute_deltas(ancien, notes, [], [], [])
+
+        deltas, _ = daemon.compute_deltas(
+            index, [self._note(2, cours="Histoire", note="17")] + notes, [], [], []
+        )
+
+        assert deltas["nouvelles_notes"] == 1
+
+    # ── Les autres natures ──────────────────────────────────────────────
+
     def test_detects_new_devoir_by_signature(self, daemon):
-        seen = {"notes": [], "devoirs": ["d:12/03|Maths|ex p.10"], "punitions": [], "absences": []}
+        seen = self._index(devoirs=["d:12/03|Maths|ex p.10"])
         devoirs = [
             {"date": "13/03", "title": "Physique", "description": "TP"},
             {"date": "12/03", "title": "Maths", "description": "ex p.10"},
         ]
-        deltas, index = daemon.compute_deltas(seen, [], devoirs, [], [])
+        deltas, _ = daemon.compute_deltas(seen, [], devoirs, [], [])
         assert deltas["nouveaux_devoirs"] == 1
         assert deltas["dernier_nouveau_devoir"] == "Physique (13/03) : TP"
 
     def test_counts_punitions_and_absences(self, daemon):
-        seen = {"notes": [], "devoirs": [], "punitions": ["p:5"], "absences": []}
+        seen = self._index(punitions=["p:5"])
         punitions = [{"id": 5}, {"id": 6}]
-        absences = [{"id": 9}]
+        absences = [{"id": 9, "date_debut": "01/03", "date_fin": "02/03"}]
         deltas, _ = daemon.compute_deltas(seen, [], [], punitions, absences)
         assert deltas["nouvelles_punitions"] == 1
         assert deltas["nouvelles_absences"] == 1

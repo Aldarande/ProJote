@@ -284,6 +284,40 @@
 
 <h1 id="beta-nouveautes">Nouveautés en cours</h1>
 
+<h2>Nouveautés : ne plus crier à chaque cycle <span class="badge badge-fix">1.7.1</span></h2>
+<p>Le centre d'alertes affichait la même ligne heure après heure :</p>
+<pre><code>23/09/2026 12:01  Nouvelle note — MATHEMATIQUES : Absent / 20
+23/09/2026 11:03  Nouvelle note — MATHEMATIQUES : Absent / 20
+23/09/2026 11:00  Nouvelle note — MATHEMATIQUES : Absent / 20
+23/09/2026 10:00  Nouvelle note — MATHEMATIQUES : Absent / 20</code></pre>
+<p>Ce n'était pas cette note en particulier. Le plugin retient ce qu'il a déjà vu par
+l'identifiant que Pronote attribue à chaque élément — et cet identifiant ne vaut que pour la
+session qui l'a émis. Relevé sur deux cycles consécutifs d'un compte réel :</p>
+<pre><code>AVANT   33#VCQp0sBVDaM9…   33#eQc2PEWI-2Lsmk6…   33#TwEveNN3yEQd…
+APRÈS   33#pddQAfJ1EmFs…   33#ZA1NMDEJbjjYwh…   33#NmxebN9T2akQ…
+
+identifiants stables : 0 sur 3</code></pre>
+<p>Toutes les notes étaient donc neuves à chaque cycle, et le libellé retenu étant celui de la
+plus récente, c'est la même phrase qui revenait. Les absences étaient touchées de la même façon :
+un compte de démonstration annonçait ses seize absences comme nouvelles. Les <strong>devoirs</strong>,
+eux, ne se répétaient jamais — faute d'identifiant exposé par Pronote, ils étaient déjà reconnus à
+leur contenu. C'est ce qui a mis sur la piste.</p>
+<ul>
+    <li><strong>Notes et absences sont reconnues à leur contenu.</strong> Période, matière, date et
+    valeur pour une note ; dates de début et de fin pour une absence. Le commentaire du professeur
+    et la moyenne de classe en sont exclus : modifiés après coup, ils auraient fait réapparaître la
+    note comme neuve. Contrepartie assumée — deux notes identiques le même jour dans la même
+    matière se confondent, et la seconde n'est pas annoncée.</li>
+    <li><strong>La bascule ne réveille personne.</strong> L'index des éléments déjà vus porte
+    désormais un numéro de format. Au premier cycle qui suit la mise à jour, l'ancien index n'est
+    pas comparable : le plugin repose sa référence en silence, exactement comme au tout premier
+    branchement, plutôt que de ressortir tout l'historique de l'élève d'un coup.</li>
+</ul>
+<p>Vérifié sur un cycle réel : après la migration, deux cycles consécutifs n'ont ajouté aucune
+alerte, là où chacun en ajoutait une auparavant. Les <strong>punitions</strong> restent signées par
+leur identifiant — elles viennent de la même réponse que les absences et sont donc probablement
+touchées aussi, mais aucun compte éprouvé n'en portait pour le vérifier.</p>
+
 <h2>Le carnet dans le widget, et la durée des absences <span class="badge badge-new">1.7.1</span></h2>
 <p>Deux corrections d'affichage, trouvées en relisant le widget et le panneau section par section.</p>
 <ul>

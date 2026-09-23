@@ -238,18 +238,49 @@ def _item_signature(item, *fields):
 
 
 def _sig_of(item, kind):
-    """Identifiant stable d'un item selon son type (id Pronote si disponible)."""
-    sid = item.get("id")
-    has_id = sid not in (None, "")
+    """Signature d'un item, stable d'une session PRONOTE à l'autre.
+
+    **L'identifiant PRONOTE n'en est pas une.** Il ne vaut que pour la session
+    qui l'a émis — comme celui d'une période ou d'une ressource d'enfant — et il
+    change à chaque authentification. Mesuré le 23 septembre 2026 sur un compte
+    réel, deux cycles consécutifs :
+
+        AVANT  33#VCQp0sBVDaM9…   33#eQc2PEWI-2Lsmk6…   33#TwEveNN3yEQd…
+        APRÈS  33#pddQAfJ1EmFs…   33#ZA1NMDEJbjjYwh…   33#NmxebN9T2akQ…
+
+        identifiants stables : 0 sur 3
+
+    L'index « déjà vu » ne reconnaissait donc plus rien : toutes les notes
+    étaient neuves à chaque cycle, ``nouvelles_notes`` valait en permanence le
+    total, et le centre d'alertes répétait la même « Nouvelle note » d'heure en
+    heure. Les absences subissaient le même sort — un compte de démonstration
+    annonçait ``nouvelles_absences: 16``, c'est-à-dire toutes. Seuls les devoirs
+    y échappaient, faute d'identifiant exposé : ils étaient déjà signés par leur
+    contenu, et eux ne se répétaient pas.
+
+    On signe donc par le contenu, sur des champs qu'un cycle ne fait pas varier.
+    Le commentaire du professeur et la moyenne de classe en sont exclus : ils
+    sont modifiés après coup, et les inclure ferait réapparaître la note comme
+    neuve. La contrepartie est assumée : deux notes identiques le même jour, dans
+    la même matière et avec la même valeur, se confondent — la seconde ne sera
+    pas annoncée. C'est le compromis déjà retenu pour les devoirs.
+
+    Les punitions restent signées par leur identifiant : elles viennent de la
+    même réponse PagePresence que les absences et sont donc très probablement
+    touchées aussi, mais aucun compte éprouvé n'en portait pour le vérifier.
+    """
     if kind == "notes":
-        return str(sid) if has_id else "n:" + _item_signature(item, "cours", "date", "note", "sur", "commentaire")
+        return "n:" + _item_signature(item, "periode", "cours", "date", "note", "sur")
     if kind == "devoirs":
-        # Les devoirs n'ont pas d'id Pronote stable exposé → signature de contenu.
+        # Les devoirs n'ont pas d'id Pronote exposé → signature de contenu.
         return "d:" + _item_signature(item, "date", "title", "description")
     if kind == "punitions":
-        return "p:" + (str(sid) if has_id else _item_signature(item, "date", "raison", "type"))
+        sid = item.get("id")
+        if sid not in (None, ""):
+            return "p:" + str(sid)
+        return "p:" + _item_signature(item, "date", "raison", "type")
     if kind == "absences":
-        return "a:" + (str(sid) if has_id else _item_signature(item, "date_debut", "date_fin"))
+        return "a:" + _item_signature(item, "date_debut", "date_fin")
     return _item_signature(item, "id")
 
 
@@ -277,12 +308,22 @@ def format_new_devoir_label(dv):
     return f"{head} : {desc}" if desc else head
 
 
+# Format des signatures rangées dans seen_index.json. À incrémenter dès que
+# _sig_of change, sinon le premier cycle qui suit la mise à jour compare des
+# signatures d'un format à celles d'un autre : plus rien ne correspond, et tout
+# l'historique de l'élève ressort d'un coup en « nouveautés ». Un index d'une
+# autre version est traité comme absent — on repose une baseline en silence,
+# exactement comme au tout premier branchement.
+VERSION_SIGNATURES = 2
+
+
 def compute_deltas(seen_index, notes_list, devoirs_list, punitions_list, absences_list):
     """Compare les items courants à l'index « déjà vu » précédent.
 
-    Retourne (deltas, new_index). Au PREMIER passage (index vide/absent), aucun
-    delta n'est émis : on n'enregistre que la baseline pour éviter une avalanche
-    de notifications au branchement initial (même logique que le centre d'alertes).
+    Retourne (deltas, new_index). Au PREMIER passage (index vide, absent, ou
+    écrit dans un format antérieur), aucun delta n'est émis : on n'enregistre
+    que la baseline pour éviter une avalanche de notifications au branchement
+    initial (même logique que le centre d'alertes).
 
     deltas contient les compteurs de nouveautés et les libellés de la dernière
     nouvelle note / du dernier nouveau devoir (vides si rien de neuf).
@@ -294,6 +335,7 @@ def compute_deltas(seen_index, notes_list, devoirs_list, punitions_list, absence
         ("absences", absences_list, "nouvelles_absences"),
     )
     new_index = {kind: [_sig_of(it, kind) for it in (lst or [])] for kind, lst, _ in kinds}
+    new_index["version"] = VERSION_SIGNATURES
 
     deltas = {
         "nouvelles_notes": 0,
@@ -305,6 +347,12 @@ def compute_deltas(seen_index, notes_list, devoirs_list, punitions_list, absence
     }
     if not seen_index:
         return deltas, new_index  # premier passage : baseline seulement
+    if seen_index.get("version") != VERSION_SIGNATURES:
+        logging.info(
+            "Index des nouveautés d'un format antérieur : baseline reposée, "
+            "aucune alerte pour ce cycle."
+        )
+        return deltas, new_index
 
     for kind, lst, count_key in kinds:
         seen = set(seen_index.get(kind, []))
