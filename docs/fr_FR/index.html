@@ -848,6 +848,10 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
                 <td><span class="badge badge-perf">Fiabilité</span></td>
                 <td><strong>Une panne de l'onglet <em>Présence</em> n'est plus redécouverte quatre fois</strong> — absences, retards, punitions et évènements du carnet passent par le même onglet Pronote. Lorsque le rattrapage échoue malgré tout, l'onglet est maintenant noté hors d'usage jusqu'à la fin du cycle : les trois relevés suivants s'abstiennent, au lieu de refaire chacun une requête, une reconnexion et un rejeu perdu d'avance. Sur le compte d'un bêta-testeur, l'onglet coûtait cinq reconnexions par cycle, à chaque cycle — le régime même qui avait valu une suspension d'adresse IP par Pronote au début du mois. Il en coûte deux au pire. Ce qui est transmis à Jeedom ne change pas : chaque onglet conserve son statut et la valeur de son relevé précédent.</td>
             </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>Le contenu des informations ne remontait jamais sur un compte parent</strong> — Pronote demande le texte d'une information <em>pour un destinataire</em>. La bibliothèque y inscrivait la ressource du compte, fixée à la connexion : sur un compte parent, c'est le parent, et le choix de l'enfant ne la met pas à jour. La requête partait donc signée de l'enfant et adressée au parent — deux personnes différentes — et Pronote la refusait. Le symptôme était discret : le titre, l'auteur et la date des informations s'affichaient normalement, seul le texte manquait. Le coût l'était moins, chaque tentative déclenchant une reconnexion complète : trois informations, trois reconnexions, aucun texte. La requête désigne maintenant l'enfant sélectionné, et aboutit du premier coup. Les comptes élève n'étaient pas concernés.</td>
+            </tr>
         </tbody>
     </table>
 

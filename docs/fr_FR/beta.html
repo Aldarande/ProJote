@@ -284,6 +284,26 @@
 
 <h1 id="beta-nouveautes">Nouveautés en cours</h1>
 
+<h2>Actualités : un contenu demandé pour la mauvaise personne <span class="badge badge-fix">1.7.1</span></h2>
+<p>Pronote ne renvoie pas le texte d'une information « dans l'absolu » : il le renvoie
+<em>pour un destinataire</em>, nommé dans la requête. La bibliothèque y inscrit la ressource du
+compte connecté, établie une fois pour toutes à la connexion — et sur un compte parent, c'est
+<strong>le parent</strong>. Sélectionner un enfant ne la met pas à jour.</p>
+<p>La requête partait donc signée de l'enfant et adressée au parent. Les deux identifiants se
+distinguent à l'œil dans le journal — l'enfant est un <code>46#…</code>, le parent un
+<code>128#…</code> :</p>
+<pre><code>Signature.membre        = 46#IUxbnVyNqlh…     (l'enfant)
+data.actualite.public   = 128#H2curZ6ote…    (le parent)
+→ Unknown error from pronote: 20 | La page a expiré ! (11)</code></pre>
+<p>Le symptôme était discret : titre, auteur, catégorie et date s'affichaient normalement, seul
+le texte manquait. Le coût l'était moins — chaque échec déclenchait une reconnexion complète,
+suivie d'un rejeu qui repartait avec le même identifiant. Trois informations sur le compte
+éprouvé, trois reconnexions, aucun texte récupéré.</p>
+<p>La requête désigne désormais l'enfant sélectionné et aboutit du premier coup. Les comptes
+élève n'étaient pas touchés : chez eux, la ressource du compte <em>est</em> l'élève. Six tests
+gardent le chemin, dont un qui vérifie qu'aucune reconnexion n'est plus déclenchée, et un autre
+que la charge de l'appelant n'est pas modifiée au passage.</p>
+
 <h2>Session expirée : le rejeu et la cascade <span class="badge badge-fix">1.7.1</span></h2>
 <p>Version de maintenance. La 1.7.0 avait appris au plugin à distinguer une session morte d'un
 droit refusé, et à relire les périodes pour réessayer (voir plus bas). Le journal d'un

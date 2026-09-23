@@ -84,6 +84,16 @@ def faux_pronotepy(monkeypatch):
                 membre = signature.get("membre")
                 if membre and not membre["N"].endswith(f"-s{journal['sessions']}"):
                     raise PronoteAPIError("La page a expiré")
+            # Le destinataire d'une actualité doit être la personne qui signe la
+            # requête. Demander le contenu « pour le parent » en signant « pour
+            # l'enfant » désigne deux personnes : PRONOTE refuse.
+            actualite = (post_data.get("data") or {}).get("actualite")
+            if actualite and signature:
+                attendu = signature.get("membre", {}).get("N")
+                if attendu and actualite.get("public", {}).get("N") != attendu:
+                    raise PronoteAPIError(
+                        "Unknown error from pronote: 20 | La page a expiré ! (11)"
+                    )
             # L'identifiant de période est lié à la session au même titre que
             # celui du membre : c'est ce que PRONOTE sanctionne par
             # « Unknown error from pronote: 20 | La page a expiré ! (11) ».
@@ -117,6 +127,13 @@ def faux_pronotepy(monkeypatch):
             return self.periods_
 
         def _nouvelle_session(self):
+            """Ce que fait _login() : session neuve, et `info` reconstruite.
+
+            `info` est toujours bâtie depuis la ressource du COMPTE, et
+            set_child() ne la met jamais à jour. Sur un compte parent elle
+            désigne donc le parent, jamais l'enfant sélectionné — c'est le
+            défaut de pronotepy, reproduit ici fidèlement.
+            """
             journal["sessions"] += 1
             s = journal["sessions"]
             self.periods_ = [
@@ -137,6 +154,9 @@ def faux_pronotepy(monkeypatch):
                     }
                 }
             }
+            self.info = ClientInfo(
+                self, self.parametres_utilisateur["dataSec"]["data"]["ressource"]
+            )
 
     class ParentClient(Client):
         # Réplique du ParentClient d'origine : post() ne délègue pas à
@@ -660,3 +680,104 @@ class TestPeriodeApresReinitialisation:
         assert rejeu["data"]["periode"]["N"].endswith(
             f"-s{faux_pronotepy.journal['sessions']}"
         )
+
+
+class TestPublicDesActualites:
+    """Le contenu d'une actualité se demande POUR quelqu'un, et ce doit être l'enfant.
+
+    `PageActualites` porte un destinataire dans sa charge :
+    ``{"actualite": {"N": …, "public": {"N": <ressource>, "G": 4}}}``. pronotepy
+    le remplit avec ``client.info.id`` — or ``client.info`` est bâtie dans
+    ``_login()`` depuis la ressource du COMPTE, et ``set_child()`` ne la met
+    jamais à jour. Sur un compte parent, la requête partait donc signée de
+    l'enfant et destinée au parent.
+
+    Relevé le 23 septembre 2026 : trois comptes parent, aucun contenu
+    d'information jamais remonté, et chaque tentative payée d'une
+    ré-authentification complète suivie d'un rejeu perdu d'avance. Les comptes
+    élève n'ont jamais eu le défaut — chez eux `info` désigne bien l'élève.
+    """
+
+    def _charge(self, actualite="65#actu-1"):
+        return {
+            "actualite": {"N": actualite, "genrePublic": 4, "public": {"N": None, "G": 4}},
+            "genreRequeteActualite": 1,
+            "modeAffActu": 0,
+        }
+
+    def _charge_de_pronotepy(self, parent):
+        """La charge telle que pronotepy la construit : public = client.info."""
+        charge = self._charge()
+        charge["actualite"]["public"]["N"] = parent.info.id
+        return charge
+
+    def test_le_compte_et_l_enfant_sont_bien_deux_personnes(self, faux_pronotepy):
+        """Garde-fou de la doublure : sans cet écart, le test ne prouverait rien."""
+        faux_pronotepy.module.apply()
+        parent = faux_pronotepy.ParentClient()
+
+        assert parent.info.id != parent._selected_child.id
+
+    def test_le_destinataire_devient_l_enfant(self, faux_pronotepy):
+        faux_pronotepy.module.apply()
+        parent = faux_pronotepy.ParentClient()
+        faux_pronotepy.journal["reseau"].clear()
+
+        assert parent.post("PageActualites", 88, self._charge_de_pronotepy(parent)) == {
+            "ok": True
+        }
+
+        envoye = faux_pronotepy.journal["reseau"][-1][1]
+        assert (
+            envoye["data"]["actualite"]["public"]["N"]
+            == envoye["Signature"]["membre"]["N"]
+        )
+
+    def test_aucune_reauthentification_n_est_declenchee(self, faux_pronotepy):
+        """C'est tout l'enjeu : la requête aboutit du premier coup.
+
+        Avant, chaque information coûtait une session complète — trois par cycle
+        sur un compte à trois actualités, pour ne rien ramener.
+        """
+        faux_pronotepy.module.apply()
+        parent = faux_pronotepy.ParentClient()
+        sessions_avant = faux_pronotepy.journal["sessions"]
+        faux_pronotepy.journal["reseau"].clear()
+
+        parent.post("PageActualites", 88, self._charge_de_pronotepy(parent))
+
+        assert faux_pronotepy.journal["sessions"] == sessions_avant
+        assert len(faux_pronotepy.journal["reseau"]) == 1, "un rejeu a eu lieu"
+
+    def test_la_charge_de_l_appelant_n_est_pas_modifiee(self, faux_pronotepy):
+        faux_pronotepy.module.apply()
+        parent = faux_pronotepy.ParentClient()
+        charge = self._charge_de_pronotepy(parent)
+        avant = charge["actualite"]["public"]["N"]
+
+        parent.post("PageActualites", 88, charge)
+
+        assert charge["actualite"]["public"]["N"] == avant
+
+    def test_un_destinataire_deja_bon_n_est_pas_touche(self, faux_pronotepy):
+        """Le cas du compte élève : ne rien réécrire, ne rien recopier."""
+        faux_pronotepy.module.apply()
+        parent = faux_pronotepy.ParentClient()
+        charge = self._charge()
+        charge["actualite"]["public"]["N"] = parent._selected_child.id
+        faux_pronotepy.journal["reseau"].clear()
+
+        parent.post("PageActualites", 88, charge)
+
+        assert faux_pronotepy.journal["reseau"][-1][1]["data"] is charge
+
+    def test_une_charge_sans_actualite_passe_intacte(self, faux_pronotepy):
+        """Le listage des actualités n'a pas de destinataire : ne rien inventer."""
+        faux_pronotepy.module.apply()
+        parent = faux_pronotepy.ParentClient()
+        charge = {"modesAffActus": {"_T": 26, "V": "[0..3]"}}
+        faux_pronotepy.journal["reseau"].clear()
+
+        parent.post("PageActualites", 88, charge)
+
+        assert faux_pronotepy.journal["reseau"][-1][1]["data"] is charge

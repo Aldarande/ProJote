@@ -211,6 +211,13 @@ def _information_content(notif):
     était déjà chargé). Depuis 2.15, c'est une méthode : le contenu est récupéré à
     la demande par une requête supplémentaire vers Pronote. Sans ce garde-fou, le
     widget recevait l'objet méthode lui-même (non sérialisable en JSON).
+
+    Cette requête désigne un destinataire, que pronotepy remplit avec la ressource
+    du compte — le PARENT sur un compte parent. Elle échouait donc systématiquement
+    là-bas, au prix d'une ré-authentification par information ; c'est
+    ``pronote_compat._public_de_l_enfant`` qui la redresse. Le rattrapage ci-dessous
+    reste utile pour tout le reste : un établissement qui n'ouvre pas la page, une
+    information retirée entre le listage et la lecture.
     """
     try:
         content = getattr(notif, "content", "")

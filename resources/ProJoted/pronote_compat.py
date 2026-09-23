@@ -202,6 +202,52 @@ def _periode_de_la_session(client, data):
     return data
 
 
+
+def _public_de_l_enfant(client, data):
+    """Rend ``data`` dont le « public » désigne l'ENFANT, sur un compte parent.
+
+    ``PageActualites`` demande le contenu d'une information pour un destinataire
+    précis, passé dans la charge :
+    ``{"actualite": {"N": …, "public": {"N": <ressource>, "G": 4}}}``.
+    pronotepy le remplit avec ``client.info.id`` — or ``client.info`` est fixée
+    une fois pour toutes dans ``_login()``, à partir de la ressource du compte.
+    Sur un compte parent, c'est **la ressource du parent**, et ``set_child()`` ne
+    la met pas à jour : il ne touche qu'à ``_selected_child`` et à
+    ``parametres_utilisateur[…]["ressource"]``.
+
+    La requête partait donc signée de l'enfant (``Signature.membre``) mais
+    destinée au parent (``data.actualite.public``) — deux personnes différentes,
+    et PRONOTE répond « La page a expiré ! (11) ». Relevé le 23 septembre 2026
+    sur trois comptes parent : aucun contenu d'information n'est jamais remonté,
+    et chaque tentative coûtait une ré-authentification complète puis un rejeu
+    perdu d'avance. Les comptes élève ne sont pas touchés : chez eux
+    ``client.info`` désigne bien l'élève.
+
+    Les deux identifiants se distinguent à l'œil dans le journal : l'enfant est
+    un ``46#…`` (ressource élève), le parent un ``128#…``.
+    """
+    if not isinstance(data, dict):
+        return data
+    actualite = data.get("actualite")
+    if not isinstance(actualite, dict):
+        return data
+    public = actualite.get("public")
+    if not isinstance(public, dict):
+        return data
+    enfant = getattr(getattr(client, "_selected_child", None), "id", None)
+    if not enfant or public.get("N") == enfant:
+        return data
+    logging.debug(
+        "pronote_compat :: actualité : public %s (ressource du compte) remplacé "
+        "par %s (l'enfant sélectionné).",
+        public.get("N"),
+        enfant,
+    )
+    frais = dict(data)
+    frais["actualite"] = dict(actualite, public=dict(public, N=enfant))
+    return frais
+
+
 def _poster_avec_reprise(self, function_name, payload, PronoteAPIError):
     """Poste, et sur échec réinitialise la session avant de rejouer une fois.
 
@@ -485,12 +531,14 @@ def _install() -> None:
                     "membre": {"N": self._selected_child.id, "G": 4},
                 }
             if data:
-                post_data["data"] = _periode_de_la_session(self, data)
+                post_data["data"] = _public_de_l_enfant(
+                    self, _periode_de_la_session(self, data)
+                )
             return post_data
 
         # _payload() est ré-évalué au rejeu : il relit le _selected_child
-        # reconstruit par le refresh corrigé plus haut, ET l'identifiant de
-        # période de la session neuve.
+        # reconstruit par le refresh corrigé plus haut, l'identifiant de période
+        # de la session neuve, et le destinataire des actualités.
         return _poster_avec_reprise(self, function_name, _payload, PronoteAPIError)
 
     clients.ParentClient.post = _post_parent_protege
