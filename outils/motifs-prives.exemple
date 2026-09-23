@@ -1,0 +1,23 @@
+# Motifs nominatifs à ne jamais publier — modèle.
+#
+# Copiez ce fichier à la racine du dépôt sous le nom « .motifs-prives ».
+# .gitignore l'écarte : il ne part jamais vers GitHub, et c'est tout l'intérêt.
+# Écrire le prénom d'un enfant dans un dépôt public pour empêcher qu'il y soit
+# publié n'aurait aucun sens.
+#
+# Une expression rationnelle par ligne, insensible à la casse. Les lignes vides
+# et celles commençant par « # » sont ignorées.
+#
+# Attention aux prénoms courts ou contenus dans des mots courants : « Marc »
+# se retrouve dans « marcher », « Luc » dans « lucide ». Encadrez-les de
+# \b pour exiger un mot entier, et vérifiez le résultat avec :
+#
+#     python outils/verifier_fuites.py --arbre
+#
+# Exemples de la forme attendue :
+#
+# \bprenom_enfant\b
+# \bautre_prenom\b
+# nom\.de\.famille
+# prenom\.nom@
+# \bidentifiant_pronote\b

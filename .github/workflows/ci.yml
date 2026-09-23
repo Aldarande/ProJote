@@ -27,6 +27,21 @@ jobs:
       - name: Lint complet (tests/)
         run: ruff check tests/
 
+  fuites:
+    name: Données personnelles
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Contrôle de fuite sur tout le contenu suivi
+        # Le crochet pre-push local peut être contourné (--no-verify) ou
+        # absent d'un autre clone : ce job est le filet, côté serveur.
+        # Il n'a pas accès à .motifs-prives, qui reste local — il ne contrôle
+        # donc que les motifs génériques.
+        run: python outils/verifier_fuites.py --arbre
+
   lint-shell:
     name: Lint Shell (shellcheck)
     runs-on: ubuntu-latest
@@ -35,7 +50,7 @@ jobs:
       - name: Installer shellcheck
         run: sudo apt-get update && sudo apt-get install -y shellcheck
       - name: shellcheck (erreurs bloquantes)
-        run: shellcheck --severity=error resources/post-install.sh
+        run: shellcheck --severity=error resources/post-install.sh outils/hooks/pre-push
       - name: shellcheck (warnings, non bloquant)
         run: shellcheck resources/post-install.sh || true
 

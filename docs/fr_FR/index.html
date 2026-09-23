@@ -842,6 +842,10 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
         <tbody>
             <tr>
                 <td><span class="badge badge-sec">Sécurité</span></td>
+                <td><strong>Une publication ne peut plus emporter de données personnelles</strong> — le dépôt du plugin est public, et il a porté pendant vingt mois des données d'exécution qui n'auraient jamais dû y être. Un contrôle automatique s'exécute désormais avant chaque publication et refuse ce qui ressemble à un jeton, à une URL d'établissement réel, à une adresse de courriel ou à un chemin nommant la session Windows, ainsi que les répertoires de données et d'environnement virtuel. Les noms des personnes à protéger restent délibérément hors du dépôt, dans un fichier local. Le même contrôle tourne dans l'intégration continue, pour le cas où il serait contourné en local. Rien ne change à l'usage du plugin.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sec">Sécurité</span></td>
                 <td><strong>Le mot de passe est désormais chiffré de façon authentifiée</strong> — lorsque vous validez vos identifiants, le mot de passe passe de l'interface au programme de connexion sous forme chiffrée. Le chiffrement employé jusqu'ici, AES-256-CBC, protégeait le contenu mais ne le signait pas : une charge modifiée en route se déchiffrait en octets quelconques, que rien ne distinguait d'un mot de passe. AES-256-GCM la refuse. Rien à faire de votre côté, et rien à migrer : ce chiffré ne vit que le temps d'une validation, il n'est jamais conservé.</td>
             </tr>
             <tr>

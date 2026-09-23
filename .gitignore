@@ -26,3 +26,8 @@ resources/ProJoted/test_token_persistence.py
 rules/
 Parle en francais/
 resources/cspell.json
+
+# Motifs nominatifs du contrôle de fuite (outils/verifier_fuites.py).
+# Ils désignent des personnes réelles : les publier reviendrait exactement à
+# ce que le contrôle cherche à empêcher. Modèle : outils/motifs-prives.exemple
+.motifs-prives

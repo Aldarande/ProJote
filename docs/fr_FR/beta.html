@@ -284,6 +284,35 @@
 
 <h1 id="beta-nouveautes">Nouveautés en cours</h1>
 
+<h2>Garde-fou contre la publication de données personnelles <span class="badge badge-sec">1.7.0</span></h2>
+<p>Le dépôt du plugin est public. Entre janvier 2025 et septembre 2026, il a porté — sans que
+personne s'en aperçoive — des données d'exécution qui n'avaient rien à y faire. Elles ont été
+retirées, et l'historique réécrit : supprimer un fichier ne l'efface pas du passé, c'est
+justement ce qui avait échoué dix-huit mois plus tôt.</p>
+<p>Pour que cela ne se reproduise pas, un contrôle s'exécute maintenant <strong>avant chaque
+publication</strong> et refuse ce qu'elle ajouterait de suspect :</p>
+<ul>
+    <li>les répertoires de données et d'environnement virtuel, qui n'ont jamais leur place dans
+    un commit ;</li>
+    <li>une URL PRONOTE d'établissement réel — le serveur de démonstration reste autorisé, ses
+    identifiants étant publics ;</li>
+    <li>une chaîne hexadécimale assez longue pour être un jeton, un identifiant d'espace dans une
+    URL, une adresse de courriel, un chemin Windows nommant la session de la machine.</li>
+</ul>
+<p><strong>Les noms des personnes à protéger ne sont pas dans le dépôt</strong>, et c'est tout
+l'intérêt : les y écrire pour empêcher qu'ils y soient publiés n'aurait aucun sens. Ils se
+déclarent dans un fichier local que git ignore. Un motif mal écrit provoque une erreur franche
+plutôt qu'un silence — un filtre de confidentialité muet est pire que pas de filtre, parce qu'il
+rassure.</p>
+<p>Le contrôle tourne aussi dans l'intégration continue, sur la totalité du contenu, pour le cas
+où le garde-fou local serait contourné ou absent d'un autre clone. Vingt-cinq tests le couvrent,
+dont un qui le rejoue sur le dépôt lui-même.</p>
+<div class="callout callout-info">
+    <strong>Rien ne change pour vous</strong>
+    Ce dispositif concerne la fabrication du plugin, pas son fonctionnement. Aucun réglage,
+    aucune commande, aucun comportement du plugin installé n'est modifié.
+</div>
+
 <h2>Reprise après expiration de session <span class="badge badge-fix">1.7.0</span></h2>
 <p>Pronote est une application à état : l'identifiant d'une période — un trimestre, un semestre —
 ne vaut que pour la session qui l'a émis. Quand la session expire en cours de relevé, la

@@ -213,6 +213,7 @@ class TestChallengeNonChiffre:
     def test_le_challenge_est_restitue_intact(self, faux_pronotepy):
         """Le repli doit rendre le challenge exact après _enleverAlea()."""
         faux_pronotepy.module.apply()
+        # fuite-acceptee : challenge renvoyé par PRONOTE, pas un jeton de compte.
         challenge = "EF4C6F47929D96D7A778BF9EE2E3A48F"  # 16 octets, cas réel
 
         capture = {}
