@@ -1220,6 +1220,10 @@ class ProJote extends eqLogic
       'absences'         => $vis['Nb_absences']      ?? true,
       'retards'          => $vis['Nb_retard']        ?? true,
       'punitions'        => $vis['Nb_punitions']     ?? true,
+      // v1.7.1 — onglet Évènements de vie scolaire (observations, défauts
+      // de carnet, mesures conservatoires). Collectés depuis la v1.7.0, ils
+      // n'étaient affichés que par leur commande isolée.
+      'evenements'       => $vis['Nb_Evenements']    ?? true,
       // v1.0.1 — nouveaux onglets et badge
       'menu'             => $vis['menu_midi_aujourdhui'] ?? true,
       'messages'         => $vis['Nb_messages']      ?? true,

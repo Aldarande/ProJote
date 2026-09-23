@@ -284,6 +284,24 @@
 
 <h1 id="beta-nouveautes">Nouveautés en cours</h1>
 
+<h2>Le carnet dans le widget, et la durée des absences <span class="badge badge-new">1.7.1</span></h2>
+<p>Deux corrections d'affichage, trouvées en relisant le widget et le panneau section par section.</p>
+<ul>
+    <li><strong>Un onglet <em>Carnet</em>.</strong> Les observations, défauts de carnet et mesures
+    conservatoires étaient relevés depuis la 1.7.0 et transmis au widget — mais ni le widget ni le
+    panneau ne les lisaient. Seule la commande isolée, posée à la main sur un tableau de bord, les
+    montrait. Sur le compte éprouvé, neuf entrées de carnet restaient invisibles dans la vue
+    d'ensemble. L'onglet les affiche désormais avec leur compteur, une couleur par catégorie et la
+    date de chaque entrée.</li>
+    <li><strong>« 2j 6h00h ».</strong> L'unité des heures était doublée — Pronote renvoie déjà
+    « 6h00 », le widget y ajoutait un « h ». Et les « jours » n'en sont pas : le champ
+    <code>NbrJours</code> compte des <strong>demi-journées</strong>. Vérifié sur les données brutes
+    du serveur : une absence du 16/09 08:00 au 16/09 18:00 — une seule journée — y vaut 2, et une
+    absence du mardi au lundi suivant en vaut 9, soit cinq jours ouvrés moins le mercredi
+    après-midi. C'est la bibliothèque Pronote qui nomme ce champ <code>days</code>, d'où le
+    malentendu. La durée se lit maintenant « 2 demi-j · 6h00 ».</li>
+</ul>
+
 <h2>Actualités : un contenu demandé pour la mauvaise personne <span class="badge badge-fix">1.7.1</span></h2>
 <p>Pronote ne renvoie pas le texte d'une information « dans l'absolu » : il le renvoie
 <em>pour un destinataire</em>, nommé dans la requête. La bibliothèque y inscrit la ressource du

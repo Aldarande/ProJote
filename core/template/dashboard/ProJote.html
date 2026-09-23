@@ -1104,6 +1104,9 @@
                     id="pjwbret#id#"></span></button>
             <button class="tab-btn" data-tab="pun#id#"><i class="fas fa-exclamation-triangle"></i> Pun.<span
                     class="tab-badge" id="pjwbpun#id#"></span></button>
+            <!-- v1.7.1 -->
+            <button class="tab-btn" data-tab="evt#id#"><i class="fas fa-clipboard-list"></i> Carnet<span
+                    class="tab-badge" id="pjwbevt#id#"></span></button>
             <!-- v1.0.1 -->
             <button class="tab-btn" data-tab="menu#id#"><i class="fas fa-utensils"></i> Menu<span class="tab-badge"
                     id="pjwbmenu#id#"></span></button>
@@ -1149,6 +1152,13 @@
         <!-- Punitions -->
         <div class="tab-pane" id="pun#id#">
             <div id="pjwpun#id#">
+                <div class="p-empty">–</div>
+            </div>
+        </div>
+
+        <!-- v1.7.1 — Évènements de vie scolaire (carnet) -->
+        <div class="tab-pane" id="evt#id#">
+            <div id="pjwevt#id#">
                 <div class="p-empty">–</div>
             </div>
         </div>
@@ -1663,8 +1673,14 @@
                     ? '<span class="vs-tag vs-tag-ok">Justifiée</span>'
                     : '<span class="vs-tag vs-tag-nok">Non justifiée</span>';
                 var duree = [];
-                if (a.nb_jours) duree.push(a.nb_jours + 'j');
-                if (a.nb_heures) duree.push(a.nb_heures + 'h');
+                // nb_jours est en réalité un nombre de DEMI-JOURNÉES : Pronote
+                // renvoie NbrJours = 2 pour une absence d'une seule journée
+                // (matin + après-midi). pronotepy le nomme `days`, d'où le
+                // malentendu.
+                if (a.nb_jours) duree.push(a.nb_jours + ' demi-j');
+                // nb_heures arrive déjà formaté par Pronote (« 6h00 ») : y
+                // ajouter un 'h' donnait « 6h00h ».
+                if (a.nb_heures) duree.push(a.nb_heures);
                 var dureeStr = duree.join(' ');
                 var row2 = [a.raison, dureeStr].filter(Boolean).join(' · ');
                 return '<div class="vs-item">' +
@@ -1762,6 +1778,74 @@
                     (p.travail ? '<div class="vs-row2">Travail : ' + esc(p.travail) + '</div>' : '') +
                     (schedule ? '<div class="vs-row2">📅 ' + esc(schedule) + '</div>' : '') +
                     (p.donneur ? '<div class="vs-row2">Donné par : ' + esc(p.donneur) + '</div>' : '') +
+                    '</div>' +
+                    '</div>';
+            }).join('');
+            container.innerHTML = summary + items;
+        }
+
+        /* ─── CARNET : évènements de vie scolaire (v1.7.1) ─── */
+        // Observations, défauts de carnet et mesures conservatoires : PRONOTE les
+        // range dans la même liste que les absences, distingués par un code. Ils
+        // étaient collectés depuis la v1.7.0 et présents dans widget_json, mais
+        // aucune vue d'ensemble ne les lisait — seule la commande isolée les
+        // montrait. Un carnet à neuf entrées restait donc invisible ici.
+        function renderEvenements(d) {
+            var container = el('pjwevt' + ID);
+            if (!container) return;
+            if (!VIS.evenements) {
+                var pane = el('evt' + ID); if (pane) pane.style.display = 'none';
+                return;
+            }
+            var list = d.evenements || [];
+            var count = d.nb_evenements != null ? d.nb_evenements : list.length;
+            var colorClass = count === 0 ? 'c-ok' : 'c-warn';
+            var summary = '<div class="vs-summary">' +
+                '<span class="vs-summary-count ' + colorClass + '">' + count + '</span>' +
+                '<span class="vs-summary-lbl">' +
+                (count <= 1 ? 'évènement' : 'évènements') + ' cette année</span>' +
+                '</div>';
+            if (!list.length) {
+                container.innerHTML = summary + '<div class="p-empty">Aucun évènement</div>';
+                return;
+            }
+            // Une couleur par catégorie : l'observation n'a pas le poids d'une
+            // mesure conservatoire, et le carnet se lit d'un coup d'œil.
+            // Les libellés sont ceux de collecteurs._LIBELLES_EVENEMENTS, mot
+            // pour mot : toute divergence ferait retomber la catégorie sur la
+            // couleur par défaut sans que rien ne le signale.
+            var couleurs = {
+                'Observation': '#e67e22',
+                'Défaut de carnet/carte': '#d35400',
+                'Mesure conservatoire': '#c0392b'
+            };
+            // PRONOTE ne range pas la date au même endroit selon la catégorie :
+            // une observation porte un « dateDebut » horodaté, un défaut de carnet
+            // un simple « date ». On n'affiche donc que le jour, sinon la liste
+            // mélange « 15/09/2026 » et « 26/06/2026 08:00:00 ».
+            function jourSeul(v) {
+                return String(v || '').trim().split(' ')[0];
+            }
+            // Le libellé répète souvent la catégorie (« Observation » / « Observation »).
+            // On ne le montre que s'il apporte quelque chose, comme « Leçon non apprise ».
+            function normalise(v) {
+                var mots = String(v || '').toLowerCase().split(/[^a-z]+/);
+                return mots.map(function (m) {
+                    return m.replace(/s$/, '');
+                }).join('');
+            }
+            var items = list.map(function (e) {
+                var teinte = couleurs[e.categorie] || '#e67e22';
+                var libelleUtile = e.libelle &&
+                    normalise(e.libelle) !== normalise(e.categorie);
+                return '<div class="vs-item">' +
+                    '<div class="vs-bar" style="background:' + teinte + '"></div>' +
+                    '<div class="vs-content">' +
+                    '<div class="vs-row1">' +
+                    '<span class="vs-date">' + esc(jourSeul(e.date)) + '</span>' +
+                    '<span class="vs-info">' + esc(e.categorie || '') + '</span>' +
+                    '</div>' +
+                    (libelleUtile ? '<div class="vs-row2">' + esc(e.libelle) + '</div>' : '') +
                     '</div>' +
                     '</div>';
             }).join('');
@@ -2147,6 +2231,7 @@
             renderAbsences(d);
             renderRetards(d);
             renderPunitions(d);
+            renderEvenements(d);
             renderDevoirs(d);
             // v1.0.1
             renderMenu(d);
@@ -2178,6 +2263,8 @@
             setBadge('pjwbabs' + ID, d.nb_absences);
             setBadge('pjwbret' + ID, d.nb_retards);
             setBadge('pjwbpun' + ID, d.nb_punitions);
+            // v1.7.1 : badge du carnet
+            setBadge('pjwbevt' + ID, d.nb_evenements);
             var dvCount = ((d.devoirs || []).concat(d.devoirs_demain || [])).filter(function (dv) { return !dv.done; }).length;
             setBadge('pjwbdv' + ID, dvCount);
             // v1.0.1 : badges menus et messages non lus
