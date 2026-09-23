@@ -836,6 +836,21 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
     <!-- ── Historique ─────────────────────── -->
     <h1 id="version">Historique des versions</h1>
 
+    <h2>1.7.1 — Septembre 2026</h2>
+    <table>
+        <thead><tr><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>Le rattrapage d'une session expirée repartait avec un identifiant périmé</strong> — la 1.7.0 avait appris au plugin à distinguer une session expirée d'un droit refusé, et à relire les périodes pour réessayer. Il restait un étage en dessous : quand la bibliothèque Pronote se reconnecte d'elle-même et rejoue la requête, elle la rejoue <em>telle qu'elle avait été formée avant</em> — avec l'identifiant de période de la session qu'on vient de quitter. Ce rejeu ne pouvait pas aboutir, et il coûtait une reconnexion complète à chaque fois. La requête est désormais reconstruite à chaque tentative : la période est retrouvée par son nom, seul repère qui survit à une reconnexion. Sur un compte de test, un relevé qui ne ramenait plus rien ramène de nouveau ses seize absences. Le correctif vaut pour les comptes parent comme pour les comptes élève, tous deux concernés.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-perf">Fiabilité</span></td>
+                <td><strong>Une panne de l'onglet <em>Présence</em> n'est plus redécouverte quatre fois</strong> — absences, retards, punitions et évènements du carnet passent par le même onglet Pronote. Lorsque le rattrapage échoue malgré tout, l'onglet est maintenant noté hors d'usage jusqu'à la fin du cycle : les trois relevés suivants s'abstiennent, au lieu de refaire chacun une requête, une reconnexion et un rejeu perdu d'avance. Sur le compte d'un bêta-testeur, l'onglet coûtait cinq reconnexions par cycle, à chaque cycle — le régime même qui avait valu une suspension d'adresse IP par Pronote au début du mois. Il en coûte deux au pire. Ce qui est transmis à Jeedom ne change pas : chaque onglet conserve son statut et la valeur de son relevé précédent.</td>
+            </tr>
+        </tbody>
+    </table>
+
     <h2>1.7.0 — Septembre 2026</h2>
     <table>
         <thead><tr><th>Type</th><th>Description</th></tr></thead>
@@ -854,7 +869,7 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
             </tr>
             <tr>
                 <td><span class="badge badge-fix">Correctif</span></td>
-                <td><strong>Une session expirée ne fait plus perdre le relevé du cycle</strong> — Pronote est une application à état : l'identifiant d'une période ne vaut que pour la session qui l'a émis. Quand la session expire en cours de relevé, la bibliothèque se reconnecte seule et rejoue la requête, mais avec le même identifiant, désormais périmé : le rejeu échoue comme la tentative. Le plugin en concluait que l'onglet <em>Présence</em> lui était refusé et abandonnait les quatre relevés du cycle — absences, retards, punitions, évènements — là où relire la liste des périodes suffisait. Les deux messages sont désormais distingués : « Accès refusé » reste définitif, « La page a expiré » déclenche une relecture et une nouvelle tentative. Une seule par cycle, et c'est voulu : chaque reprise coûte une authentification complète, et leur accumulation a déjà valu une suspension d'adresse IP par Pronote. Le rejeu lui-même a été réparé dans la foulée : il emporte maintenant l'identifiant de période de la session neuve, là où il repostait celui de la session morte — une requête perdue d'avance, payée d'une reconnexion complète, à chaque expiration. Et lorsque la reprise échoue malgré tout, les trois autres relevés de l'onglet ne vont plus redécouvrir la panne chacun pour leur compte : un compte de bêta-testeur y passait cinq reconnexions par cycle, il en passe deux.</td>
+                <td><strong>Une session expirée ne fait plus perdre le relevé du cycle</strong> — Pronote est une application à état : l'identifiant d'une période ne vaut que pour la session qui l'a émis. Quand la session expire en cours de relevé, la bibliothèque se reconnecte seule et rejoue la requête, mais avec le même identifiant, désormais périmé : le rejeu échoue comme la tentative. Le plugin en concluait que l'onglet <em>Présence</em> lui était refusé et abandonnait les quatre relevés du cycle — absences, retards, punitions, évènements — là où relire la liste des périodes suffisait. Les deux messages sont désormais distingués : « Accès refusé » reste définitif, « La page a expiré » déclenche une relecture et une nouvelle tentative. Une seule par cycle, et c'est voulu : chaque reprise coûte une authentification complète, et leur accumulation a déjà valu une suspension d'adresse IP par Pronote.</td>
             </tr>
             <tr>
                 <td><span class="badge badge-perf">Fiabilité</span></td>
