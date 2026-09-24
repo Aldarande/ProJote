@@ -459,7 +459,8 @@ sendVarToJS('eqLogicId', $eqLogic);
 										<option value="menu">{{Menu}}</option>
 										<option value="msg">{{Messagerie}}</option>
 										<option value="stats">{{Statistiques}}</option>
-										<option value="alertes">{{Alertes}}</option>
+										<option value="alertes">{{Evenements ProJote}}</option>
+										<option value="notif">{{Notifications}}</option>
 										<option value="comp">{{Compétences}}</option>
 									</select>
 								</div>

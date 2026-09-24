@@ -1167,8 +1167,13 @@
             <!-- v1.1.0 -->
             <button class="tab-btn" data-tab="stats#id#"><i class="fas fa-chart-line"></i> Stats<span class="tab-badge"
                     id="pjwbstats#id#"></span></button>
-            <button class="tab-btn" data-tab="alertes#id#"><i class="fas fa-bell"></i> Alertes<span class="tab-badge"
+            <!-- v1.7.1 : « Alertes » mélangeait deux choses — les évènements que
+                 ProJote fabrique (nouvelle note, nouvelle absence) et les
+                 actualités publiées par l'établissement. Deux onglets désormais. -->
+            <button class="tab-btn" data-tab="alertes#id#"><i class="fas fa-bell"></i> Évèn.<span class="tab-badge"
                     id="pjwbalertes#id#"></span></button>
+            <button class="tab-btn" data-tab="notif#id#"><i class="fas fa-bullhorn"></i> Notif.<span class="tab-badge"
+                    id="pjwbnotif#id#"></span></button>
             <button class="tab-btn" data-tab="comp#id#"><i class="fas fa-award"></i> Compét.<span class="tab-badge"
                     id="pjwbcomp#id#"></span></button>
         </div>
@@ -1204,6 +1209,13 @@
         <!-- Punitions -->
         <div class="tab-pane" id="pun#id#">
             <div id="pjwpun#id#">
+                <div class="p-empty">–</div>
+            </div>
+        </div>
+
+        <!-- v1.7.1 — Actualités publiées par l'établissement -->
+        <div class="tab-pane" id="notif#id#">
+            <div id="pjwnotif#id#">
                 <div class="p-empty">–</div>
             </div>
         </div>
@@ -2105,38 +2117,56 @@
             return '<div class="pj-pj-liste">' + puces + '</div>';
         }
 
-        function renderAlertes(d) {
+        /* Les évènements que ProJote fabrique lui-même : nouvelle note,
+           nouvelle absence, matière en baisse. À ne pas confondre avec le
+           Carnet, qui vient de Pronote. */
+        function renderEvenementsProjote(d) {
             var elA = el('pjwalertes' + ID);
             if (!elA) return;
-            if (VIS && VIS.alertes === false) {
+            if (VIS && VIS.evenements_projote === false) {
                 var pane = el('alertes' + ID); if (pane) pane.style.display = 'none';
                 return;
             }
-            var html = '';
             var events = d.events || [];
-            if (events.length) {
-                html += '<div class="dv-section-title">Événements ProJote</div>';
-                events.forEach(function (e) {
-                    var type = (e.type || '').replace(/[^a-z]/gi, '');
-                    html += '<div class="pj-alert-row pj-alert-' + type + '">' +
-                        '<span class="pj-alert-date">' + esc(e.date || '') + '</span>' +
-                        '<span class="pj-alert-label">' + esc(e.label || '') + '</span></div>';
-                });
+            if (!events.length) {
+                elA.innerHTML = '<div class="p-empty">Aucun évènement</div>';
+                return;
+            }
+            var html = '';
+            events.forEach(function (e) {
+                var type = (e.type || '').replace(/[^a-z]/gi, '');
+                html += '<div class="pj-alert-row pj-alert-' + type + '">' +
+                    '<span class="pj-alert-date">' + esc(e.date || '') + '</span>' +
+                    '<span class="pj-alert-label">' + esc(e.label || '') + '</span></div>';
+            });
+            elA.innerHTML = html;
+        }
+
+        /* Les actualités publiées par l'établissement, et les fichiers qui y
+           sont joints. */
+        function renderNotifications(d) {
+            var elN = el('pjwnotif' + ID);
+            if (!elN) return;
+            if (VIS && VIS.notifications === false) {
+                var pane = el('notif' + ID); if (pane) pane.style.display = 'none';
+                return;
             }
             var notifs = d.notifications || [];
-            if (notifs.length) {
-                html += '<div class="dv-section-title">Notifications Pronote</div>';
-                notifs.forEach(function (n) {
-                    var unread = (n.lu === false || n.lu === 0);
-                    html += '<div class="pj-notif-row' + (unread ? ' pj-notif-unread' : '') + '">' +
-                        '<div class="pj-notif-head"><span class="pj-notif-author">' + esc(n.auteur || '—') + '</span>' +
-                        '<span class="pj-notif-date">' + esc(n.creation || '') + '</span></div>' +
-                        '<div class="pj-notif-subject">' + esc(n.sujet || '') + '</div>' +
-                        piecesJointes(n) +
-                        '</div>';
-                });
+            if (!notifs.length) {
+                elN.innerHTML = '<div class="p-empty">Aucune notification</div>';
+                return;
             }
-            elA.innerHTML = html || '<div class="p-empty">Aucune alerte</div>';
+            var html = '';
+            notifs.forEach(function (n) {
+                var unread = (n.lu === false || n.lu === 0);
+                html += '<div class="pj-notif-row' + (unread ? ' pj-notif-unread' : '') + '">' +
+                    '<div class="pj-notif-head"><span class="pj-notif-author">' + esc(n.auteur || '—') + '</span>' +
+                    '<span class="pj-notif-date">' + esc(n.creation || '') + '</span></div>' +
+                    '<div class="pj-notif-subject">' + esc(n.sujet || '') + '</div>' +
+                    piecesJointes(n) +
+                    '</div>';
+            });
+            elN.innerHTML = html;
         }
 
         /* ─── COMPÉTENCES (v1.2.0) ────────────────────────── */
@@ -2318,7 +2348,8 @@
             renderProchainDS(d);
             // v1.1.0
             renderStats();
-            renderAlertes(d);
+            renderEvenementsProjote(d);
+            renderNotifications(d);
             // v1.2.0
             renderCompetences(d);
             // Masquer les boutons d'onglets des sections non visibles
@@ -2349,11 +2380,12 @@
             // v1.0.1 : badges menus et messages non lus
             setBadge('pjwbmenu' + ID, d.Nb_menus_semaine);
             setBadge('pjwbmsg' + ID, d.Nb_messages_non_lus);
-            // v1.1.0 : badge alertes = notifications Pronote non lues
+            // Le badge des non-lues suit les actualités, pas les évènements.
             var unreadNotifs = (d.notifications || []).filter(function (n) {
                 return n.lu === false || n.lu === 0;
             }).length;
-            setBadge('pjwbalertes' + ID, unreadNotifs);
+            setBadge('pjwbnotif' + ID, unreadNotifs);
+            setBadge('pjwbalertes' + ID, (d.events || []).length);
             // v1.2.0 : badge nombre d'évaluations par compétences
             setBadge('pjwbcomp' + ID, (d.competences || []).length);
         }

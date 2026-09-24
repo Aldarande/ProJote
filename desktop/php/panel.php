@@ -108,6 +108,28 @@ $jsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APO
     }
     #pj-panel .pj-card-repliee { background:transparent; box-shadow:none; }
     #pj-panel .pj-card-b { padding:14px; }
+
+    /* Pièces jointes d'une actualité : disquette opaque quand le fichier est
+       sur le disque de Jeedom, grisée quand il est resté chez Pronote. Mêmes
+       états que dans le widget, pour qu'on les reconnaisse d'une vue à l'autre. */
+    #pj-panel .pj-pj-liste { display:flex; flex-wrap:wrap; gap:5px; margin-top:5px; }
+    #pj-panel .pj-pj {
+        display:inline-flex; align-items:center; gap:5px; max-width:100%;
+        padding:2px 8px; border-radius:11px; font-size:.78em;
+        background:rgba(128,128,128,.12); opacity:.55;
+        text-decoration:none; color:inherit;
+    }
+    #pj-panel .pj-pj span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #pj-panel .pj-pj-prise {
+        opacity:1; font-weight:600; background:rgba(39,174,96,.16);
+    }
+    #pj-panel a.pj-pj-prise:hover { background:rgba(39,174,96,.28); }
+
+    #pj-panel .pj-notif { padding:7px 0; border-bottom:1px solid rgba(128,128,128,.15); }
+    #pj-panel .pj-notif:last-child { border-bottom:none; }
+    #pj-panel .pj-notif-nonlue { border-left:3px solid var(--pj-green); padding-left:8px; }
+    #pj-panel .pj-notif-tete { display:flex; justify-content:space-between; gap:10px; font-size:.78em; opacity:.75; }
+    #pj-panel .pj-notif-sujet { font-weight:600; font-size:.9em; margin-top:2px; }
     #pj-panel .pj-span2 { grid-column:span 2; }
 
     #pj-panel .pj-id { display:flex; align-items:center; gap:16px; }
@@ -272,6 +294,52 @@ $jsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APO
         return h + '</ul>';
     }
 
+    /* Actualités publiées par l'établissement, avec les fichiers joints.
+       La disquette opaque ouvre le fichier rapatrié ; grisée, elle dit qu'il
+       existe chez Pronote sans avoir été demandé. */
+    function notificationsList(list, eqId) {
+        list = asArray(list);
+        if (!list.length) return '';
+        var racine = 'plugins/ProJote/data/' + encodeURIComponent(eqId) + '/file/';
+        var h = '';
+        list.slice(0, 10).forEach(function (n) {
+            var nonlue = (n.lu === false || n.lu === 0);
+            var pj = asArray(n.pieces_jointes).map(function (p) {
+                var nom = esc(p.nom || '?');
+                if (p.recuperee && p.fichier) {
+                    return '<a class="pj-pj pj-pj-prise" target="_blank" rel="noopener" href="' +
+                        racine + encodeURIComponent(p.fichier) +
+                        '" title="{{Enregistre par ProJote - ouvrir}}">' +
+                        '<i class="fas fa-save"></i><span>' + nom + '</span></a>';
+                }
+                return '<span class="pj-pj" title="' +
+                    (p.lien ? '{{Lien externe, non telecharge}}' : '{{Non rapatrie}}') + '">' +
+                    '<i class="fas ' + (p.lien ? 'fa-link' : 'fa-save') + '"></i>' +
+                    '<span>' + nom + '</span></span>';
+            }).join('');
+            h += '<div class="pj-notif' + (nonlue ? ' pj-notif-nonlue' : '') + '">' +
+                 '<div class="pj-notif-tete"><span>' + esc(n.auteur || '—') + '</span>' +
+                 '<span>' + esc(n.creation || '') + '</span></div>' +
+                 '<div class="pj-notif-sujet">' + esc(n.sujet || '') + '</div>' +
+                 (pj ? '<div class="pj-pj-liste">' + pj + '</div>' : '') +
+                 '</div>';
+        });
+        return h;
+    }
+
+    /* Ce que ProJote a repéré lui-même : nouvelle note, nouvelle absence,
+       matière en baisse. À distinguer du Carnet, qui vient de Pronote. */
+    function evenementsProjoteList(list) {
+        list = asArray(list);
+        if (!list.length) return '';
+        var h = '<ul class="pj-list">';
+        list.slice(0, 15).forEach(function (e) {
+            h += '<li><small class="meta">' + esc(e.date || '') + '</small> ' +
+                 esc(e.label || '') + '</li>';
+        });
+        return h + '</ul>';
+    }
+
     function renderStudent(s) {
         var d = s.data || {};
         var h = '<div class="pj-grid">';
@@ -325,6 +393,10 @@ $jsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APO
         h += carte('fa-book', '{{Devoirs}}', homeworkList(d), '{{Aucun devoir}}');
         h += carte('fa-exclamation-triangle', '{{Punitions}}', punitionsList(d.punitions), '{{Aucune punition}}');
         h += carte('fa-clipboard-list', '{{Carnet}}', carnetList(d.evenements), '{{Aucun évènement}}');
+        h += carte('fa-bullhorn', '{{Notifications}}',
+                   notificationsList(d.notifications, s.id), '{{Aucune notification}}');
+        h += carte('fa-bell', '{{Évènements ProJote}}',
+                   evenementsProjoteList(d.events), '{{Aucun évènement}}');
 
         // ICAL
         if (d.URL_Ical || d.ical) {

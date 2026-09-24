@@ -118,7 +118,10 @@ class ProJote extends eqLogic
         'type'              => 'select',
         'label'             => 'Onglet par défaut',
         'default'           => 'dv',
-        'values'            => ['dv' => 'Devoirs', 'notes' => 'Notes', 'abs' => 'Absences', 'ret' => 'Retards', 'pun' => 'Punitions', 'menu' => 'Menu cantine', 'msg' => 'Messagerie', 'stats' => 'Statistiques', 'alertes' => 'Alertes', 'comp' => 'Compétences'],
+        // Doit rester d'accord avec les onglets du gabarit et avec le sélecteur
+        // de desktop/php/ProJote.php : un onglet absent d'ici ne peut pas être
+        // choisi comme onglet d'ouverture.
+        'values'            => ['dv' => 'Devoirs', 'notes' => 'Notes', 'abs' => 'Absences', 'ret' => 'Retards', 'pun' => 'Punitions', 'evt' => 'Carnet', 'menu' => 'Menu cantine', 'msg' => 'Messagerie', 'stats' => 'Statistiques', 'alertes' => 'Évènements ProJote', 'notif' => 'Notifications', 'comp' => 'Compétences'],
       ],
       'edt_nav_mode' => [
         'allow_displayType' => ['dashboard', 'mobile'],
@@ -1230,8 +1233,10 @@ class ProJote extends eqLogic
       'prochain_ds'      => $vis['prochain_DS_matiere'] ?? true,
       // v1.1.0 — onglet Statistiques
       'stats'            => $vis['moyenne_generale']  ?? true,
-      // v1.1.0 — onglet Alertes (événements ProJote + notifications Pronote)
-      'alertes'          => ($vis['event'] ?? true) || ($vis['notifications'] ?? true),
+      // v1.7.1 — deux onglets distincts là où « Alertes » mélangeait les
+      // évènements fabriqués par ProJote et les actualités de l'établissement.
+      'evenements_projote' => $vis['event']         ?? true,
+      'notifications'      => $vis['notifications'] ?? true,
       // v1.2.0 — onglet Compétences
       'competences'      => $vis['competences']      ?? true,
     ];
