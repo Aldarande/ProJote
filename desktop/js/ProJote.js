@@ -1278,3 +1278,24 @@ $(document).on('click.projote', '#pjw-manual-photo-delete', function () {
   });
 });
 
+
+/* Section « Avancé » de la configuration : repliée par défaut.
+   Elle ne concerne que les établissements qui publient leurs documents en
+   pièce jointe d'actualité — inutile de l'imposer à tout le monde. */
+$(document).off('click', '#pjw-avance-bascule').on('click', '#pjw-avance-bascule', function (e) {
+    e.preventDefault();
+    var bloc = $('#pjw-avance');
+    var ouvert = bloc.is(':visible');
+    bloc.toggle(!ouvert);
+    $('#pjw-avance-fleche')
+        .toggleClass('fa-caret-right', ouvert)
+        .toggleClass('fa-caret-down', !ouvert);
+});
+
+/* Un exemple cliqué remplit le champ des mots reconnus. `change` est émis
+   explicitement : sans lui, le formulaire du coeur Jeedom ne verrait pas la
+   valeur et l'enregistrement repartirait avec l'ancienne. */
+$(document).off('click', '.pjw-pj-exemple').on('click', '.pjw-pj-exemple', function (e) {
+    e.preventDefault();
+    $('#pjw-pj-mots').val($(this).data('valeur')).trigger('change');
+});

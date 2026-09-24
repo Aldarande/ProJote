@@ -257,6 +257,7 @@
         <a href="#cadence">Cadence de collecte</a>
         <a href="#widget">Widget</a>
         <a href="#ical">Export iCalendar</a>
+        <a href="#pieces-jointes">Pièces jointes</a>
         <a href="#scenarios">Exemples de scénarios</a>
         <a href="#version">Historique des versions</a>
 
@@ -741,6 +742,85 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
     </div>
 
     <!-- ── Exemples de scénarios ──────────── -->
+    <h1 id="pieces-jointes">Pièces jointes des actualités <span class="badge badge-new">v1.7.1</span></h1>
+
+    <p>Certains établissements ne publient pas le menu de la cantine dans l'onglet prévu
+    pour cela, mais en PDF attaché à une actualité. Le plugin sait désormais récupérer
+    ces fichiers — mais seulement ceux que vous désignez.</p>
+
+    <h2>Ce qui s'affiche sans rien régler</h2>
+
+    <p>Les pièces jointes sont <strong>toujours signalées</strong> dans l'onglet
+    <em>Alertes</em> du widget, sous l'actualité qui les porte. Les lister ne coûte aucune
+    requête supplémentaire à Pronote, le plugin lisant déjà le contenu de chaque
+    actualité.</p>
+
+    <table>
+        <thead><tr><th>Icône</th><th>Ce qu'elle dit</th></tr></thead>
+        <tbody>
+            <tr><td><strong>Disquette opaque, sur fond vert</strong></td><td>Le fichier est sur le disque de votre Jeedom. Un clic l'ouvre.</td></tr>
+            <tr><td><strong>Disquette grisée</strong></td><td>Le fichier existe chez Pronote mais n'a pas été demandé — il ne correspond à aucun de vos mots, ou l'option est désactivée.</td></tr>
+            <tr><td><strong>Maillon grisé</strong></td><td>La pièce jointe est un lien externe, pas un fichier : il n'y a rien à rapatrier.</td></tr>
+        </tbody>
+    </table>
+
+    <h2>Activer le téléchargement</h2>
+
+    <p>Dans l'équipement, onglet <em>Configuration</em>, dépliez la section
+    <strong>Avancé</strong> :</p>
+
+    <table>
+        <thead><tr><th>Réglage</th><th>Rôle</th></tr></thead>
+        <tbody>
+            <tr><td><strong>Télécharger les pièces jointes</strong></td><td>Désactivé par défaut. Tant qu'il l'est, rien n'est rapatrié : les pièces jointes sont seulement signalées.</td></tr>
+            <tr><td><strong>Mots reconnus</strong></td><td>Chaînes séparées par des virgules. Un fichier est pris si l'une d'elles figure dans son nom <em>ou</em> dans le titre de l'actualité qui le porte. La casse et les accents sont ignorés.</td></tr>
+            <tr><td><strong>Durée de rétention</strong></td><td>30 jours par défaut. Au-delà, le fichier est effacé au relevé suivant. La durée se compte depuis le dernier téléchargement réel, pas depuis la dernière vérification.</td></tr>
+        </tbody>
+    </table>
+
+    <p>Des exemples cliquables sont proposés sous le champ ; en voici la lecture :</p>
+
+    <table>
+        <thead><tr><th>Vous saisissez</th><th>Ce qui est rapatrié</th></tr></thead>
+        <tbody>
+            <tr><td><code>menu, cantine</code></td><td>Le cas courant. Attrape <code>Menu_S39.pdf</code>, mais aussi <code>S39.pdf</code> s'il est publié sous une actualité nommée <em>Menu de la semaine</em>.</td></tr>
+            <tr><td><code>menu</code></td><td>Plus étroit, si votre établissement est régulier dans ses intitulés.</td></tr>
+            <tr><td><code>.pdf</code></td><td>Tous les PDF joints aux actualités, quel que soit leur sujet.</td></tr>
+            <tr><td><code>restauration, self, repas</code></td><td>Pour les établissements qui n'emploient ni « menu » ni « cantine ».</td></tr>
+            <tr><td><em>(vide)</em></td><td>Rien. C'est le défaut.</td></tr>
+        </tbody>
+    </table>
+
+    <h2>Où vont les fichiers</h2>
+
+    <p>Dans <code>plugins/ProJote/data/&lt;identifiant de l'équipement&gt;/file/</code>, un dossier
+    propre à chaque enfant. Le nom du fichier est assaini avant d'être écrit : il vient de
+    Pronote, et ne doit jamais composer un chemin. Un fichier de plus de 5 Mo est refusé.</p>
+
+    <h2>Le fichier n'est pas repris à chaque relevé</h2>
+
+    <p>Le plugin ne retélécharge pas ce qu'il a déjà. Trois garde-fous se succèdent :</p>
+
+    <ul>
+        <li><strong>Un délai de 12 heures.</strong> Un fichier vérifié récemment n'est pas
+        redemandé du tout. Un menu est hebdomadaire : le revoir deux fois par jour suffit.</li>
+        <li><strong>Une requête conditionnelle.</strong> Passé ce délai, le plugin demande au
+        serveur si le fichier a changé. Mesuré le 24 septembre 2026 : les serveurs Pronote
+        <em>ignorent</em> cette demande et renvoient le fichier entier — d'où le troisième
+        garde-fou.</li>
+        <li><strong>Une comparaison d'empreinte.</strong> Si le contenu reçu est identique à
+        celui qu'on a, le fichier sur disque n'est pas réécrit et sa date de rapatriement est
+        conservée — ce qui évite aussi qu'un fichier inchangé échappe indéfiniment à la
+        rétention.</li>
+    </ul>
+
+    <div class="callout callout-info">
+        <strong>Pourquoi pas un simple lien vers Pronote ?</strong>
+        L'adresse d'une pièce jointe contient l'identifiant de la session Pronote et un bloc
+        chiffré avec sa clé. Elle cesse de fonctionner dès que la session se termine, quelques
+        minutes plus tard. Le fichier doit donc être rapatrié pendant le relevé, ou pas du tout.
+    </div>
+
     <h1 id="scenarios">Exemples de scénarios</h1>
     <p>
         ProJote n'embarque <strong>aucun scénario prédéfini</strong> : il expose des commandes que
@@ -894,6 +974,10 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
             <tr>
                 <td><span class="badge badge-fix">Correctif</span></td>
                 <td><strong>Les onglets récents manquaient dans « Onglet par défaut »</strong> — la liste de l'onglet <em>Affichage</em> de l'équipement s'arrêtait aux punitions. Menu, Messagerie, Statistiques, Alertes, Compétences et le nouveau Carnet ne pouvaient donc pas être choisis comme onglet d'ouverture du widget, bien qu'ils existent. Les onze sont désormais proposés.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-new">Nouveauté</span></td>
+                <td><strong>Récupérer le menu de la cantine publié en pièce jointe</strong> — demandé par un utilisateur dont l'établissement ne remplit pas l'onglet <em>Menu</em> de Pronote, mais attache un PDF à une actualité. Les pièces jointes sont désormais <strong>toujours signalées</strong> dans l'onglet <em>Alertes</em> du widget — les lister ne coûte aucune requête supplémentaire — par une disquette opaque quand le fichier est sur votre Jeedom, grisée quand il est resté chez Pronote. Une section <em>Avancé</em> de la configuration permet d'activer le téléchargement, de choisir les mots reconnus (des exemples cliquables sont proposés : <code>menu, cantine</code>, <code>.pdf</code>…) et la durée de rétention, 30 jours par défaut. Rien n'est téléchargé tant que vous ne l'avez pas demandé. Les fichiers vont dans <code>data/&lt;équipement&gt;/file/</code> et ne sont pas repris à chaque relevé : un délai de 12 heures, puis une comparaison d'empreinte, évitent de retransférer ce qui n'a pas changé. Voir <a href="#pieces-jointes">Pièces jointes des actualités</a>.</td>
             </tr>
         </tbody>
     </table>

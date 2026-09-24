@@ -222,6 +222,7 @@ try:
         cours_affiche_from_lesson,
     )
     from periodes_scolaires import _periodes_couvrantes, periodes  # noqa: F401
+    import pieces_jointes  # noqa: F401 - passé au collecteur des notifications
     from presence_pronote import (  # noqa: F401 - façade
         _erreur_de_refus,
         _motif_de_refus,
@@ -1655,7 +1656,15 @@ def _collecteurs(message):
         ("Periodes", "les dates de période", periodes),
         ("Menus", "les menus", menus),
         ("Messages", "la messagerie", messages),
-        ("Notifications", "les notifications", notifications),
+        (
+            "Notifications",
+            "les notifications",
+            lambda c: notifications(
+                c,
+                pieces_jointes.reglages(message),
+                _dossier_equipement(_data_dir, message.get("CmdId")),
+            ),
+        ),
         ("Absences", "les absences", absences),
         ("Retards", "les retards", retards),
         ("Punitions", "les punitions", punitions),

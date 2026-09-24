@@ -54,6 +54,7 @@ from format_pronote import (
     build_menu_data,
 )
 from periodes_scolaires import _periodes_couvrantes
+import pieces_jointes
 from pronote_errors import est_onglet_non_accessible
 from presence_pronote import (
     _erreur_de_refus,
@@ -1013,9 +1014,43 @@ def devoirs(client, fenetre_jours=DEVOIRS_FENETRE_DEFAUT):
         return data
 
 
-def notifications(client):
+def _pieces_de_l_actualite(notif, options, dossier):
+    """Décrit les fichiers joints à une actualité, et rapatrie ceux qui sont retenus.
+
+    L'énumération est gratuite : `attachments()` réutilise la réponse déjà
+    obtenue pour le contenu (même `_fetch_content()` mémorisé). On peut donc
+    toujours dire ce qui existe, et ne télécharger que le choix de
+    l'utilisateur — c'est ce que l'affichage montre, disquette opaque pour ce
+    qui a été pris, grisée pour le reste.
+    """
+    try:
+        pieces = notif.attachments()
+    except Exception as e:
+        logging.debug("Pièces jointes illisibles pour « %s » : %s", notif.title, e)
+        return []
+    titre = getattr(notif, "title", "") or ""
+    return [
+        pieces_jointes.decrire(piece, titre, options, dossier) for piece in pieces or []
+    ]
+
+
+def notifications(client, options_pj=None, dossier_pj=None):
+    """Actualités Pronote, et les fichiers qui y sont joints.
+
+    Args:
+        client: client pronotepy connecté.
+        options_pj: réglages du rapatriement (cf. pieces_jointes.reglages) :
+            actif, mots-clés, durée de rétention. None = ne rien télécharger.
+        dossier_pj: dossier de données de l'équipement, ou None pour ne rien
+            écrire sur disque.
+    """
     try:
         data = {"Notification": [], "dernier_Notification": []}
+        # La rétention s'applique une fois par relevé, indépendamment de ce que
+        # Pronote renvoie : un fichier doit finir par partir même si l'actualité
+        # qui le portait a disparu.
+        if dossier_pj and (options_pj or {}).get("actif"):
+            pieces_jointes.purger(dossier_pj, (options_pj or {}).get("retention"))
         # Récupération des notifications
         notification_eleve = client.information_and_surveys()
         if not notification_eleve == []:
@@ -1034,6 +1069,9 @@ def notifications(client):
                         "message": _information_content(notif),
                         "categorie": (notif.category),
                         "lu": (notif.read),
+                        "pieces_jointes": _pieces_de_l_actualite(
+                            notif, options_pj or {}, dossier_pj
+                        ),
                     }
                 )
                 # récupération du dernier message

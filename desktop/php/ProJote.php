@@ -576,6 +576,77 @@ sendVarToJS('eqLogicId', $eqLogic);
 							</div>
 
 							<div id="pjw-manual-photo-status" style="font-size:11px;margin-top:8px;padding:0 15px;clear:both;"></div>
+						
+							<!-- ── Avance : rapatriement des pieces jointes ────────────────
+								 Replie par defaut : la fonctionnalite ne concerne que les
+								 etablissements qui publient le menu en PDF attache a une
+								 actualite plutot que dans l'onglet Menu. -->
+							<div class="form-group" style="margin-bottom:4px;">
+								<div class="col-sm-12" style="padding-left:0;">
+									<a href="#" id="pjw-avance-bascule" style="font-size:12px;font-weight:600;">
+										<i class="fas fa-caret-right" id="pjw-avance-fleche"></i> {{Avance}}
+									</a>
+								</div>
+							</div>
+
+							<div id="pjw-avance" style="display:none;">
+
+								<div class="form-group" style="margin-bottom:4px;">
+									<label class="col-sm-6 control-label" style="font-size:12px;">{{Telecharger les pieces jointes}}
+										<sup><i class="fas fa-question-circle tooltips" title="{{Quand cette option est active, les fichiers joints aux actualites dont le nom correspond aux mots ci-dessous sont rapatries dans le dossier data de l'equipement. Desactivee, les pieces jointes sont seulement signalees dans le widget, sans etre telechargees. L'URL d'une piece jointe expire avec la session Pronote : le fichier ne peut etre recupere que pendant le releve, jamais apres.}}"></i></sup>
+									</label>
+									<div class="col-sm-6">
+										<input type="checkbox" class="eqLogicAttr" data-l1key="configuration" data-l2key="pieces_jointes_actif">
+									</div>
+								</div>
+
+								<div class="form-group" style="margin-bottom:4px;">
+									<label class="col-sm-6 control-label" style="font-size:12px;">{{Mots reconnus}}
+										<sup><i class="fas fa-question-circle tooltips" title="{{Chaines separees par des virgules, par exemple : menu, cantine. Un fichier est rapatrie si l'une d'elles figure dans son nom ou dans le titre de l'actualite qui le porte. La casse et les accents sont ignores. Vide, aucun fichier n'est telecharge.}}"></i></sup>
+									</label>
+									<div class="col-sm-6">
+										<input type="text" class="eqLogicAttr form-control input-sm" id="pjw-pj-mots" data-l1key="configuration" data-l2key="pieces_jointes_mots" placeholder="{{menu, cantine}}">
+										<!-- Exemples cliquables : le champ se remplit au clic. Ils
+											 disent surtout ce que la regle sait faire — un mot du nom
+											 du fichier, un mot du titre de l'actualite, ou une
+											 extension. -->
+										<div style="margin-top:5px;font-size:11px;line-height:1.7;">
+											<span style="opacity:.7;">{{Exemples}} :</span>
+											<a href="#" class="pjw-pj-exemple" data-valeur="menu, cantine" style="margin-left:4px;">menu, cantine</a>
+											<span style="opacity:.45;">·</span>
+											<a href="#" class="pjw-pj-exemple" data-valeur="menu">menu</a>
+											<span style="opacity:.45;">·</span>
+											<a href="#" class="pjw-pj-exemple" data-valeur=".pdf">.pdf</a>
+											<span style="opacity:.45;">·</span>
+											<a href="#" class="pjw-pj-exemple" data-valeur="restauration, self, repas">restauration, self, repas</a>
+											<div style="opacity:.7;margin-top:3px;">
+												{{Un fichier est pris si l'une des chaines figure dans son nom}}
+												<em>{{ou}}</em> {{dans le titre de l'actualite. Ainsi}}
+												<code>menu</code> {{attrape}} <code>Menu_S39.pdf</code>
+												{{comme}} <code>S39.pdf</code> {{publie sous}}
+												<em>{{Menu de la semaine}}</em>. <code>.pdf</code> {{prend tous les PDF.}}
+											</div>
+										</div>
+									</div>
+								</div>
+
+								<div class="form-group" style="margin-bottom:4px;">
+									<label class="col-sm-6 control-label" style="font-size:12px;">{{Duree de retention}}
+										<sup><i class="fas fa-question-circle tooltips" title="{{Un fichier rapatrie depuis plus longtemps que cette duree est efface au releve suivant. La duree se compte depuis le dernier telechargement reel : un fichier inchange depuis six semaines s'en va, meme si le plugin l'a reverifie ce matin.}}"></i></sup>
+									</label>
+									<div class="col-sm-6">
+										<select class="eqLogicAttr form-control input-sm" data-l1key="configuration" data-l2key="pieces_jointes_retention">
+											<option value="7">{{7 jours}}</option>
+											<option value="14">{{14 jours}}</option>
+											<option value="30" selected>{{30 jours}} ({{defaut}})</option>
+											<option value="90">{{90 jours}}</option>
+											<option value="365">{{1 an}}</option>
+										</select>
+									</div>
+								</div>
+
+							</div>
+
 						</fieldset>
 					</form>
 				</div>

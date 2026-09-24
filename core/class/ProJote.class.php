@@ -1363,6 +1363,11 @@ class ProJote extends eqLogic
       'DevoirsJours' => $this->getConfiguration('devoirs_jours', 7),
       // Onglets que l'utilisateur ne suit pas : le démon ne les interroge pas.
       'OngletsDesactives' => $this->ongletsDesactives(),
+      // Rapatriement des pièces jointes d'actualité (section avancée). Désactivé
+      // par défaut : le démon se contente alors de signaler ce qui existe.
+      'PiecesJointesActif' => $this->getConfiguration('pieces_jointes_actif', 0),
+      'PiecesJointesMots' => $this->getConfiguration('pieces_jointes_mots', ''),
+      'PiecesJointesRetention' => $this->getConfiguration('pieces_jointes_retention', 30),
       'Log'         => log::convertLogLevel(log::getLogLevel(__CLASS__)),
     );
     // Envoi des paramètres au démon via la méthode générique.
