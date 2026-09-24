@@ -320,16 +320,16 @@ sendVarToJS('eqLogicId', $eqLogic);
 						<!-- Partie droite de l'onglet "Équipement" -->
 						<!-- Affiche un champ de commentaire par défaut mais vous pouvez y mettre ce que vous voulez -->
 						<div class="col-lg-6">
-							<legend><i class="col-sm-1 fas fa-info"></i> {{Informations}}</legend>
+							<legend><i class="fas fa-info-circle"></i> {{Informations}}</legend>
 							<div class="form-group description">
 								<label class="col-sm-2 control-label">{{Description}}</label>
 								<div class="col-sm-10">
 									<textarea class="form-control eqLogicAttr autogrow" data-l1key="comment"></textarea>
 								</div>
 							</div>
-							<!-- Section du Eleve -->
+							<!-- Section de l'élève -->
 							<div class="form-group Eleve">
-								<legend><i class="col-sm-1 fas fa-address-card"></i> {{Elève}} </legend>
+								<legend><i class="fas fa-address-card"></i> {{Élève}}</legend>
 								<div class="row">
 									<div class="col-sm-8">
 										<div class="form-group">
@@ -359,9 +359,170 @@ sendVarToJS('eqLogicId', $eqLogic);
 									</div>
 								</div>
 							</div>
+
+							<!-- ── Paramètres avancés ───────────────────────────────────────
+							     Repliés par défaut : ce sont des réglages de comportement que
+							     l'on pose une fois, à la mise en place de l'équipement, et que
+							     l'on ne rouvre plus ensuite. Ils vivaient jusqu'ici dans
+							     l'onglet Affichage, où ils n'avaient rien à faire : ils ne
+							     décident pas de ce qui s'affiche, mais de ce qui est collecté.
+							
+							     Le mecanisme de repli (#pjw-avance / #pjw-avance-bascule) est
+							     celui qui portait déjà le bloc des pièces jointes : les ids
+							     sont conservés, le gestionnaire JS reste donc inchangé. -->
+							<div class="form-group">
+								<legend id="pjw-avance-bascule" style="cursor:pointer;" title="{{Cliquez pour afficher ou masquer}}">
+									<i class="fas fa-sliders-h"></i> {{Paramètres avancés}}
+									<i class="fas fa-caret-right" id="pjw-avance-fleche" style="font-size:14px;"></i>
+								</legend>
+
+								<div id="pjw-avance" style="display:none;">
+									<div class="row">
+										<div class="col-sm-12">
+											<legend style="font-size:13px;"><i class="fas fa-cloud-download-alt"></i> {{Collecte}}</legend>
+										</div>
+									</div>
+
+									<div class="row">
+										<div class="col-sm-7">
+
+											<!-- Fenêtre couverte par la liste des devoirs -->
+											<div class="form-group" style="margin-bottom:4px;">
+												<label class="col-sm-4 control-label" style="font-size:12px;">{{Devoirs affichés}}
+													<sup><i class="fas fa-question-circle tooltips" title="{{Nombre de jours à venir couverts par la liste des devoirs. Sur un seul jour, la liste est vide les week-ends.}}"></i></sup>
+												</label>
+												<div class="col-sm-8">
+													<select class="eqLogicAttr form-control input-sm" data-l1key="configuration" data-l2key="devoirs_jours">
+														<option value="1">{{Aujourd'hui seulement}}</option>
+														<option value="3">{{3 prochains jours}}</option>
+														<option value="7" selected>{{7 prochains jours}}</option>
+														<option value="14">{{14 prochains jours}}</option>
+														<option value="30">{{30 prochains jours}}</option>
+													</select>
+												</div>
+											</div>
+
+											<!-- Onglets Pronote suivis -->
+											<div class="form-group" style="margin-bottom:4px;">
+												<label class="col-sm-4 control-label" style="font-size:12px;">{{Onglets suivis}}
+													<sup><i class="fas fa-question-circle tooltips" title="{{Décochez ce que vous ne suivez pas : les commandes correspondantes ne sont plus créées, et le plugin cesse d'interroger Pronote pour cet onglet. Les commandes déjà existantes ne sont pas supprimées : elles cessent simplement d'être mises à jour, et vous pouvez les retirer vous-même depuis l'onglet Commandes.}}"></i></sup>
+												</label>
+												<div class="col-sm-8">
+													<!--
+													     La valeur vit dans un champ caché, la case n'est que l'habillage
+													     (meme motif que #accountTypeValue). Un equipement anterieur a la
+													     1.5.0 n'a aucune de ces cles : le champ est alors vide, et JS lit
+													     « vide = suivi ». Lier la case directement a la configuration
+													     aurait fait dependre son etat du remplissage de formulaire du
+													     coeur de Jeedom, qui decoche ce qu'il ne trouve pas — une collecte
+													     se serait arretee a la premiere sauvegarde, sans rien demander.
+													     -->
+													<input type="text" class="eqLogicAttr pjw-onglet-valeur" data-l1key="configuration" data-l2key="collecte_messagerie" style="display:none;">
+													<input type="text" class="eqLogicAttr pjw-onglet-valeur" data-l1key="configuration" data-l2key="collecte_menus" style="display:none;">
+													<input type="text" class="eqLogicAttr pjw-onglet-valeur" data-l1key="configuration" data-l2key="collecte_notifications" style="display:none;">
+													<input type="text" class="eqLogicAttr pjw-onglet-valeur" data-l1key="configuration" data-l2key="collecte_competences" style="display:none;">
+													<label class="checkbox-inline" style="font-size:12px;white-space:nowrap;">
+														<input type="checkbox" class="pjw-onglet-case" data-onglet="collecte_messagerie" checked>{{Messagerie}}
+													</label>
+													<label class="checkbox-inline" style="font-size:12px;white-space:nowrap;">
+														<input type="checkbox" class="pjw-onglet-case" data-onglet="collecte_menus" checked>{{Cantine}}
+													</label>
+													<label class="checkbox-inline" style="font-size:12px;white-space:nowrap;">
+														<input type="checkbox" class="pjw-onglet-case" data-onglet="collecte_notifications" checked>{{Notifications}}
+													</label>
+													<label class="checkbox-inline" style="font-size:12px;white-space:nowrap;">
+														<input type="checkbox" class="pjw-onglet-case" data-onglet="collecte_competences" checked>{{Compétences}}
+													</label>
+												</div>
+											</div>
+										</div>
+									</div>
+
+									<!-- Le titre occupe sa propre ligne : sans cela il pousse la colonne
+									     de gauche vers le bas, et l'encadré d'aide d'en face démarre plus
+									     haut que le premier réglage auquel il se rapporte. -->
+									<div class="row">
+										<div class="col-sm-12">
+											<legend style="font-size:13px;"><i class="fas fa-paperclip"></i> {{Pièces jointes des actualités}}</legend>
+										</div>
+									</div>
+
+									<div class="row">
+										<div class="col-sm-7">
+
+											<div class="form-group" style="margin-bottom:4px;">
+												<label class="col-sm-4 control-label" style="font-size:12px;">{{Télécharger les pièces jointes}}
+													<sup><i class="fas fa-question-circle tooltips" title="{{Quand cette option est active, les fichiers joints aux actualités dont le nom correspond aux mots ci-dessous sont rapatriés dans le dossier data de l'équipement. Désactivée, les pièces jointes sont seulement signalées dans le widget, sans être téléchargées. L'URL d'une pièce jointe expire avec la session Pronote : le fichier ne peut être récupéré que pendant le relevé, jamais après.}}"></i></sup>
+												</label>
+												<div class="col-sm-8">
+													<input type="checkbox" class="eqLogicAttr" data-l1key="configuration" data-l2key="pieces_jointes_actif">
+												</div>
+											</div>
+
+											<div class="form-group" style="margin-bottom:4px;">
+												<label class="col-sm-4 control-label" style="font-size:12px;">{{Mots reconnus}}
+													<sup><i class="fas fa-question-circle tooltips" title="{{Chaînes séparées par des virgules, par exemple : menu, cantine. Un fichier est rapatrié si l'une d'elles figure dans son nom ou dans le titre de l'actualité.}}"></i></sup>
+												</label>
+												<div class="col-sm-8">
+													<input type="text" class="eqLogicAttr form-control input-sm" id="pjw-pj-mots" data-l1key="configuration" data-l2key="pieces_jointes_mots" placeholder="{{menu, cantine}}">
+												</div>
+
+											</div>
+
+											<div class="form-group" style="margin-bottom:4px;">
+												<label class="col-sm-4 control-label" style="font-size:12px;">{{Durée de rétention}}
+													<sup><i class="fas fa-question-circle tooltips" title="{{Un fichier rapatrié depuis plus longtemps que cette durée est effacé au relevé suivant. La durée se compte depuis le dernier téléchargement réel : un fichier inchangé depuis six semaines s'en va, même si le plugin l'a revérifié ce matin.}}"></i></sup>
+												</label>
+												<div class="col-sm-8">
+													<select class="eqLogicAttr form-control input-sm" data-l1key="configuration" data-l2key="pieces_jointes_retention">
+														<option value="7">{{7 jours}}</option>
+														<option value="14">{{14 jours}}</option>
+														<option value="30" selected>{{30 jours}} ({{défaut}})</option>
+														<option value="90">{{90 jours}}</option>
+														<option value="365">{{1 an}}</option>
+													</select>
+												</div>
+											</div>
+
+										</div>
+
+										<div class="col-sm-5">
+											<!-- Aide de saisie des « Mots reconnus ». Elle occupe la colonne
+											     voisine, sur la même ligne Bootstrap que la section
+											     « Pièces jointes » : elle démarre donc à sa hauteur. Sous le
+											     champ, elle repoussait la durée de rétention hors de vue. -->
+											<div style="font-size:11px;line-height:1.7;padding:8px 10px;background:rgba(127,127,127,.06);border-left:2px solid #94C904;border-radius:3px;">
+												<div style="font-weight:600;margin-bottom:2px;"><i class="fas fa-lightbulb"></i> {{Mots reconnus}}</div>
+												<!-- Exemples cliquables : le champ se remplit au clic. Ils
+												     disent surtout ce que la règle sait faire — un mot du nom
+												     du fichier, un mot du titre de l'actualité, ou une
+												     extension. -->
+												<div style="margin-top:5px;font-size:11px;line-height:1.7;">
+													<span style="opacity:.7;">{{Exemples}} :</span>
+													<a href="#" class="pjw-pj-exemple" data-valeur="menu, cantine" style="margin-left:4px;">menu, cantine</a>
+													<span style="opacity:.45;">·</span>
+													<a href="#" class="pjw-pj-exemple" data-valeur="menu">menu</a>
+													<span style="opacity:.45;">·</span>
+													<a href="#" class="pjw-pj-exemple" data-valeur=".pdf">.pdf</a>
+													<span style="opacity:.45;">·</span>
+													<a href="#" class="pjw-pj-exemple" data-valeur="restauration, self, repas">restauration, self, repas</a>
+													<div style="opacity:.7;margin-top:3px;">
+														{{Un fichier est pris si l'une des chaînes figure dans son nom}}
+														<em>{{ou}}</em> {{dans le titre de l'actualité. Ainsi}}
+														<code>menu</code> {{attrape}} <code>Menu_S39.pdf</code>
+														{{comme}} <code>S39.pdf</code> {{publié sous}}
+														<em>{{Menu de la semaine}}</em>. <code>.pdf</code> {{prend tous les PDF.}}
+													</div>
+												</div>
+											</div>
+										</div>
+									</div>
+								</div>
+							</div>
+
 							<div class="form-group Token" style="display: none;">
-								<!-- Section du Token -->
-								<legend><i class="col-sm-1 fas fa-file-code"></i> {{Token Info}} </legend>
+								<!-- Section du jeton -->
+								<legend><i class="fas fa-file-code"></i> {{Informations du jeton}}</legend>
 								<div class="form-group">
 									<label class="col-sm-2 control-label">{{pronote_url}} :</label>
 									<span id="Token_pronote_url" class="col-sm-10"></span>
@@ -526,127 +687,7 @@ sendVarToJS('eqLogicId', $eqLogic);
 								</div>
 							</div>
 
-							<!-- Fenetre couverte par la liste des devoirs -->
-							<div class="form-group" style="margin-bottom:4px;">
-								<label class="col-sm-6 control-label" style="font-size:12px;">{{Devoirs affiches}}
-									<sup><i class="fas fa-question-circle tooltips" title="{{Nombre de jours a venir couverts par la liste des devoirs. Sur un seul jour, la liste est vide les week-ends.}}"></i></sup>
-								</label>
-								<div class="col-sm-6">
-									<select class="eqLogicAttr form-control input-sm" data-l1key="configuration" data-l2key="devoirs_jours">
-										<option value="1">{{Aujourd'hui seulement}}</option>
-										<option value="3">{{3 prochains jours}}</option>
-										<option value="7" selected>{{7 prochains jours}}</option>
-										<option value="14">{{14 prochains jours}}</option>
-										<option value="30">{{30 prochains jours}}</option>
-									</select>
-								</div>
-							</div>
-
-							<!-- Onglets Pronote suivis -->
-							<div class="form-group" style="margin-bottom:4px;">
-								<label class="col-sm-6 control-label" style="font-size:12px;">{{Onglets suivis}}
-									<sup><i class="fas fa-question-circle tooltips" title="{{Decochez ce que vous ne suivez pas : les commandes correspondantes ne sont plus creees, et le plugin cesse d'interroger Pronote pour cet onglet. Les commandes deja existantes ne sont pas supprimees : elles cessent simplement d'etre mises a jour, et vous pouvez les retirer vous-meme depuis l'onglet Commandes.}}"></i></sup>
-								</label>
-								<div class="col-sm-6">
-									<!--
-										La valeur vit dans un champ caché, la case n'est que l'habillage
-										(meme motif que #accountTypeValue). Un equipement anterieur a la
-										1.5.0 n'a aucune de ces cles : le champ est alors vide, et JS lit
-										« vide = suivi ». Lier la case directement a la configuration
-										aurait fait dependre son etat du remplissage de formulaire du
-										coeur de Jeedom, qui decoche ce qu'il ne trouve pas — une collecte
-										se serait arretee a la premiere sauvegarde, sans rien demander.
-									-->
-									<input type="text" class="eqLogicAttr pjw-onglet-valeur" data-l1key="configuration" data-l2key="collecte_messagerie" style="display:none;">
-									<input type="text" class="eqLogicAttr pjw-onglet-valeur" data-l1key="configuration" data-l2key="collecte_menus" style="display:none;">
-									<input type="text" class="eqLogicAttr pjw-onglet-valeur" data-l1key="configuration" data-l2key="collecte_notifications" style="display:none;">
-									<input type="text" class="eqLogicAttr pjw-onglet-valeur" data-l1key="configuration" data-l2key="collecte_competences" style="display:none;">
-									<label class="checkbox-inline" style="font-size:12px;">
-										<input type="checkbox" class="pjw-onglet-case" data-onglet="collecte_messagerie" checked>{{Messagerie}}
-									</label>
-									<label class="checkbox-inline" style="font-size:12px;">
-										<input type="checkbox" class="pjw-onglet-case" data-onglet="collecte_menus" checked>{{Cantine}}
-									</label>
-									<label class="checkbox-inline" style="font-size:12px;">
-										<input type="checkbox" class="pjw-onglet-case" data-onglet="collecte_notifications" checked>{{Notifications}}
-									</label>
-									<label class="checkbox-inline" style="font-size:12px;">
-										<input type="checkbox" class="pjw-onglet-case" data-onglet="collecte_competences" checked>{{Competences}}
-									</label>
-								</div>
-							</div>
-
 							<div id="pjw-manual-photo-status" style="font-size:11px;margin-top:8px;padding:0 15px;clear:both;"></div>
-						
-							<!-- ── Avance : rapatriement des pieces jointes ────────────────
-								 Replie par defaut : la fonctionnalite ne concerne que les
-								 etablissements qui publient le menu en PDF attache a une
-								 actualite plutot que dans l'onglet Menu. -->
-							<div class="form-group" style="margin-bottom:4px;">
-								<div class="col-sm-12" style="padding-left:0;">
-									<a href="#" id="pjw-avance-bascule" style="font-size:12px;font-weight:600;">
-										<i class="fas fa-caret-right" id="pjw-avance-fleche"></i> {{Avance}}
-									</a>
-								</div>
-							</div>
-
-							<div id="pjw-avance" style="display:none;">
-
-								<div class="form-group" style="margin-bottom:4px;">
-									<label class="col-sm-6 control-label" style="font-size:12px;">{{Telecharger les pieces jointes}}
-										<sup><i class="fas fa-question-circle tooltips" title="{{Quand cette option est active, les fichiers joints aux actualites dont le nom correspond aux mots ci-dessous sont rapatries dans le dossier data de l'equipement. Desactivee, les pieces jointes sont seulement signalees dans le widget, sans etre telechargees. L'URL d'une piece jointe expire avec la session Pronote : le fichier ne peut etre recupere que pendant le releve, jamais apres.}}"></i></sup>
-									</label>
-									<div class="col-sm-6">
-										<input type="checkbox" class="eqLogicAttr" data-l1key="configuration" data-l2key="pieces_jointes_actif">
-									</div>
-								</div>
-
-								<div class="form-group" style="margin-bottom:4px;">
-									<label class="col-sm-6 control-label" style="font-size:12px;">{{Mots reconnus}}
-										<sup><i class="fas fa-question-circle tooltips" title="{{Chaines separees par des virgules, par exemple : menu, cantine. Un fichier est rapatrie si l'une d'elles figure dans son nom ou dans le titre de l'actualite qui le porte. La casse et les accents sont ignores. Vide, aucun fichier n'est telecharge.}}"></i></sup>
-									</label>
-									<div class="col-sm-6">
-										<input type="text" class="eqLogicAttr form-control input-sm" id="pjw-pj-mots" data-l1key="configuration" data-l2key="pieces_jointes_mots" placeholder="{{menu, cantine}}">
-										<!-- Exemples cliquables : le champ se remplit au clic. Ils
-											 disent surtout ce que la regle sait faire — un mot du nom
-											 du fichier, un mot du titre de l'actualite, ou une
-											 extension. -->
-										<div style="margin-top:5px;font-size:11px;line-height:1.7;">
-											<span style="opacity:.7;">{{Exemples}} :</span>
-											<a href="#" class="pjw-pj-exemple" data-valeur="menu, cantine" style="margin-left:4px;">menu, cantine</a>
-											<span style="opacity:.45;">·</span>
-											<a href="#" class="pjw-pj-exemple" data-valeur="menu">menu</a>
-											<span style="opacity:.45;">·</span>
-											<a href="#" class="pjw-pj-exemple" data-valeur=".pdf">.pdf</a>
-											<span style="opacity:.45;">·</span>
-											<a href="#" class="pjw-pj-exemple" data-valeur="restauration, self, repas">restauration, self, repas</a>
-											<div style="opacity:.7;margin-top:3px;">
-												{{Un fichier est pris si l'une des chaines figure dans son nom}}
-												<em>{{ou}}</em> {{dans le titre de l'actualite. Ainsi}}
-												<code>menu</code> {{attrape}} <code>Menu_S39.pdf</code>
-												{{comme}} <code>S39.pdf</code> {{publie sous}}
-												<em>{{Menu de la semaine}}</em>. <code>.pdf</code> {{prend tous les PDF.}}
-											</div>
-										</div>
-									</div>
-								</div>
-
-								<div class="form-group" style="margin-bottom:4px;">
-									<label class="col-sm-6 control-label" style="font-size:12px;">{{Duree de retention}}
-										<sup><i class="fas fa-question-circle tooltips" title="{{Un fichier rapatrie depuis plus longtemps que cette duree est efface au releve suivant. La duree se compte depuis le dernier telechargement reel : un fichier inchange depuis six semaines s'en va, meme si le plugin l'a reverifie ce matin.}}"></i></sup>
-									</label>
-									<div class="col-sm-6">
-										<select class="eqLogicAttr form-control input-sm" data-l1key="configuration" data-l2key="pieces_jointes_retention">
-											<option value="7">{{7 jours}}</option>
-											<option value="14">{{14 jours}}</option>
-											<option value="30" selected>{{30 jours}} ({{defaut}})</option>
-											<option value="90">{{90 jours}}</option>
-											<option value="365">{{1 an}}</option>
-										</select>
-									</div>
-								</div>
-
-							</div>
 
 						</fieldset>
 					</form>

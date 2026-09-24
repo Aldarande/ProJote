@@ -1279,9 +1279,12 @@ $(document).on('click.projote', '#pjw-manual-photo-delete', function () {
 });
 
 
-/* Section « Avancé » de la configuration : repliée par défaut.
-   Elle ne concerne que les établissements qui publient leurs documents en
-   pièce jointe d'actualité — inutile de l'imposer à tout le monde. */
+/* Section « Paramètres avancés » de l'onglet Équipement, sous la fiche de
+   l'élève : repliée par défaut. Elle réunit ce qui se règle une fois, à la
+   mise en place — onglets Pronote collectés, fenêtre des devoirs, et
+   rapatriement des pièces jointes d'actualité, qui ne concerne que les
+   établissements publiant leurs documents ainsi. Inutile de l'imposer à
+   tout le monde à chaque ouverture de la page. */
 $(document).off('click', '#pjw-avance-bascule').on('click', '#pjw-avance-bascule', function (e) {
     e.preventDefault();
     var bloc = $('#pjw-avance');
