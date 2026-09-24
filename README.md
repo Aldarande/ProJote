@@ -287,8 +287,7 @@ Vérifiez les **nouveautés** : [Changelog](https://aldarande.github.io/ProJote/
 
 Pour une documentation détaillée :
 - 📖 [Documentation officielle](https://aldarande.github.io/ProJote/fr_FR/index.html)
-- 🐛 [Signaler un bug](https://github.com/aldarande/ProJote/issues)
-- 💬 [Support Jeedom Community](https://community.jeedom.com/)
+- 🐛 [Signaler un bug — sujet « Bug ProJote » du forum Jeedom](https://community.jeedom.com/t/bug-projote/150998)
 
 ---
 
