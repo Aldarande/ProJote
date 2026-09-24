@@ -28,21 +28,6 @@ import pieces_jointes
 PRIS = {"actif": True, "mots": ["menu"], "retention": 30}
 
 
-def _vieillir(tmp_path, heures=24):
-    """Recule la date de dernière vérification, pour franchir VERIFICATION_MIN.
-
-    Sans cela, un second appel dans la même seconde de test tomberait sur le
-    délai de revérification et ne demanderait rien au serveur.
-    """
-    import json
-    import time
-
-    index_path = tmp_path / pieces_jointes.DOSSIER / pieces_jointes.INDEX
-    index = json.loads(index_path.read_text())
-    for entree in index.values():
-        entree["verifie_le"] = time.time() - heures * 3600
-    index_path.write_text(json.dumps(index))
-
 
 class _Reponse:
     def __init__(self, contenu, code=200, entetes=None):
@@ -219,7 +204,6 @@ class TestRapatriement:
             b"%PDF-1.4 menu", {"ETag": '"abc"', "Last-Modified": "Mon, 22 Sep 2026 08:00:00 GMT"}
         ))
         pieces_jointes.decrire(piece, "Cantine", PRIS, str(tmp_path))
-        _vieillir(tmp_path)
 
         pieces_jointes.decrire(piece, "Cantine", PRIS, str(tmp_path))
 
@@ -234,7 +218,6 @@ class TestRapatriement:
         pieces_jointes.decrire(piece, "Cantine", PRIS, str(tmp_path))
         fichier = tmp_path / pieces_jointes.DOSSIER / "Menu_S39.pdf"
         empreinte_avant = fichier.read_bytes()
-        _vieillir(tmp_path)
 
         session.code = 304
         decrit = pieces_jointes.decrire(piece, "Cantine", PRIS, str(tmp_path))
@@ -248,7 +231,6 @@ class TestRapatriement:
         pieces_jointes.decrire(piece, "Cantine", PRIS, str(tmp_path))
         fichier = tmp_path / pieces_jointes.DOSSIER / "Menu_S39.pdf"
         date_avant = fichier.stat().st_mtime_ns
-        _vieillir(tmp_path)
 
         pieces_jointes.decrire(piece, "Cantine", PRIS, str(tmp_path))
 
@@ -260,7 +242,6 @@ class TestRapatriement:
         piece = _Piece("Menu.pdf", session=session)
         pieces_jointes.decrire(piece, "Cantine", PRIS, str(tmp_path))
 
-        _vieillir(tmp_path)
         session.contenu = b"semaine 40"
         pieces_jointes.decrire(piece, "Cantine", PRIS, str(tmp_path))
 
@@ -444,43 +425,47 @@ class TestRetention:
         assert pieces_jointes.purger(str(tmp_path), 30) == 1
 
 
-# ── Le délai de revérification ──────────────────────────────────────────────
+# ── L'empreinte tranche à chaque passe ──────────────────────────────────────
 #
-# La requête conditionnelle devait rendre la vérification gratuite. Mesuré sur
-# un serveur PRONOTE réel le 24 septembre 2026 : il ignore « If-Modified-Since »
-# et renvoie le fichier entier. Vérifier coûte donc le transfert complet, et les
-# notifications sont collectées huit fois par jour.
+# Pas de délai : le plugin redemande le fichier à chaque relevé des actualités
+# et compare. Un menu republié est donc vu tout de suite. Mesuré le 24 septembre
+# 2026, les serveurs PRONOTE ignorent « If-Modified-Since » : la comparaison
+# d'empreinte est ce qui évite la réécriture, et la cadence de trois heures des
+# actualités est ce qui borne la dépense.
 
 
-class TestDelaiDeVerification:
-    def test_un_fichier_verifie_recemment_n_est_pas_redemande(self, tmp_path):
+class TestVerificationAChaquePasse:
+    def test_le_serveur_est_interroge_a_chaque_passe(self, tmp_path):
+        piece = _Piece("Menu_S39.pdf")
+
+        pieces_jointes.decrire(piece, "Cantine", PRIS, str(tmp_path))
+        pieces_jointes.decrire(piece, "Cantine", PRIS, str(tmp_path))
+        pieces_jointes.decrire(piece, "Cantine", PRIS, str(tmp_path))
+
+        assert len(piece.session.appels) == 3
+
+    def test_un_changement_est_vu_des_la_passe_suivante(self, tmp_path):
+        """C'est ce que le délai retardait, et pourquoi il a été retiré."""
+        session = _Session(b"semaine 39")
+        piece = _Piece("Menu.pdf", session=session)
+        pieces_jointes.decrire(piece, "Cantine", PRIS, str(tmp_path))
+
+        session.contenu = b"semaine 40"
+        pieces_jointes.decrire(piece, "Cantine", PRIS, str(tmp_path))
+
+        fichier = tmp_path / pieces_jointes.DOSSIER / "Menu.pdf"
+        assert fichier.read_bytes() == b"semaine 40"
+
+    def test_la_date_de_rapatriement_ne_bouge_pas_sans_changement(self, tmp_path):
+        """Sinon un fichier inchangé échapperait indéfiniment à la rétention."""
+        import json
+
         piece = _Piece("Menu_S39.pdf")
         pieces_jointes.decrire(piece, "Cantine", PRIS, str(tmp_path))
-        appels_apres_premier = len(piece.session.appels)
-
-        decrit = pieces_jointes.decrire(piece, "Cantine", PRIS, str(tmp_path))
-
-        assert len(piece.session.appels) == appels_apres_premier, (
-            "le serveur a été sollicité alors que le fichier venait d'être vu"
-        )
-        assert decrit["recuperee"] is True, "le fichier reste disponible"
-
-    def test_passe_le_delai_on_revient_demander(self, tmp_path):
-        piece = _Piece("Menu_S39.pdf")
-        pieces_jointes.decrire(piece, "Cantine", PRIS, str(tmp_path))
-        _vieillir(tmp_path, heures=13)
+        index_path = tmp_path / pieces_jointes.DOSSIER / pieces_jointes.INDEX
+        avant = json.loads(index_path.read_text())["Menu_S39.pdf"]["repris_le"]
 
         pieces_jointes.decrire(piece, "Cantine", PRIS, str(tmp_path))
 
-        assert len(piece.session.appels) == 2
-
-    def test_un_fichier_efface_est_repris_sans_attendre(self, tmp_path):
-        """La rétention l'a emporté, ou l'utilisateur l'a supprimé."""
-        piece = _Piece("Menu_S39.pdf")
-        pieces_jointes.decrire(piece, "Cantine", PRIS, str(tmp_path))
-        (tmp_path / pieces_jointes.DOSSIER / "Menu_S39.pdf").unlink()
-
-        decrit = pieces_jointes.decrire(piece, "Cantine", PRIS, str(tmp_path))
-
-        assert len(piece.session.appels) == 2
-        assert decrit["recuperee"] is True
+        apres = json.loads(index_path.read_text())["Menu_S39.pdf"]["repris_le"]
+        assert apres == avant

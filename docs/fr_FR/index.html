@@ -797,22 +797,19 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
     propre à chaque enfant. Le nom du fichier est assaini avant d'être écrit : il vient de
     Pronote, et ne doit jamais composer un chemin. Un fichier de plus de 5 Mo est refusé.</p>
 
-    <h2>Le fichier n'est pas repris à chaque relevé</h2>
+    <h2>Le fichier n'est pas réécrit sans raison</h2>
 
-    <p>Le plugin ne retélécharge pas ce qu'il a déjà. Trois garde-fous se succèdent :</p>
+    <p>À chaque relevé des actualités, le plugin demande au serveur si le fichier a changé,
+    par une requête conditionnelle. Mesuré le 24 septembre 2026 : <strong>les serveurs Pronote
+    ignorent cette demande</strong> et renvoient le fichier entier. C'est donc la comparaison
+    d'empreinte qui tranche : si le contenu reçu est identique à celui qu'on a, le fichier sur
+    disque n'est pas réécrit et sa date de rapatriement est conservée — ce qui évite aussi
+    qu'un fichier inchangé échappe indéfiniment à la rétention.</p>
 
-    <ul>
-        <li><strong>Un délai de 12 heures.</strong> Un fichier vérifié récemment n'est pas
-        redemandé du tout. Un menu est hebdomadaire : le revoir deux fois par jour suffit.</li>
-        <li><strong>Une requête conditionnelle.</strong> Passé ce délai, le plugin demande au
-        serveur si le fichier a changé. Mesuré le 24 septembre 2026 : les serveurs Pronote
-        <em>ignorent</em> cette demande et renvoient le fichier entier — d'où le troisième
-        garde-fou.</li>
-        <li><strong>Une comparaison d'empreinte.</strong> Si le contenu reçu est identique à
-        celui qu'on a, le fichier sur disque n'est pas réécrit et sa date de rapatriement est
-        conservée — ce qui évite aussi qu'un fichier inchangé échappe indéfiniment à la
-        rétention.</li>
-    </ul>
+    <p>Le contenu transite donc à chaque relevé des actualités, soit <strong>toutes les trois
+    heures</strong> (voir <a href="#cadence">Cadence de collecte</a>). C'est le prix d'une
+    détection immédiate : un menu republié est vu au relevé suivant, sans délai. Le plafond de
+    5 Mo par fichier borne la dépense.</p>
 
     <div class="callout callout-info">
         <strong>Pourquoi pas un simple lien vers Pronote ?</strong>
@@ -977,7 +974,7 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
             </tr>
             <tr>
                 <td><span class="badge badge-new">Nouveauté</span></td>
-                <td><strong>Récupérer le menu de la cantine publié en pièce jointe</strong> — demandé par un utilisateur dont l'établissement ne remplit pas l'onglet <em>Menu</em> de Pronote, mais attache un PDF à une actualité. Les pièces jointes sont désormais <strong>toujours signalées</strong> dans l'onglet <em>Alertes</em> du widget — les lister ne coûte aucune requête supplémentaire — par une disquette opaque quand le fichier est sur votre Jeedom, grisée quand il est resté chez Pronote. Une section <em>Avancé</em> de la configuration permet d'activer le téléchargement, de choisir les mots reconnus (des exemples cliquables sont proposés : <code>menu, cantine</code>, <code>.pdf</code>…) et la durée de rétention, 30 jours par défaut. Rien n'est téléchargé tant que vous ne l'avez pas demandé. Les fichiers vont dans <code>data/&lt;équipement&gt;/file/</code> et ne sont pas repris à chaque relevé : un délai de 12 heures, puis une comparaison d'empreinte, évitent de retransférer ce qui n'a pas changé. Voir <a href="#pieces-jointes">Pièces jointes des actualités</a>.</td>
+                <td><strong>Récupérer le menu de la cantine publié en pièce jointe</strong> — demandé par un utilisateur dont l'établissement ne remplit pas l'onglet <em>Menu</em> de Pronote, mais attache un PDF à une actualité. Les pièces jointes sont désormais <strong>toujours signalées</strong> dans l'onglet <em>Alertes</em> du widget — les lister ne coûte aucune requête supplémentaire — par une disquette opaque quand le fichier est sur votre Jeedom, grisée quand il est resté chez Pronote. Une section <em>Avancé</em> de la configuration permet d'activer le téléchargement, de choisir les mots reconnus (des exemples cliquables sont proposés : <code>menu, cantine</code>, <code>.pdf</code>…) et la durée de rétention, 30 jours par défaut. Rien n'est téléchargé tant que vous ne l'avez pas demandé. Les fichiers vont dans <code>data/&lt;équipement&gt;/file/</code>. À chaque relevé des actualités — toutes les trois heures — le plugin vérifie si le fichier a changé et ne le réécrit que dans ce cas, de sorte qu'un menu republié est vu sans délai. Voir <a href="#pieces-jointes">Pièces jointes des actualités</a>.</td>
             </tr>
         </tbody>
     </table>

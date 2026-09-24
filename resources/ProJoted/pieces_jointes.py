@@ -31,19 +31,25 @@ requête, pièces jointes = 0``.
 On énumère donc toujours, et l'on ne télécharge que ce qui correspond aux mots
 choisis. L'affichage montre les deux états : ce qui existe, et ce qui a été pris.
 
-# Ne pas reprendre le même fichier à chaque relevé
+# Ne pas réécrire le même fichier
 
-Le démon passe toutes les heures ; retélécharger le même PDF à chaque fois n'a
-pas de sens. Avant de rapatrier, on demande au serveur *si le fichier a changé*,
-par une requête conditionnelle (``If-None-Match`` / ``If-Modified-Since``) :
-un ``304`` ne transporte aucun octet et vaut « rien de neuf, garde ce que tu
-as ». Les empreintes nécessaires sont rangées à côté des fichiers, dans
-``.index.json``.
+À chaque relevé, on demande au serveur *si le fichier a changé*, par une requête
+conditionnelle (``If-None-Match`` / ``If-Modified-Since``) : un ``304`` ne
+transporte aucun octet et vaut « rien de neuf, garde ce que tu as ». Les
+empreintes nécessaires sont rangées à côté des fichiers, dans ``.index.json``.
 
-Tous les serveurs n'honorent pas les requêtes conditionnelles. Quand celui-ci
-répond ``200`` quand même, on compare l'empreinte du contenu reçu à celle qu'on
-avait : identique, le fichier sur disque n'est pas réécrit et sa date de
-rapatriement est conservée.
+Tous les serveurs n'honorent pas les requêtes conditionnelles. Mesuré sur un
+serveur PRONOTE réel le 24 septembre 2026 : **il les ignore** et renvoie le
+fichier entier. On compare donc l'empreinte du contenu reçu à celle qu'on
+avait — identique, le fichier sur disque n'est pas réécrit et sa date de
+rapatriement est conservée, ce qui évite aussi qu'un fichier inchangé échappe
+indéfiniment à la rétention.
+
+Le contenu transite donc à chaque collecte des actualités, toutes les trois
+heures (cf. ``cadence.py``). C'est le prix d'une détection immédiate : un menu
+republié est vu au relevé suivant, et non au bout d'un délai. Le choix est
+assumé, la cadence des actualités le borne, et le plafond ``TAILLE_MAX`` évite
+qu'un fichier démesuré en fasse les frais.
 
 # Le nom du fichier vient de Pronote
 
@@ -71,19 +77,6 @@ DOSSIER = "file"
 INDEX = ".index.json"
 
 RETENTION_DEFAUT = 30
-
-# Délai minimal entre deux vérifications d'un fichier déjà rapatrié.
-#
-# La requête conditionnelle était censée rendre la vérification gratuite. Mesuré
-# sur un serveur PRONOTE réel le 24 septembre 2026 : il **ignore**
-# « If-Modified-Since » et renvoie le fichier entier, 200 et tout le contenu.
-# L'empreinte nous épargne la réécriture, pas le transfert — 1,3 Mo à chaque
-# collecte des notifications, huit fois par jour.
-#
-# On espace donc la vérification. Un menu de cantine est hebdomadaire : le
-# revoir une fois par jour suffit largement, et le fichier reste disponible
-# entre-temps.
-VERIFICATION_MIN = 12 * 3600
 
 _CARACTERES_SURS = re.compile(r"[^A-Za-z0-9._-]+")
 
@@ -301,20 +294,6 @@ def decrire(piece, titre_actualite, options, dossier):
         os.makedirs(cible, exist_ok=True)
         index = _lire_index(cible)
         connu = index.get(sur_disque, {})
-
-        # Vérifié il y a peu : on ne redemande rien. Le fichier est là, il reste
-        # annoncé comme récupéré.
-        depuis = time.time() - float(connu.get("verifie_le") or 0)
-        if os.path.exists(destination) and depuis < VERIFICATION_MIN:
-            logging.debug(
-                "Pièce jointe « %s » vérifiée il y a %d h, on ne redemande pas.",
-                sur_disque,
-                depuis // 3600,
-            )
-            decrit["recuperee"] = True
-            decrit["fichier"] = sur_disque
-            return decrit
-
         repris, empreintes, motif = _telecharger(piece, destination, connu)
     except Exception as e:
         logging.warning("Pièce jointe « %s » non rapatriée : %s", nom, e)
@@ -334,10 +313,6 @@ def decrire(piece, titre_actualite, options, dossier):
         logging.debug(
             "Pièce jointe « %s » inchangée, conservée (%s).", sur_disque, motif
         )
-    # Dans les deux cas le fichier vient d'être confronté au serveur : c'est la
-    # date que VERIFICATION_MIN regarde.
-    empreintes = dict(empreintes)
-    empreintes["verifie_le"] = time.time()
     index[sur_disque] = empreintes
     _ecrire_index(cible, index)
 

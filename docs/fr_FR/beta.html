@@ -323,16 +323,18 @@ disque, <strong>grisée</strong> quand il est resté chez Pronote. On voit ce qu
 rétention de 30 jours. Les fichiers vont dans <code>data/&lt;équipement&gt;/file/</code>, sous
 un nom assaini — il vient de Pronote et ne doit jamais composer un chemin.</p>
 
-<h3>Ne pas reprendre le même fichier à chaque relevé</h3>
-<p>La requête conditionnelle devait suffire. Mesure faite contre un serveur Pronote réel :</p>
+<h3>Ne pas réécrire le même fichier</h3>
+<p>La requête conditionnelle devait rendre la vérification gratuite. Mesure faite contre un
+serveur Pronote réel :</p>
 <pre><code>07:48:54  Pièce jointe rapatriée : Diverse_Hands_in_Solidarity_Poster.png (1317869 octets)
-07:55:42  … inchangée, conservée (contenu identique, mais le serveur l'a renvoyé)
-07:58:15  … vérifiée il y a 0 h, on ne redemande pas</code></pre>
+07:55:42  … inchangée, conservée (contenu identique, mais le serveur l'a renvoyé)</code></pre>
 <p>Le serveur <strong>ignore</strong> <code>If-Modified-Since</code> et renvoie le fichier
-entier. L'empreinte épargne la réécriture, pas le transfert — 1,3 Mo à chaque collecte des
-notifications, huit fois par jour. Un délai de 12 heures a donc été ajouté : passé ce
-délai seulement, le plugin revient demander. La troisième ligne ci-dessus est ce garde-fou
-en action, sur le compte réel.</p>
+entier. C'est donc la comparaison d'empreinte qui tranche : elle épargne la réécriture et
+préserve la date de rapatriement dont dépend la rétention.</p>
+<p>Le contenu transite à chaque relevé des actualités, soit toutes les trois heures. C'est un
+choix assumé : un délai de revérification avait été essayé, puis retiré — il retardait la
+détection d'un menu republié, ce qui est précisément ce qu'on cherche à voir. La cadence des
+actualités borne la dépense, et le plafond de 5 Mo par fichier aussi.</p>
 
 <p>Cinquante-deux tests couvrent le chemin : les mots-clés, la sélection, l'assainissement du
 nom — y compris les tentatives de remontée de dossier —, le 304, le serveur qui l'ignore, le
