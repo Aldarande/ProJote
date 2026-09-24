@@ -121,7 +121,7 @@ class ProJote extends eqLogic
         // Doit rester d'accord avec les onglets du gabarit et avec le sélecteur
         // de desktop/php/ProJote.php : un onglet absent d'ici ne peut pas être
         // choisi comme onglet d'ouverture.
-        'values'            => ['dv' => 'Devoirs', 'notes' => 'Notes', 'abs' => 'Absences', 'ret' => 'Retards', 'pun' => 'Punitions', 'evt' => 'Carnet', 'menu' => 'Menu cantine', 'msg' => 'Messagerie', 'stats' => 'Statistiques', 'alertes' => 'Évènements ProJote', 'notif' => 'Notifications', 'comp' => 'Compétences'],
+        'values'            => ['dv' => 'Devoirs', 'notes' => 'Notes', 'abs' => 'Absences', 'ret' => 'Retards', 'pun' => 'Punitions', 'evt' => 'Carnet', 'menu' => 'Menu cantine', 'msg' => 'Messagerie', 'stats' => 'Statistiques', 'notif' => 'Notifications', 'comp' => 'Compétences', 'alertes' => 'Évènements ProJote'],
       ],
       'edt_nav_mode' => [
         'allow_displayType' => ['dashboard', 'mobile'],
