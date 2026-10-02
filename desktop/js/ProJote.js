@@ -177,7 +177,7 @@ function loadProJoteData(eqLogicId) {
   let profilePicturePath = '/plugins/ProJote/core/php/fichier.php?id=' + eqLogicId + '&photo=pronote';
       $.get(profilePicturePath)
         .done(function () {
-          $('#local-picture').attr('src', profilePicturePath + '?' + new Date().getTime()).show();
+          $('#local-picture').attr('src', avecAntiCache(profilePicturePath)).show();
         })
         .fail(function () {
           $('#local-picture').hide();
@@ -285,6 +285,19 @@ function brancherOngletsSuivis() {
     let cle = $(this).attr('data-onglet');
     $('.pjw-onglet-valeur[data-l2key="' + cle + '"]').val($(this).is(':checked') ? '1' : '0');
   });
+}
+
+/**
+ * Ajoute un paramètre anti-cache à une URL, avec le bon séparateur.
+ *
+ * Les URL de photo portent désormais une query string (fichier.php?id=…&photo=…).
+ * Y coller « ?_=<horodatage> » produisait « …&photo=pronote?_=123 » : le
+ * paramètre `photo` ne valait plus « pronote », le point d'accès refusait en
+ * 400, et la page de configuration n'affichait aucune photo — alors que le
+ * widget, dont l'URL est composée côté serveur, fonctionnait.
+ */
+function avecAntiCache(url) {
+  return url + (url.indexOf('?') === -1 ? '?' : '&') + '_=' + Date.now();
 }
 
 function resetFields() {
@@ -1186,13 +1199,12 @@ $(document).on('click.projote', '#pjw-preview-refresh', function () {
  */
 function loadManualPhotoPreview(eqLogicId) {
   if (!eqLogicId) return;
-  let ts = '?_=' + Date.now();
-
   // Photo Pronote (téléchargée par le démon)
-  let pronotePath = '/plugins/ProJote/core/php/fichier.php?id=' + eqLogicId + '&photo=pronote';
-  $.get(pronotePath + ts)
+  let pronotePath = avecAntiCache(
+    '/plugins/ProJote/core/php/fichier.php?id=' + eqLogicId + '&photo=pronote');
+  $.get(pronotePath)
     .done(function () {
-      $('#pjw-pronote-photo-img').attr('src', pronotePath + ts);
+      $('#pjw-pronote-photo-img').attr('src', pronotePath);
       $('#pjw-pronote-photo-wrap').show();
       $('#pjw-no-pronote-photo').hide();
     })
@@ -1202,10 +1214,11 @@ function loadManualPhotoPreview(eqLogicId) {
     });
 
   // Photo manuelle (uploadée par l'utilisateur)
-  let manualPath = '/plugins/ProJote/core/php/fichier.php?id=' + eqLogicId + '&photo=manual';
-  $.get(manualPath + ts)
+  let manualPath = avecAntiCache(
+    '/plugins/ProJote/core/php/fichier.php?id=' + eqLogicId + '&photo=manual');
+  $.get(manualPath)
     .done(function () {
-      $('#pjw-manual-photo-img').attr('src', manualPath + ts);
+      $('#pjw-manual-photo-img').attr('src', manualPath);
       $('#pjw-manual-photo-wrap').show();
       $('#pjw-no-manual-photo').hide();
     })
@@ -1241,9 +1254,9 @@ $(document).on('change.projote', '#pjw-manual-photo-input', function () {
     dataType: 'json',
     success: function (data) {
       if (data && data.state === 'ok') {
-        let ts = '?_=' + Date.now();
-        let manualPath = '/plugins/ProJote/core/php/fichier.php?id=' + eqLogicId + '&photo=manual';
-        $('#pjw-manual-photo-img').attr('src', manualPath + ts);
+        let manualPath = avecAntiCache(
+          '/plugins/ProJote/core/php/fichier.php?id=' + eqLogicId + '&photo=manual');
+        $('#pjw-manual-photo-img').attr('src', manualPath);
         $('#pjw-manual-photo-wrap').show();
         $('#pjw-no-manual-photo').hide();
         $('#pjw-manual-photo-status').text('Photo enregistrée.').css('color', 'green');
