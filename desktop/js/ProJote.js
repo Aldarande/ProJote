@@ -174,7 +174,7 @@ function loadProJoteData(eqLogicId) {
 
       // Photo de profil
       // Servie par fichier.php (session Jeedom exigée) : data/ est fermé.
-  let profilePicturePath = '/plugins/ProJote/core/php/fichier.php?id=' + eqLogicId + '&photo=pronote';
+      let profilePicturePath = '/plugins/ProJote/core/php/fichier.php?id=' + eqLogicId + '&photo=pronote';
       $.get(profilePicturePath)
         .done(function () {
           $('#local-picture').attr('src', avecAntiCache(profilePicturePath)).show();
