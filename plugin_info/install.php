@@ -79,11 +79,77 @@ function ProJote_install() {
   _ProJote_protegerDossierDonnees();
 }
 
+/**
+ * Réécrit les URL de photo laissées par les versions antérieures.
+ *
+ * Jusqu'à la 1.4.6, la photo était servie depuis `data/` par un lien direct, et
+ * cette URL était rangée dans `widget_json` et dans la commande « Picture ».
+ * La fermeture de `data/` rend ces liens morts : le fichier est bien là, mais
+ * Apache le refuse. Sans cette reprise, les widgets et le panneau afficheraient
+ * une image cassée jusqu'au cycle suivant — une heure au pire, mais une heure
+ * pendant laquelle le plugin paraît en panne alors qu'il ne l'est pas.
+ *
+ * C'est le défaut d'avoir stocké une URL plutôt qu'un fait : `toHtml()` la
+ * recalcule désormais depuis le disque, mais les valeurs déjà écrites, elles,
+ * doivent être reprises.
+ */
+function _ProJote_migrerUrlPhotos() {
+  foreach (eqLogic::byType('ProJote') as $eq) {
+    $id = $eq->getId();
+    $vers = array(
+      '/plugins/ProJote/data/' . $id . '/profile_picture.jpg'
+        => '/plugins/ProJote/core/php/fichier.php?id=' . $id . '&photo=pronote',
+      '/plugins/ProJote/data/' . $id . '/profile_picture_manual.jpg'
+        => '/plugins/ProJote/core/php/fichier.php?id=' . $id . '&photo=manual',
+    );
+
+    // On décode avant de remplacer : json_encode() échappe les slashes, et le
+    // blob contient « \/plugins\/... ». Un remplacement sur la chaîne brute ne
+    // trouverait donc rien — c'est ce qui avait fait échouer une première
+    // version de cette reprise, sans le moindre signe d'erreur.
+    $json = $eq->getConfiguration('widget_json', '');
+    $blob = $json === '' ? null : json_decode($json, true);
+    if (is_array($blob)) {
+      $modifie = false;
+      foreach (array('photo', 'pronote_photo') as $cle) {
+        if (empty($blob[$cle]) || !is_string($blob[$cle])) {
+          continue;
+        }
+        foreach ($vers as $ancien => $nouveau) {
+          // Les valeurs portent parfois « ?v=<mtime> » : on compare le préfixe
+          // et on laisse tomber l'ancien paramètre, que le neuf refabrique.
+          if (strpos($blob[$cle], $ancien) === 0) {
+            $blob[$cle] = $nouveau;
+            $modifie = true;
+            break;
+          }
+        }
+      }
+      if ($modifie) {
+        $eq->setConfiguration('widget_json', json_encode($blob));
+        $eq->save(true);
+      }
+    }
+
+    $cmd = $eq->getCmd(null, 'Picture');
+    if (is_object($cmd)) {
+      $valeur = (string) $cmd->execCmd();
+      foreach ($vers as $ancien => $nouveau) {
+        if (strpos($valeur, $ancien) === 0) {
+          $eq->checkAndUpdateCmd('Picture', $nouveau);
+          break;
+        }
+      }
+    }
+  }
+}
+
 // Fonction exécutée automatiquement après la mise à jour du plugin
 function ProJote_update() {
   _ProJote_setVersion();
   _ProJote_createMissingCmds();
   _ProJote_protegerDossierDonnees();
+  _ProJote_migrerUrlPhotos();
 }
 
 /**

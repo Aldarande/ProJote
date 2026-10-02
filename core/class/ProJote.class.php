@@ -1180,12 +1180,17 @@ class ProJote extends eqLogic
     // Servie par fichier.php, qui exige une session Jeedom : data/ est fermé.
     $manualPhotoUrl  = '/plugins/ProJote/core/php/fichier.php?id=' . $this->getId()
       . '&photo=manual&v=' . (file_exists($manualPhotoFile) ? filemtime($manualPhotoFile) : '0');
-    $pronotePhotoUrl = !empty($widgetData['photo']) ? $widgetData['photo'] : null;
-    // Si la photo stockée vient de Pronote (et non d'un précédent calcul manuel), on la garde.
-    // On utilise le champ 'pronote_photo' s'il existe, sinon on tombe sur la valeur brute.
-    if (!empty($widgetData['pronote_photo'])) {
-      $pronotePhotoUrl = $widgetData['pronote_photo'];
-    }
+    // La photo Pronote se déduit du disque, et non de l'URL rangée dans
+    // widget_json. Une URL stockée survit aux changements de code : quand le
+    // dossier data/ a été fermé au profit de fichier.php, tous les widgets
+    // ont affiché une image morte jusqu'au cycle suivant, alors que le fichier
+    // était bien là. Le chemin, lui, est déterministe — autant le recalculer.
+    $pronotePhotoFile = $dataDir . DIRECTORY_SEPARATOR . $this->getId()
+      . DIRECTORY_SEPARATOR . 'profile_picture.jpg';
+    $pronotePhotoUrl = file_exists($pronotePhotoFile)
+      ? '/plugins/ProJote/core/php/fichier.php?id=' . $this->getId()
+        . '&photo=pronote&v=' . filemtime($pronotePhotoFile)
+      : null;
     $manualExists = file_exists($manualPhotoFile);
     // Défaut « auto » et non « none » : ce réglage a été introduit quand la photo
     // Pronote n'arrivait jamais, et masquer une image absente ne coûtait rien.
