@@ -932,6 +932,18 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
         <thead><tr><th>Type</th><th>Description</th></tr></thead>
         <tbody>
             <tr>
+                <td><span class="badge badge-sec">Sécurité</span></td>
+                <td><strong>Le dossier de données n'est plus accessible depuis un navigateur</strong> — tout ce que le plugin range dans <code>data/</code> concerne un mineur : sa photo, les documents joints aux actualités de l'établissement, et les jetons qui donnent accès à son compte Pronote. Ce dossier était protégé par un fichier de règles Apache… qui <strong>n'était créé par rien</strong> : il est exclu du dépôt, et n'existait que sur les installations où quelqu'un l'avait posé à la main. Partout ailleurs, les jetons de reconnexion étaient lisibles par qui connaissait l'adresse. Le dossier est désormais fermé à l'installation <em>et à chaque mise à jour</em>, ce qui rattrape les installations existantes. Photo et pièces jointes restent consultables, mais passent par un point d'accès qui vérifie d'abord que vous êtes connecté à Jeedom.
+                <div class="callout callout-info" style="margin-top:8px;">
+                    <strong>Si vous utilisez l'URL de la photo dans un scénario</strong>
+                    La commande <em>Photo</em> contient maintenant une adresse qui exige une session Jeedom. Un scénario ou un service extérieur qui la lisait sans être authentifié ne récupérera plus l'image.
+                </div></td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>Les pièces jointes ne s'ouvraient pas</strong> — le menu de la cantine arrivait bien avec la notification, mais le clic sur le lien se soldait par un refus d'accès. Deux causes superposées, et aucune n'était celle qu'on soupçonnait : les règles du dossier n'ouvraient que les images, un PDF était donc refusé par le serveur web alors que le fichier était parfaitement lisible ; et le lien du widget désignait un dossier qui n'existe pas, celui du panneau étant le seul correct. Les deux passent désormais par le point d'accès authentifié, et le même lien fonctionne des deux côtés.</td>
+            </tr>
+            <tr>
                 <td><span class="badge badge-fix">Correctif</span></td>
                 <td><strong>Le rattrapage d'une session expirée repartait avec un identifiant périmé</strong> — la 1.7.0 avait appris au plugin à distinguer une session expirée d'un droit refusé, et à relire les périodes pour réessayer. Il restait un étage en dessous : quand la bibliothèque Pronote se reconnecte d'elle-même et rejoue la requête, elle la rejoue <em>telle qu'elle avait été formée avant</em> — avec l'identifiant de période de la session qu'on vient de quitter. Ce rejeu ne pouvait pas aboutir, et il coûtait une reconnexion complète à chaque fois. La requête est désormais reconstruite à chaque tentative : la période est retrouvée par son nom, seul repère qui survit à une reconnexion. Sur un compte de test, un relevé qui ne ramenait plus rien ramène de nouveau ses seize absences. Le correctif vaut pour les comptes parent comme pour les comptes élève, tous deux concernés.</td>
             </tr>
