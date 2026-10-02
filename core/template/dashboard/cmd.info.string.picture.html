@@ -16,7 +16,7 @@
                 cmd.querySelector('.content-xs').setAttribute('title', '{{Date de valeur}}: ' + _options.valueDate + '<br>{{Date de collecte}}: ' + _options.collectDate)
 
                 var img = cmd.querySelector('.value');
-                var fallbackUrl = '/plugins/ProJote/data/#eqLogic_id#/profile_picture.jpg'; // <-- Remplace par ton URL de secours
+                var fallbackUrl = '/plugins/ProJote/core/php/fichier.php?id=#eqLogic_id#&photo=pronote'; // <-- Remplace par ton URL de secours
 
                 // Fonction de fallback si l'image ne charge pas
                 var triedFallback = false;

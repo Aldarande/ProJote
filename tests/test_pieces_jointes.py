@@ -469,3 +469,54 @@ class TestVerificationAChaquePasse:
 
         apres = json.loads(index_path.read_text())["Menu_S39.pdf"]["repris_le"]
         assert apres == avant
+
+
+# ── Fermeture du dossier ─────────────────────────────────────────────────────
+class TestPoserHtaccess:
+    """Le dossier des pièces jointes ne doit pas être joignable en HTTP.
+
+    Ces documents concernent un mineur — menu de cantine, circulaires. Ils sont
+    servis par core/php/piece_jointe.php, qui exige une session Jeedom. Le
+    .htaccess posé ici est une seconde barrière, au plus près des données : si
+    le data/.htaccess parent venait à être relâché, ce dossier resterait fermé.
+
+    Un détail de terrain, relevé le 2 octobre 2026 : le parent refusait déjà
+    tout sauf les images, si bien qu'un PDF renvoyait 403 au clic. Le symptôme
+    se confond avec un défaut de droits Unix — le fichier est pourtant lisible
+    par www-data, seule son extension le distingue d'une photo.
+    """
+
+    def test_le_fichier_est_cree(self, tmp_path):
+        pieces_jointes.poser_htaccess(str(tmp_path))
+        assert (tmp_path / ".htaccess").exists()
+
+    def test_le_dossier_est_entierement_ferme(self, tmp_path):
+        """Aucune ouverture par extension : tout passe par le point d'accès."""
+        pieces_jointes.poser_htaccess(str(tmp_path))
+        contenu = (tmp_path / ".htaccess").read_text(encoding="utf-8")
+        assert "Require all denied" in contenu
+        assert "Require all granted" not in contenu
+
+    def test_ecriture_idempotente(self, tmp_path):
+        """Un contenu identique ne doit pas être réécrit à chaque cycle."""
+        pieces_jointes.poser_htaccess(str(tmp_path))
+        chemin = tmp_path / ".htaccess"
+        avant = chemin.stat().st_mtime_ns
+        pieces_jointes.poser_htaccess(str(tmp_path))
+        assert chemin.stat().st_mtime_ns == avant
+
+    def test_un_fichier_altere_est_retabli(self, tmp_path):
+        """Si quelqu'un ouvre le dossier à la main, le cycle suivant referme."""
+        chemin = tmp_path / ".htaccess"
+        chemin.write_text("Require all granted\n", encoding="utf-8")
+        pieces_jointes.poser_htaccess(str(tmp_path))
+        assert "Require all denied" in chemin.read_text(encoding="utf-8")
+
+    def test_un_echec_d_ecriture_ne_leve_pas(self, tmp_path, monkeypatch):
+        """Mieux vaut une pièce jointe non servie qu'un cycle interrompu."""
+
+        def _refuse(*a, **k):
+            raise OSError("lecture seule")
+
+        monkeypatch.setattr("builtins.open", _refuse)
+        pieces_jointes.poser_htaccess(str(tmp_path))

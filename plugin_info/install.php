@@ -28,15 +28,62 @@ function _ProJote_setVersion() {
   }
 }
 
+/**
+ * Ferme le dossier de données à tout accès HTTP direct.
+ *
+ * `data/` contient les jetons de reconnexion Pronote, la photo de l'élève et
+ * les pièces jointes rapatriées — rien qui doive être joignable par qui
+ * connaît l'URL. Le dossier est exclu du dépôt (voir .gitignore) : sans cette
+ * écriture, une installation neuve le laissait entièrement ouvert, et seules
+ * les machines où le fichier avait été posé à la main étaient protégées.
+ *
+ * Photo et pièces jointes sortent par core/php/fichier.php, qui vérifie la
+ * session Jeedom. Les jetons, eux, ne sortent jamais.
+ *
+ * Rejoué à chaque mise à jour, et non à la seule installation : les
+ * installations existantes doivent être rattrapées, et un fichier effacé ou
+ * modifié à la main doit être rétabli.
+ */
+function _ProJote_protegerDossierDonnees() {
+  $dossier = dirname(__FILE__) . '/../data';
+  $regles = "# Généré par ProJote — ne pas modifier à la main.\n"
+    . "#\n"
+    . "# Aucun accès direct : jetons de reconnexion, photo de l'élève et pièces\n"
+    . "# jointes. Photo et pièces jointes sont servies par\n"
+    . "# core/php/fichier.php, qui exige une session Jeedom authentifiée.\n"
+    . "Require all denied\n";
+
+  try {
+    if (!is_dir($dossier) && !@mkdir($dossier, 0775, true)) {
+      log::add('ProJote', 'error', 'Dossier de données introuvable et non créable : ' . $dossier);
+      return;
+    }
+    $chemin = $dossier . '/.htaccess';
+    if (file_exists($chemin) && file_get_contents($chemin) === $regles) {
+      return;
+    }
+    if (file_put_contents($chemin, $regles) === false) {
+      log::add('ProJote', 'error',
+        'Impossible d\'écrire ' . $chemin . ' : le dossier de données reste accessible en HTTP.');
+      return;
+    }
+    log::add('ProJote', 'info', 'Dossier de données fermé à tout accès HTTP direct.');
+  } catch (Exception $e) {
+    log::add('ProJote', 'error', 'Protection du dossier de données échouée : ' . $e->getMessage());
+  }
+}
+
 // Fonction exécutée automatiquement après l'installation du plugin
 function ProJote_install() {
   _ProJote_setVersion();
+  _ProJote_protegerDossierDonnees();
 }
 
 // Fonction exécutée automatiquement après la mise à jour du plugin
 function ProJote_update() {
   _ProJote_setVersion();
   _ProJote_createMissingCmds();
+  _ProJote_protegerDossierDonnees();
 }
 
 /**

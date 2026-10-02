@@ -202,8 +202,13 @@ try {
     // Résolution de la photo selon la préférence photo_source de l'équipement.
     // Valeurs : 'none' (initiales, défaut) | 'pronote' | 'manual' | 'auto' (Pronote puis manuelle)
     $manualPhotoFile = realpath(dirname(__FILE__) . '/../../data') . DIRECTORY_SEPARATOR . $eqLogic->getId() . DIRECTORY_SEPARATOR . 'profile_picture_manual.jpg';
-    $manualPhotoUrl  = '/plugins/ProJote/data/' . $eqLogic->getId() . '/profile_picture_manual.jpg';
-    $pronotePhotoUrl = !empty($result['Local_Picture']) ? $result['Local_Picture'] : null;
+    // Les photos ne sont plus servies depuis data/ : ce dossier est fermé, et
+    // la photo d'un enfant ne doit pas être joignable par qui connaît l'URL.
+    // fichier.php vérifie la session Jeedom avant de la lire.
+    $manualPhotoUrl  = '/plugins/ProJote/core/php/fichier.php?id=' . $eqLogic->getId() . '&photo=manual';
+    $pronotePhotoUrl = !empty($result['Local_Picture'])
+        ? '/plugins/ProJote/core/php/fichier.php?id=' . $eqLogic->getId() . '&photo=pronote'
+        : null;
     $manualExists    = file_exists($manualPhotoFile);
     // Défaut « auto » et non « none » : ce réglage a été introduit quand la photo
     // Pronote n'arrivait jamais, et masquer une image absente ne coûtait rien.

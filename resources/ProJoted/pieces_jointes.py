@@ -76,6 +76,54 @@ DOSSIER = "file"
 # Empreintes des fichiers déjà rapatriés, rangées avec eux.
 INDEX = ".index.json"
 
+# Règles Apache déposées dans le sous-dossier au moment de sa création.
+#
+# Le dossier reste FERMÉ : ni les jetons, ni l'index, ni les pièces jointes ne
+# sont joignables directement en HTTP. Les documents rapatriés concernent un
+# mineur et ne doivent pas être servis à qui connaît l'URL.
+#
+# Ils sont servis par core/php/piece_jointe.php, qui vérifie l'authentification
+# Jeedom avant toute lecture. Ce fichier est donc une seconde barrière, posée
+# au plus près des données : si le data/.htaccess parent venait à être relâché,
+# le dossier des pièces jointes resterait fermé.
+NOM_HTACCESS = ".htaccess"
+
+REGLES_HTACCESS = """# Généré par ProJote — ne pas modifier à la main.
+#
+# Aucun accès direct. Les pièces jointes sont servies par
+# core/php/piece_jointe.php, qui exige une session Jeedom authentifiée.
+Require all denied
+"""
+
+
+def poser_htaccess(cible):
+    """Dépose les règles Apache dans le dossier des pièces jointes.
+
+    Appelée à chaque rapatriement plutôt qu'une seule fois : le dossier peut
+    être recréé, et le fichier supprimé, sans que le plugin en soit informé.
+    L'écriture n'a lieu que si le contenu diffère, pour ne pas toucher la date
+    de modification à chaque cycle.
+
+    Un échec n'interrompt rien : les pièces jointes restent téléchargées, elles
+    ne seront simplement pas servies — exactement l'état d'avant ce correctif.
+    """
+    chemin = os.path.join(cible, NOM_HTACCESS)
+    try:
+        if os.path.exists(chemin):
+            with open(chemin, "r", encoding="utf-8") as f:
+                if f.read() == REGLES_HTACCESS:
+                    return
+        with open(chemin, "w", encoding="utf-8") as f:
+            f.write(REGLES_HTACCESS)
+        logging.info("Règles d'accès posées sur le dossier des pièces jointes.")
+    except OSError as e:
+        logging.warning(
+            "Règles d'accès non posées sur %s : %s — les pièces jointes seront "
+            "téléchargées mais refusées par Apache au clic.",
+            cible,
+            e,
+        )
+
 RETENTION_DEFAUT = 30
 
 _CARACTERES_SURS = re.compile(r"[^A-Za-z0-9._-]+")
@@ -292,6 +340,7 @@ def decrire(piece, titre_actualite, options, dossier):
 
     try:
         os.makedirs(cible, exist_ok=True)
+        poser_htaccess(cible)
         index = _lire_index(cible)
         connu = index.get(sur_disque, {})
         repris, empreintes, motif = _telecharger(piece, destination, connu)

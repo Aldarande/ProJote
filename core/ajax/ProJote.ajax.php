@@ -546,7 +546,8 @@ try {
     }
 
     log::add('ProJote', 'info', 'Photo manuelle enregistrée pour eqLogic ' . $eqLogicId);
-    ajax::success('/plugins/ProJote/data/' . $eqLogicId . '/profile_picture_manual.jpg');
+    // Servie par fichier.php, qui exige une session : data/ est fermé.
+    ajax::success('/plugins/ProJote/core/php/fichier.php?id=' . $eqLogicId . '&photo=manual&v=' . time());
 
     // ──────────────────────────────────────────────────────────────────────────
     // ACTION : DeleteManualPhoto — Supprime la photo de profil manuelle

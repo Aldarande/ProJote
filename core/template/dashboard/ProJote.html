@@ -2102,7 +2102,13 @@
         function piecesJointes(n) {
             var liste = n.pieces_jointes || [];
             if (!liste.length) return '';
-            var racine = '/plugins/ProJote/data/' + encodeURIComponent(ID) + '/pieces_jointes/';
+            /* Point d'accès authentifié, et non un lien direct : le dossier des
+               pièces jointes est fermé en HTTP (documents concernant un mineur).
+               L'ancienne racine désignait en plus « pieces_jointes/ », alors que le
+               collecteur écrit dans « file/ » — le lien du widget ne pouvait donc
+               pas aboutir, même sans la question des droits. */
+            var racine = '/plugins/ProJote/core/php/piece_jointe.php?id=' +
+                encodeURIComponent(ID) + '&fichier=';
             var puces = liste.map(function (p) {
                 var nom = esc(p.nom || '?');
                 if (p.recuperee && p.fichier) {

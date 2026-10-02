@@ -173,7 +173,8 @@ function loadProJoteData(eqLogicId) {
       }
 
       // Photo de profil
-      let profilePicturePath = '/plugins/ProJote/data/' + eqLogicId + '/profile_picture.jpg';
+      // Servie par fichier.php (session Jeedom exigée) : data/ est fermé.
+  let profilePicturePath = '/plugins/ProJote/core/php/fichier.php?id=' + eqLogicId + '&photo=pronote';
       $.get(profilePicturePath)
         .done(function () {
           $('#local-picture').attr('src', profilePicturePath + '?' + new Date().getTime()).show();
@@ -1172,9 +1173,11 @@ $(document).on('click.projote', '#pjw-preview-refresh', function () {
 /**
  * Charge les miniatures de photo dans l'onglet Affichage pour un équipement donné.
  *
- * Teste l'existence des deux fichiers via GET HTTP :
- *   - /plugins/ProJote/data/{id}/profile_picture.jpg      → photo Pronote (démon)
- *   - /plugins/ProJote/data/{id}/profile_picture_manual.jpg → photo manuelle (upload)
+ * Teste l'existence des deux photos via GET HTTP, à travers le point d'accès
+ * authentifié — data/ est fermé, la photo d'un enfant ne doit pas être
+ * joignable par qui connaît l'URL :
+ *   - core/php/fichier.php?id={id}&photo=pronote → photo Pronote (démon)
+ *   - core/php/fichier.php?id={id}&photo=manual  → photo manuelle (upload)
  *
  * Affiche ou masque les blocs #pjw-pronote-photo-wrap / #pjw-manual-photo-wrap en conséquence.
  * Un timestamp est ajouté à l'URL pour contourner le cache navigateur.
@@ -1186,7 +1189,7 @@ function loadManualPhotoPreview(eqLogicId) {
   let ts = '?_=' + Date.now();
 
   // Photo Pronote (téléchargée par le démon)
-  let pronotePath = '/plugins/ProJote/data/' + eqLogicId + '/profile_picture.jpg';
+  let pronotePath = '/plugins/ProJote/core/php/fichier.php?id=' + eqLogicId + '&photo=pronote';
   $.get(pronotePath + ts)
     .done(function () {
       $('#pjw-pronote-photo-img').attr('src', pronotePath + ts);
@@ -1199,7 +1202,7 @@ function loadManualPhotoPreview(eqLogicId) {
     });
 
   // Photo manuelle (uploadée par l'utilisateur)
-  let manualPath = '/plugins/ProJote/data/' + eqLogicId + '/profile_picture_manual.jpg';
+  let manualPath = '/plugins/ProJote/core/php/fichier.php?id=' + eqLogicId + '&photo=manual';
   $.get(manualPath + ts)
     .done(function () {
       $('#pjw-manual-photo-img').attr('src', manualPath + ts);
@@ -1239,7 +1242,7 @@ $(document).on('change.projote', '#pjw-manual-photo-input', function () {
     success: function (data) {
       if (data && data.state === 'ok') {
         let ts = '?_=' + Date.now();
-        let manualPath = '/plugins/ProJote/data/' + eqLogicId + '/profile_picture_manual.jpg';
+        let manualPath = '/plugins/ProJote/core/php/fichier.php?id=' + eqLogicId + '&photo=manual';
         $('#pjw-manual-photo-img').attr('src', manualPath + ts);
         $('#pjw-manual-photo-wrap').show();
         $('#pjw-no-manual-photo').hide();
