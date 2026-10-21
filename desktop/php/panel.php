@@ -302,7 +302,7 @@ $jsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APO
         if (!list.length) return '';
         // Point d'accès authentifié : le dossier des pièces jointes est fermé
         // en HTTP, ces documents concernent un mineur.
-        var racine = 'plugins/ProJote/core/php/piece_jointe.php?id=' +
+        var racine = 'plugins/ProJote/core/php/fichier.php?id=' +
             encodeURIComponent(eqId) + '&fichier=';
         var h = '';
         list.slice(0, 10).forEach(function (n) {
