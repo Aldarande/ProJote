@@ -233,10 +233,12 @@ try:
         _refus_de_presence,
     )
     from pronote_errors import (
+        MOTIF_DELAI,
         SuspensionIP,
         ip_suspension_reason,
         is_authentification_refusee,
         is_ip_suspension_error,
+        message_injoignable,
     )
 
 except ImportError as e:
@@ -654,6 +656,41 @@ def clear_ip_suspension():
         "Connexion à Pronote rétablie : fin de la pause pour suspension d'IP."
     )
     return True
+
+
+def notifier_injoignable(eqLogicId, exc=None, motif=None):
+    """Signale à Jeedom que Pronote n'a pas répondu, sans accuser le jeton.
+
+    Le statut ``unreachable`` est traité à part par jeeProJote.php : il affiche
+    « Pronote injoignable », n'invite pas à rescanner le QR Code et ne crée un
+    message qu'au bout de plusieurs cycles consécutifs. Le compteur du circuit
+    breaker, lui, n'est pas touché : une panne réseau ne doit pas rapprocher du
+    blocage « Token expiré. Trop de tentatives échouées ».
+
+    Args:
+        eqLogicId: équipement concerné.
+        exc: exception réseau d'origine (facultative).
+        motif: motif déjà connu de l'appelant (le timeout dur du worker).
+
+    Returns:
+        str: le message transmis, pour le journal de l'appelant.
+    """
+    message = message_injoignable(exc, motif)
+    if not eqLogicId:
+        return message
+    try:
+        jeedom_com.send_change_immediate(
+            {
+                "CmdId": eqLogicId,
+                "connection_status": "unreachable",
+                "error": message,
+            }
+        )
+    except Exception as e:
+        logging.warning(
+            "Statut « Pronote injoignable » non transmis à Jeedom : %s", e
+        )
+    return message
 
 
 def verifdossier(chemin_dossier):
@@ -2105,6 +2142,23 @@ def process_message(message):
                             "timestamp": time.time(),
                             "blocked_until": 0,
                         }
+            elif not token_secours.erreur_de_jeton(_erreur_connexion):
+                # Pronote ou l'ENT n'a pas répondu : le jeton n'est pas en cause
+                # et il n'y a rien à revalider. Compter l'incident comme une
+                # tentative refusée rapprochait du blocage « Token expiré. Trop
+                # de tentatives échouées » — et le statut « disconnected »
+                # faisait annoncer « Session expirée, rescannez le QR code » sur
+                # un compte dont le cycle suivant se reconnectait tout seul.
+                eqLogicId = message.get("CmdId", "")
+                annonce = notifier_injoignable(eqLogicId, _erreur_connexion)
+                logging.warning(
+                    "Équipement %s : %s. Le jeton n'est pas en cause, le compteur "
+                    "d'échecs n'est pas incrémenté. Détail : %s",
+                    eqLogicId,
+                    annonce,
+                    _erreur_connexion,
+                )
+                return
             else:
                 logging.error(
                     "Tous les jetons disponibles ont été refusés pour l'équipement %s.",
@@ -2123,15 +2177,20 @@ def process_message(message):
                 # présente sous la forme d'un KeyError sur une clé d'enveloppe
                 # (« 'dataSec' ») — inutile de le lui montrer, cela n'aide qu'à
                 # lire les logs. Tout autre détail, lui, est conservé : il peut
-                # nommer une panne réseau ou une réponse inattendue du serveur.
+                # nommer une réponse inattendue du serveur.
                 detail = "" if is_authentification_refusee(_erreur_connexion) else (
                     str(_erreur_connexion).strip() if _erreur_connexion else ""
                 )
+                # Ne pas affirmer que le jeton est périmé : Pronote ne dit pas
+                # pourquoi il refuse, et un refus isolé se répare souvent seul au
+                # cycle suivant. On ne demande une revalidation que si cela dure.
                 jeedom_com.send_change_immediate(
                     {
                         "error": (
-                            "Pronote a refusé le jeton de connexion"
+                            "Pronote a refusé la connexion"
                             + (" (" + detail + ")" if detail else "")
+                            + ". Si cela se répète au prochain cycle, revalidez "
+                            "le compte (QR code ou identifiants)."
                         ),
                         "CmdId": eqLogicId,
                         "connection_status": "disconnected",
@@ -2333,13 +2392,20 @@ def _worker_loop():
                 lambda: process_message(message), _WORKER_TIMEOUT
             )
             if not finished:
-                logging.error(
+                # Le délai est dépassé parce qu'en face personne ne répond : le
+                # jeton n'y est pour rien. Incrémenter le circuit breaker ici
+                # rapprochait du blocage « Token expiré. Trop de tentatives
+                # échouées » alors que rien n'était expiré — deux cycles perdus
+                # suffisaient, le 20 octobre 2026, à faire annoncer une session
+                # expirée sur un compte valide.
+                logging.warning(
                     "ProJote — équipement %s : traitement abandonné (timeout dur %ds, "
-                    "Pronote/ENT injoignable ?). Circuit breaker incrémenté, passage au suivant.",
+                    "Pronote/ENT injoignable ?). Le jeton n'est pas en cause : "
+                    "compteur d'échecs inchangé, passage au suivant.",
                     eq_id,
                     _WORKER_TIMEOUT,
                 )
-                check_and_update_failed_attempts(eq_id, increment=True)
+                notifier_injoignable(eq_id, motif=MOTIF_DELAI)
                 with _queued_eq_lock:
                     _queued_eq.discard(eq_id)
         except Exception as e:

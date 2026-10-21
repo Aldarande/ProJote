@@ -457,6 +457,120 @@ class ProJote extends eqLogic
     return true;
   }
 
+  // --- SERVEUR PRONOTE OU ENT INJOIGNABLE ---
+  // À distinguer d'un jeton refusé. Le 20 octobre 2026, deux cycles perdus sur un
+  // timeout de 120 s ont valu à un équipement le message « Session expirée —
+  // rescannez le QR code » : le jeton était valide, et le cycle de 17 h s'est
+  // reconnecté sans aucune action. Un incident réseau ne demande rien à
+  // l'utilisateur, il ne mérite donc ni ce message ni un message par cycle.
+
+  /** Préfixe du logicalId du message — un par équipement, jamais empilé. */
+  const UNREACHABLE_MESSAGE_PREFIX = 'unreachable_';
+
+  /** Nombre de cycles consécutifs injoignables avant de prévenir. */
+  const UNREACHABLE_CYCLES = 3;
+
+  /** Durée d'indisponibilité au-delà de laquelle on prévient (6 h). */
+  const UNREACHABLE_DELAY = 21600;
+
+  /** Durée de vie du compteur en cache (7 jours). */
+  const UNREACHABLE_CACHE_LIFETIME = 604800;
+
+  /**
+   * Clé de cache portant le compteur de cycles injoignables d'un équipement.
+   *
+   * @param eqLogic $eqLogic
+   * @return string
+   */
+  private static function unreachableCacheKey($eqLogic)
+  {
+    return __CLASS__ . '::unreachable::' . $eqLogic->getId();
+  }
+
+  /**
+   * logicalId du message du centre de messages pour cet équipement.
+   *
+   * @param eqLogic $eqLogic
+   * @return string
+   */
+  public static function unreachableMessageId($eqLogic)
+  {
+    return self::UNREACHABLE_MESSAGE_PREFIX . $eqLogic->getId();
+  }
+
+  /**
+   * Enregistre un cycle « Pronote injoignable » et prévient si cela dure.
+   *
+   * Le compteur vit en cache : il ne survit pas à un vidage, et c'est très bien —
+   * perdre la trace d'un incident en cours de résorption ne coûte rien.
+   *
+   * @param eqLogic $eqLogic Équipement concerné.
+   * @param string  $reason  Message rendu par le démon (déjà rédigé pour l'utilisateur).
+   * @return bool true si un message vient d'être créé.
+   */
+  public static function declareUnreachable($eqLogic, $reason = '')
+  {
+    $key = self::unreachableCacheKey($eqLogic);
+    $etat = cache::byKey($key)->getValue(array());
+    if (!is_array($etat)) {
+      $etat = array();
+    }
+    $compte  = isset($etat['count']) ? (int) $etat['count'] : 0;
+    $depuis  = isset($etat['since']) && (int) $etat['since'] > 0 ? (int) $etat['since'] : time();
+    $prevenu = !empty($etat['notified']);
+
+    $compte++;
+    $duree = time() - $depuis;
+    $cree  = false;
+
+    if (!$prevenu && ($compte >= self::UNREACHABLE_CYCLES || $duree >= self::UNREACHABLE_DELAY)) {
+      message::add(
+        __CLASS__,
+        '[' . $eqLogic->getHumanName() . '] ' . sprintf(
+          __('Pronote ne répond plus depuis %d relevés. Rien à faire de votre côté : ni le jeton ni vos identifiants ne sont en cause. Le plugin réessaie à chaque cycle et reprendra seul dès que le serveur répondra. Si cela dure plus d\'une journée, vérifiez que Pronote est joignable depuis un navigateur.', __FILE__),
+          $compte
+        ),
+        '',
+        self::unreachableMessageId($eqLogic)
+      );
+      $prevenu = true;
+      $cree = true;
+    }
+
+    cache::set(
+      $key,
+      array('count' => $compte, 'since' => $depuis, 'notified' => $prevenu),
+      self::UNREACHABLE_CACHE_LIFETIME
+    );
+
+    log::add(__CLASS__, 'warning', '[INJOIGNABLE] ' . $eqLogic->getHumanName() . ' - '
+      . ($reason != '' ? $reason : 'Pronote injoignable') . ' (' . $compte . ' relevé'
+      . ($compte > 1 ? 's' : '') . ' consécutif' . ($compte > 1 ? 's' : '') . ').');
+
+    return $cree;
+  }
+
+  /**
+   * Referme l'incident : appelée dès qu'un relevé aboutit.
+   *
+   * @param eqLogic $eqLogic
+   * @return bool true si un incident était en cours.
+   */
+  public static function clearUnreachable($eqLogic)
+  {
+    $key = self::unreachableCacheKey($eqLogic);
+    $etat = cache::byKey($key)->getValue(array());
+    if (!is_array($etat) || empty($etat['count'])) {
+      return false;
+    }
+    $compte = (int) $etat['count'];
+    cache::set($key, array('count' => 0, 'since' => 0, 'notified' => false), self::UNREACHABLE_CACHE_LIFETIME);
+    message::removeAll(__CLASS__, self::unreachableMessageId($eqLogic));
+    log::add(__CLASS__, 'info', 'Pronote répond de nouveau pour ' . $eqLogic->getHumanName()
+      . ' après ' . $compte . ' relevé' . ($compte > 1 ? 's' : '') . ' sans réponse.');
+    return true;
+  }
+
   /**
    * Tâche planifiée (cron) exécutée toutes les heures par Jeedom.
    *
@@ -1158,17 +1272,20 @@ class ProJote extends eqLogic
     if (is_object($cmdStatut)) {
       $statut = trim((string) $cmdStatut->execCmd());
       // Tout ce qui ne commence pas par « Connecté » est un état à signaler :
-      // « Déconnecté : … », « Erreur : … », « IP suspendue — reprise à … ».
+      // « Déconnecté : … », « Erreur : … », « IP suspendue — reprise à … »,
+      // « Pronote injoignable ».
       if ($statut !== '' && stripos($statut, 'Connecté') !== 0) {
-        $estSuspension = (stripos($statut, 'IP suspendue') !== false);
+        // Une suspension d'IP et un serveur injoignable se résorbent seuls ; un
+        // jeton refusé demande une action. Le widget ne doit pas presser
+        // l'utilisateur dans les deux premiers cas.
+        $seResorbeSeul = (stripos($statut, 'IP suspendue') !== false)
+          || (stripos($statut, 'injoignable') !== false);
         $widgetData['alerte'] = array(
           'message' => $statut,
           // Date du dernier CHANGEMENT de valeur, pas de la dernière collecte :
           // c'est « depuis quand est-ce cassé », pas « quand a-t-on regardé ».
           'depuis'  => $cmdStatut->getValueDate(),
-          // Une suspension d'IP se résorbe seule ; un jeton refusé demande une
-          // action. Le widget ne doit pas presser l'utilisateur dans le premier cas.
-          'action'  => $estSuspension ? 'attendre' : 'revalider',
+          'action'  => $seResorbeSeul ? 'attendre' : 'revalider',
         );
       }
     }

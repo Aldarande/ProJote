@@ -64,6 +64,11 @@ jobs:
           php-version: "8.1"
       - name: php -l sur les fichiers PHP
         run: find core -name '*.php' -print0 | xargs -0 -r -n1 php -l
+      - name: Essai de la temporisation « Pronote injoignable »
+        # Le job pytest n'a pas d'interpréteur PHP, celui-ci en a un : c'est
+        # donc ici que tourne le seul scénario PHP du dépôt. Le test pytest
+        # homonyme le relance sur les postes qui ont php.
+        run: php tests/php/essai_unreachable.php
 
   test:
     name: Tests unitaires (pytest)

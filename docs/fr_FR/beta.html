@@ -296,6 +296,42 @@
 </div>
 
 
+<h2>Une panne réseau n'est plus une session expirée <span class="badge badge-fix">1.7.2</span></h2>
+<p>Le 20 octobre, le journal d'un équipement raconte une panne de Pronote, et le centre de
+messages une tout autre histoire :</p>
+<pre><code>15:02 ERROR  traitement abandonné (timeout dur 120s, Pronote/ENT injoignable ?)
+16:17 ERROR  Connexion au jeton impossible : ('Connection aborted.',
+             TimeoutError(110, 'Connection timed out'))
+16:17 ERROR  Tous les jetons disponibles ont été refusés pour l'équipement 767.
+→ centre de messages : « Session expirée — Veuillez rescanner le QR code ou
+  re-valider les identifiants. »</code></pre>
+<p>À 17 h, le relevé suivant s'est reconnecté <strong>sans aucune action</strong>. Le jeton
+n'avait jamais été en cause : le serveur de l'établissement ne répondait pas. Le plugin savait
+pourtant reconnaître un incident passager — il s'en servait pour épargner le jeton de secours,
+puis l'oubliait trois lignes plus loin et retombait dans le chemin « jeton refusé ».</p>
+<ul>
+    <li><strong>Un statut à part.</strong> Un serveur qui ne répond pas donne « Pronote
+    injoignable » : le widget signale que les données sont figées, sans presser de revalider
+    quoi que ce soit — exactement ce qu'il fait déjà pour une suspension d'adresse IP.</li>
+    <li><strong>Le compteur d'échecs n'est plus alimenté.</strong> Deux cycles perdus sur une
+    panne réseau rapprochaient du blocage « Token expiré. Trop de tentatives échouées » — et
+    celui-là, il faut vraiment rescanner pour en sortir. Le timeout dur de 120 s comptait lui
+    aussi un échec ; plus maintenant.</li>
+    <li><strong>Un seul message, et seulement si cela dure.</strong> Trois relevés sans réponse
+    (ou six heures) valent un message, qui s'efface de lui-même au premier relevé réussi.
+    Jusqu'ici, chaque cycle en empilait un.</li>
+    <li><strong>Le journal passe en avertissement.</strong> Une panne chez l'hébergeur du
+    collège n'est pas une erreur du plugin.</li>
+</ul>
+<p>Quand Pronote refuse vraiment la connexion, le message ne tranche plus non plus : il dit
+« Pronote a refusé la connexion. Si cela se répète au prochain cycle, revalidez le compte (QR
+code ou identifiants) ». PRONOTE n'explique pas ses refus, et un refus isolé se répare le plus
+souvent seul au relevé suivant — c'est d'ailleurs ce que fait le jeton de secours, sans rien
+demander à personne.</p>
+<p>Trente-et-un tests gardent la frontière, dont le timeout dur du worker et la trace exacte
+du 20 octobre.</p>
+
+
 <h2>« Alertes » se sépare en deux <span class="badge badge-new">1.7.1</span></h2>
 <p>L'onglet <em>Alertes</em> empilait deux sections de nature différente : « Événements
 ProJote » — ce que le plugin repère lui-même en comparant deux relevés — et
@@ -1248,10 +1284,19 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
                 </td>
             </tr>
             <tr>
-                <td>Session expirée (message dans le centre)</td>
+                <td>Connexion refusée (message dans le centre)</td>
                 <td>
                     Depuis la v0.9, un token de secours est utilisé automatiquement.<br>
-                    Si l'erreur persiste, re-validez la connexion depuis la configuration de l'équipement.
+                    Si l'erreur persiste au relevé suivant, re-validez la connexion depuis la configuration de l'équipement.
+                </td>
+            </tr>
+            <tr>
+                <td>Pronote injoignable</td>
+                <td>
+                    Le serveur de l'établissement (ou son ENT) ne répond pas. Ni le jeton ni vos
+                    identifiants ne sont en cause : <strong>rien à faire</strong>, le plugin
+                    réessaie à chaque relevé et reprend seul.<br>
+                    Si cela dure plus d'une journée, vérifiez que Pronote s'ouvre depuis un navigateur.
                 </td>
             </tr>
             <tr>

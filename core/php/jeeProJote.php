@@ -17,7 +17,8 @@
  *
  * Ce fichier reçoit un JSON structuré contenant :
  *  - CmdId             : ID de l'équipement Jeedom à mettre à jour
- *  - connection_status : 'connected', 'disconnected', 'error' ou 'ip_suspended'
+ *  - connection_status : 'connected', 'disconnected', 'unreachable', 'error'
+ *                        ou 'ip_suspended'
  *  - ip_suspended_until : fin de la fenêtre de pause (timestamp) si IP suspendue
  *  - ConnectionDate    : Date/heure de la dernière connexion réussie
  *  - Eleve             : Infos élève (Nom_Eleve, Nom_Classe, Etablissement)
@@ -121,6 +122,24 @@ try {
         die();
     }
 
+    // ===== PRONOTE OU L'ENT NE RÉPOND PAS =====
+    // Un serveur injoignable n'est pas un jeton refusé : il n'y a rien à rescanner,
+    // et le relevé suivant se reconnecte le plus souvent tout seul. On met donc le
+    // statut à jour — le widget doit dire qu'il montre des données figées — mais on
+    // n'alimente le centre de messages qu'au bout de plusieurs relevés consécutifs.
+    if ($connection_status === 'unreachable') {
+        $error_message = isset($result['error']) ? $result['error'] : __('Pronote injoignable', __FILE__);
+
+        if ($eqLogic->getCmd(null, 'Statut_Connexion')) {
+            $eqLogic->checkAndUpdateCmd('Statut_Connexion', __('Pronote injoignable', __FILE__));
+        }
+
+        ProJote::declareUnreachable($eqLogic, $error_message);
+
+        // Fin du traitement - données non traitées
+        die();
+    }
+
     if ($connection_status === 'disconnected' || $connection_status === 'error') {
         $error_message = isset($result['error']) ? $result['error'] : 'Raison non spécifiée';
 
@@ -134,7 +153,7 @@ try {
 
         // Log le statut avec différenciation claire
         if ($connection_status === 'disconnected') {
-            log::add('ProJote', 'warning', '[SESSION EXPIRÉE] ' . $eqLogic->getHumanName() . ' - ' . $error_message);
+            log::add('ProJote', 'warning', '[CONNEXION REFUSÉE] ' . $eqLogic->getHumanName() . ' - ' . $error_message);
         } else {
             log::add('ProJote', 'error', '[CONNEXION ÉCHOUÉE] ' . $eqLogic->getHumanName() . ' - ' . $error_message);
         }
@@ -142,9 +161,12 @@ try {
         // Ajoute un message au centre de messages Jeedom
         // Signature: message::add($_type, $_message, $_action='', $_logicalId='')
         if ($connection_status === 'disconnected') {
+            // Le texte vient du démon : lui seul sait ce que Pronote a répondu.
+            // Un message figé « Session expirée — rescannez le QR code » affirmait
+            // une cause unique là où le serveur n'en donne aucune.
             message::add(
                 'ProJote',
-                '[' . $eqLogic->getHumanName() . '] Session expirée — Veuillez rescanner le QR code ou re-valider les identifiants.'
+                '[' . $eqLogic->getHumanName() . '] ' . $error_message
             );
         } else {
             message::add(
@@ -169,6 +191,9 @@ try {
         // Pronote répond de nouveau : on referme une éventuelle fenêtre de pause
         // et on retire le message d'alerte du centre de messages.
         ProJote::clearIpSuspension();
+        // Idem pour un incident « injoignable » en cours : le compteur de relevés
+        // sans réponse repart de zéro et le message est retiré.
+        ProJote::clearUnreachable($eqLogic);
         if ($eqLogic->getCmd(null, 'Statut_Connexion')) {
             $eqLogic->checkAndUpdateCmd('Statut_Connexion', 'Connecté');
         }

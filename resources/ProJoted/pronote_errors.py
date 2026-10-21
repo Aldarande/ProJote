@@ -86,6 +86,61 @@ IP_SUSPENSION_MESSAGE = (
     "(trop de connexions en peu de temps)"
 )
 
+# ── Serveur injoignable ──────────────────────────────────────────────────────
+# Un serveur Pronote ou un ENT qui ne répond pas n'est pas un jeton refusé. Le
+# 20 octobre 2026, deux cycles perdus sur un timeout de 120 s ont fait annoncer
+# « Session expirée — rescannez le QR code » sur un compte dont le jeton était
+# parfaitement valide : le cycle suivant s'est reconnecté sans aucune action.
+# D'où un libellé distinct, qui dit ce qui s'est passé et qu'il n'y a rien à
+# faire.
+INJOIGNABLE_MESSAGE = "Pronote injoignable"
+
+# Motif le plus fréquent, et le seul que le démon nomme de lui-même : le timeout
+# dur par équipement expire sans qu'aucune exception ne soit levée.
+MOTIF_DELAI = "délai dépassé"
+
+# Fragments désignant un délai dépassé dans le texte d'une exception réseau.
+# Relevé en production : « ('Connection aborted.', TimeoutError(110, 'Connection
+# timed out')) ».
+_MARQUEURS_DELAI = ("timed out", "timeout", "délai")
+
+
+def motif_injoignable(exc=None):
+    """Nomme en français la raison pour laquelle Pronote n'a pas répondu.
+
+    Args:
+        exc: exception réseau d'origine (facultative).
+
+    Returns:
+        str: motif court, ou chaîne vide si l'exception ne le dit pas.
+    """
+    texte = str(exc).lower() if exc is not None else ""
+    if any(marqueur in texte for marqueur in _MARQUEURS_DELAI):
+        return MOTIF_DELAI
+    return ""
+
+
+def message_injoignable(exc=None, motif=None):
+    """Phrase rendue à l'utilisateur quand Pronote n'a pas répondu.
+
+    Elle part dans le widget et dans le centre de messages : elle doit dire que
+    l'incident vient d'en face, et qu'il se résorbe seul.
+
+    Args:
+        exc: exception réseau d'origine (facultative).
+        motif: motif déjà connu de l'appelant, qui court-circuite la lecture de
+            l'exception — le timeout dur du worker n'en lève aucune.
+
+    Returns:
+        str: message prêt à être affiché.
+    """
+    if motif is None:
+        motif = motif_injoignable(exc)
+    return "%s%s — nouvel essai au prochain cycle" % (
+        INJOIGNABLE_MESSAGE,
+        " (%s)" % motif if motif else "",
+    )
+
 
 class SuspensionIP(BaseException):
     """Suspension d'IP rencontrée en cours de cycle : le cycle doit s'arrêter.
