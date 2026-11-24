@@ -1029,8 +1029,12 @@ def devoirs(client, fenetre_jours=DEVOIRS_FENETRE_DEFAUT):
 #
 # Un échec ici ne pose jamais de clé « error » : il ferait passer toute la
 # collecte des devoirs pour ratée et rejouer l'ancien relevé.
+#
+# Seuls les contenus qui portent une description ou une pièce jointe sont
+# retenus : un titre seul est le plus souvent un objectif de programme
+# (« Appliquer des principes… ») recopié à chaque séance, sans consigne.
 CONTENU_COURS_JOURS_PASSES = 7  # séances passées prises en compte
-CONTENU_COURS_MAX = 15  # nombre maximum d'entrées remontées
+CONTENU_COURS_MAX = 25  # nombre maximum d'entrées remontées (≈ une semaine)
 
 
 def _val(d, *keys, default=None):
@@ -1089,7 +1093,9 @@ def parse_contenus_cours(entries, lessons_by_id, date_min, date_max, make_files=
                     fichiers = make_files(pieces)
                 except Exception as e:
                     logging.debug("Pièces jointes du contenu illisibles : %s", e)
-            if not (titre or description or fichiers):
+            # Pièce jointe : on se fie à la liste brute, pour ne pas écarter un
+            # contenu dont seule la description des fichiers aurait échoué.
+            if not (description or pieces):
                 continue
             out.append(
                 {

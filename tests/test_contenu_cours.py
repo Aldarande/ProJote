@@ -60,6 +60,27 @@ class TestParseContenusCours:
         assert out[1]["description"] == "Lire p. 42"
         assert "_tri" not in out[0]
 
+    def test_titre_seul_ecarte(self, collecteurs):
+        """Un titre sans description ni pièce jointe est un objectif de programme."""
+        lessons = {"a": _lesson("a", datetime.datetime(2026, 11, 18, 9, 0))}
+        entries = [_entry("a", [
+            _contenu("Appliquer des principes simples"),
+            _contenu("", "", pieces=[{"N": "1"}]),
+        ])]
+        files = lambda pieces: [{"nom": "fiche.pdf", "url": "u", "type": 1}]
+        out = collecteurs.parse_contenus_cours(entries, lessons, D_MIN, D_MAX, files)
+        assert len(out) == 1 and out[0]["fichiers"][0]["nom"] == "fiche.pdf"
+
+    def test_piece_jointe_illisible_garde_le_contenu(self, collecteurs):
+        lessons = {"a": _lesson("a", datetime.datetime(2026, 11, 18, 9, 0))}
+        entries = [_entry("a", [_contenu("Fiche", pieces=[{"N": "1"}])])]
+
+        def boom(pieces):
+            raise RuntimeError("illisible")
+
+        out = collecteurs.parse_contenus_cours(entries, lessons, D_MIN, D_MAX, boom)
+        assert len(out) == 1 and out[0]["fichiers"] == []
+
     def test_tous_les_contenus_d_une_seance(self, collecteurs):
         lessons = {"a": _lesson("a", datetime.datetime(2026, 11, 18, 9, 0))}
         entries = [_entry("a", [_contenu("Partie 1", "x"), _contenu("Partie 2", "y")])]
