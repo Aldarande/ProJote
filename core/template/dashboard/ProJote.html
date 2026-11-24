@@ -460,12 +460,20 @@
        à la ligne, les derniers onglets sortaient simplement du cadre — ni
        visibles, ni défilables, donc inatteignables. Mesuré sur une tuile de
        368 px : cinq onglets sur onze hors d'atteinte, dont les compétences.
-       Le défilement horizontal aurait aussi marché, mais il cache la moitié
-       de la navigation derrière un geste que rien n'annonce. */
+       v1.8.0 : avec treize onglets, le retour à la ligne donnait deux
+       rangées, voire trois, qui mangeaient la hauteur de la tuile. La barre
+       tient de nouveau sur une ligne et défile horizontalement. Pour que
+       les onglets cachés ne soient pas perdus, l'ascenseur reste visible,
+       la molette fait défiler la barre, et l'onglet actif est ramené dans
+       le cadre. */
     .pjw-#id# .tab-btns {
         display: flex;
-        flex-wrap: wrap;
-        row-gap: 2px;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        overscroll-behavior-x: contain;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(var(--contrast-color), .35) transparent;
         margin-bottom: 10px;
         background: rgba(var(--contrast-color), .07);
         border-radius: 8px;
@@ -491,9 +499,24 @@
         align-items: center;
         gap: 3px;
         transition: opacity .15s, background .15s;
-        flex: 1;
+        /* Occupe la place libre sur une tuile large, sans jamais rétrécir
+           sous sa largeur naturelle : au-delà, la barre défile. */
+        flex: 1 0 auto;
         justify-content: center;
         white-space: nowrap;
+    }
+
+    .pjw-#id# .tab-btns::-webkit-scrollbar {
+        height: 5px;
+    }
+
+    .pjw-#id# .tab-btns::-webkit-scrollbar-thumb {
+        background: rgba(var(--contrast-color), .35);
+        border-radius: 3px;
+    }
+
+    .pjw-#id# .tab-btns::-webkit-scrollbar-track {
+        background: transparent;
     }
 
     /* .tab-btn i hérite du parent (.tab-btn = 0.83em) → 0.9em donne ~9px */
@@ -2411,9 +2434,32 @@
                 if (defPane) defPane.classList.add('active');
             }
 
+            /* Barre d'onglets défilante : ramener un onglet dans le cadre sans
+               scrollIntoView, qui ferait aussi défiler la page entière. */
+            var barre = tabsEl.querySelector('.tab-btns');
+            function montrerOnglet(btn) {
+                if (!barre || !btn) return;
+                var g = btn.offsetLeft - barre.offsetLeft;
+                var d = g + btn.offsetWidth;
+                if (g < barre.scrollLeft) barre.scrollLeft = g - 8;
+                else if (d > barre.scrollLeft + barre.clientWidth) barre.scrollLeft = d - barre.clientWidth + 8;
+            }
+            setTimeout(function () { montrerOnglet(tabsEl.querySelector('.tab-btn.active')); }, 0);
+            /* À la souris, la molette verticale fait défiler la barre — sinon
+               les onglets cachés ne s'atteignent qu'en visant l'ascenseur. La
+               page ne défile pas tant que la barre peut encore avancer. */
+            if (barre) barre.addEventListener('wheel', function (e) {
+                if (barre.scrollWidth <= barre.clientWidth || Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+                var max = barre.scrollWidth - barre.clientWidth;
+                if ((e.deltaY < 0 && barre.scrollLeft <= 0) || (e.deltaY > 0 && barre.scrollLeft >= max - 1)) return;
+                e.preventDefault();
+                barre.scrollLeft += e.deltaY;
+            }, { passive: false });
+
             tabsEl.addEventListener('click', function (e) {
                 var btn = e.target.closest('.tab-btn');
                 if (!btn) return;
+                montrerOnglet(btn);
                 var target = btn.getAttribute('data-tab');
                 tabsEl.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('active'); });
                 tabsEl.querySelectorAll('.tab-pane').forEach(function (p) { p.classList.remove('active'); });
