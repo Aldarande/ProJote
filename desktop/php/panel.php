@@ -175,16 +175,29 @@ $jsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APO
     #pj-panel .pj-txt { font-size:.8em; opacity:.7; word-break:break-word; margin-top:2px; }
     #pj-panel .pj-li-tete { display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
     #pj-panel .pj-li-tete .meta { white-space:nowrap; opacity:.6; }
-    #pj-panel .pj-depliable { cursor:pointer; }
+    #pj-panel .pj-ctitre { font-style:italic; }
     #pj-panel .pj-clamp { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3; line-clamp:3; overflow:hidden; }
     #pj-panel .pj-clamp.pj-clamp-2 { -webkit-line-clamp:2; line-clamp:2; }
     #pj-panel .pj-ouvert .pj-clamp { display:block; -webkit-line-clamp:unset; line-clamp:unset; }
-    #pj-panel .pj-pj { display:flex; flex-wrap:wrap; gap:4px; margin-top:4px; }
-    #pj-panel .pj-pj a {
-        font-size:.75em; padding:1px 7px; border-radius:9px; text-decoration:none;
-        background:rgba(52,152,219,.12); color:#3498db;
+    /* Seules les entrées réellement coupées se déplient : elles seules reçoivent
+       la classe pj-tronque (posée après rendu), le curseur et le chevron. */
+    #pj-panel .pj-tronque { cursor:pointer; position:relative; padding-right:18px; }
+    #pj-panel .pj-tronque::after {
+        content:'\25BE'; position:absolute; right:2px; top:7px; opacity:.5; transition:transform .2s;
+    }
+    #pj-panel .pj-tronque.pj-ouvert::after { transform:rotate(180deg); }
+    #pj-panel .pj-tronque:focus-visible { outline:2px solid var(--pj-green); outline-offset:2px; }
+    /* Pièces jointes d'un devoir ou d'un contenu de cours. Nom distinct de
+       .pj-pj, déjà pris par les pastilles des actualités. Couleurs du thème,
+       hauteur suffisante pour le doigt. */
+    #pj-panel .pj-fichiers { display:flex; flex-wrap:wrap; gap:6px; margin-top:5px; }
+    #pj-panel .pj-fichiers a {
+        display:inline-block; font-size:.75em; padding:4px 8px; min-height:24px; line-height:16px;
+        border-radius:11px; text-decoration:none; color:inherit;
+        background:rgba(128,128,128,.12); border:1px solid rgba(128,128,128,.2);
         max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
     }
+    #pj-panel .pj-fichiers a:hover { background:rgba(128,128,128,.22); }
 
     #pj-panel .pj-ical {
         display:inline-flex; align-items:center; gap:7px; padding:8px 14px;
@@ -286,7 +299,7 @@ $jsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APO
     function piecesJointes(fichiers) {
         fichiers = asArray(fichiers);
         if (!fichiers.length) return '';
-        return '<div class="pj-pj">' + fichiers.map(function (f) {
+        return '<div class="pj-fichiers">' + fichiers.map(function (f) {
             return '<a href="' + esc(f.url) + '" target="_blank" rel="noopener" title="' + esc(f.nom) + '">' +
                    (f.type === 0 ? '🔗' : '📎') + ' ' + esc(f.nom) + '</a>';
         }).join('') + '</div>';
@@ -302,7 +315,7 @@ $jsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APO
             var quand = (c.date || '') + (c.heure ? ' · ' + c.heure : '');
             h += '<li class="pj-depliable"><div class="pj-li-tete"><strong>' + esc(c.title || '–') + '</strong>' +
                  (quand ? '<small class="meta">' + esc(quand) + '</small>' : '') + '</div>' +
-                 (titre ? '<div class="pj-txt pj-clamp pj-clamp-2" style="font-style:italic">' + esc(titre) + '</div>' : '') +
+                 (titre ? '<div class="pj-txt pj-ctitre pj-clamp pj-clamp-2">' + esc(titre) + '</div>' : '') +
                  (c.description ? '<div class="pj-txt pj-clamp">' + esc(c.description) + '</div>' : '') +
                  piecesJointes(c.fichiers) +
                  '</li>';
@@ -477,11 +490,40 @@ $jsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APO
     tabs.innerHTML = tabsHtml;
     panes.innerHTML = panesHtml;
 
-    // Un clic sur un devoir ou un contenu de cours déplie son texte (hors liens)
+    /* Devoirs et contenus de cours dépliables : seules les entrées dont le texte
+       est réellement coupé le deviennent. La mesure se fait élève par élève, à
+       l'affichage de son onglet : un onglet masqué n'a pas de hauteur. */
+    function marquerTronques(racine) {
+        racine.querySelectorAll('.pj-depliable').forEach(function (li) {
+            if (li.classList.contains('pj-tronque')) return;
+            var coupe = [].some.call(li.querySelectorAll('.pj-clamp'), function (t) {
+                return t.scrollHeight > t.clientHeight + 1;
+            });
+            if (!coupe) return;
+            li.classList.add('pj-tronque');
+            li.setAttribute('role', 'button');
+            li.setAttribute('tabindex', '0');
+            li.setAttribute('aria-expanded', 'false');
+        });
+    }
+    function basculer(li) {
+        var ouvert = li.classList.toggle('pj-ouvert');
+        li.setAttribute('aria-expanded', ouvert ? 'true' : 'false');
+    }
+    var actif = panes.querySelector('.pj-student.active');
+    if (actif) marquerTronques(actif);
+
+    // Clic ou Entrée/Espace sur une entrée coupée : déplie ou replie (hors liens)
     panes.addEventListener('click', function (e) {
         if (e.target.closest('a')) return;
-        var li = e.target.closest('.pj-depliable');
-        if (li) li.classList.toggle('pj-ouvert');
+        var li = e.target.closest('.pj-tronque');
+        if (li) basculer(li);
+    });
+    panes.addEventListener('keydown', function (e) {
+        if ((e.key === 'Enter' || e.key === ' ') && e.target.classList.contains('pj-tronque')) {
+            e.preventDefault();
+            basculer(e.target);
+        }
     });
 
     tabs.addEventListener('click', function (e) {
@@ -490,7 +532,9 @@ $jsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APO
         tabs.querySelectorAll('.pj-tab').forEach(function (x) { x.classList.remove('active'); });
         panes.querySelectorAll('.pj-student').forEach(function (x) { x.classList.remove('active'); });
         t.classList.add('active');
-        panes.querySelector('.pj-student[data-i="' + i + '"]').classList.add('active');
+        var pane = panes.querySelector('.pj-student[data-i="' + i + '"]');
+        pane.classList.add('active');
+        marquerTronques(pane);
     });
 
     // Actualiser : déclenche la commande refresh de chaque élève (si jeedom dispo), puis recharge.
