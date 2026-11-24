@@ -324,6 +324,23 @@ se remplissent au relevé qui suit la mise à jour. Si Pronote refuse le cahier 
 devoirs ne sont pas perdus pour autant : seul le contenu reste vide.</p>
 
 
+<h2>Lisible en thème clair comme en sombre <span class="badge badge-fix">1.8.0</span></h2>
+<p>Les contrastes du widget ont été mesurés texte par texte, sur les deux thèmes de Jeedom.
+Le seuil de lisibilité est 4,5 :</p>
+<pre><code>                         clair          sombre
+Texte d'un devoir        2,26 → 4,81    3,31 → 6,89
+Date d'un devoir         1,96 → 5,99    2,79 → 6,89
+Date d'une note          1,56 → 5,99    — → 5,02
+Onglet inactif           2,17 → 7,25    3,15 → 5,60
+Note en vert             2,09 → 4,90    3,62 → 4,95
+Note en orange           2,08 → 5,22    3,64 → 5,12
+Note en rouge            2,66 → 4,61    2,92 → 5,05</code></pre>
+<p>La cause était double : Jeedom écrit en gris moyen (clair) ou en gris clair (sombre), et le
+widget atténuait encore ce gris pour hiérarchiser ses textes. Le texte part désormais de la
+couleur de contraste du thème, et aucune atténuation ne descend sous 0,72. Restent sous le seuil,
+volontairement, la couleur d'accent (un réglage) et la pièce jointe restée chez Pronote.</p>
+
+
 <h2>Une panne réseau n'est plus une session expirée <span class="badge badge-fix">1.7.2</span></h2>
 <p>Le 20 octobre, le journal d'un équipement raconte une panne de Pronote, et le centre de
 messages une tout autre histoire :</p>
