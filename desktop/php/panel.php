@@ -80,6 +80,26 @@ $jsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APO
            ligne de texte, alignee sur la liste des notes. */
         align-items:start;
     }
+    /* Sections d'un élève (notes, devoirs, contenu des cours, punitions…) :
+       une seule rangée qui défile horizontalement, l'ascenseur en haut. En
+       grille, elles passaient sur deux ou trois rangées et poussaient les
+       dernières loin sous l'emploi du temps. L'ascenseur est placé au-dessus
+       en retournant la rangée (rotateX), puis chaque carte dans l'autre sens :
+       c'est le seul moyen de déplacer celui du navigateur sans le redessiner,
+       et il garde ainsi le style que Jeedom lui donne. */
+    #pj-panel .pj-defile {
+        /* Retournée, la rangée a son haut en bas : flex-end aligne donc les
+           cartes en haut à l'écran, et le padding-bottom espace l'ascenseur
+           des cartes. */
+        display:flex; gap:16px; align-items:flex-end;
+        overflow-x:auto; overflow-y:hidden; padding-bottom:8px; margin-bottom:16px;
+        transform:rotateX(180deg);
+        scroll-snap-type:x proximity; overscroll-behavior-x:contain;
+    }
+    #pj-panel .pj-defile > .pj-card {
+        transform:rotateX(180deg);
+        flex:0 0 340px; max-width:85vw; scroll-snap-align:start;
+    }
     #pj-panel .pj-card {
         border:1px solid rgba(128,128,128,.22); border-radius:12px; overflow:hidden;
         background:rgba(127,127,127,.04); box-shadow:0 2px 6px rgba(0,0,0,.06);
@@ -448,8 +468,8 @@ $jsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APO
              carte('fa-calendar-alt', '{{Emploi du temps — prochain jour}}',
                    edtTable(d.edt_prochainjour), '{{Pas de cours}}', quand) + '</div>';
 
-        // Notes / Devoirs / Punitions / Carnet
-        h += '<div class="pj-grid">';
+        // Notes / Devoirs / Contenu des cours / Punitions / Carnet… : rangée défilante
+        h += '<div class="pj-defile">';
         h += carte('fa-star', '{{Dernières notes}}', notesList(d.notes), '{{Aucune note}}');
         h += carte('fa-book', '{{Devoirs}}', homeworkList(d), '{{Aucun devoir}}');
         h += carte('fa-book-open', '{{Contenu des cours}}', contenusList(d.contenus_cours), '{{Aucun contenu de cours}}');
@@ -466,7 +486,7 @@ $jsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APO
             h += '<div class="pj-card"><div class="pj-card-h"><i class="fas fa-calendar-check"></i> {{Calendrier ICAL}}</div>' +
                  '<div class="pj-card-b"><a class="pj-ical" href="' + esc(ical) + '" target="_blank"><i class="fas fa-download"></i> {{S\'abonner}}</a></div></div>';
         }
-        h += '</div>'; // grid
+        h += '</div>'; // rangée défilante
 
         return h;
     }
