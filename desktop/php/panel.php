@@ -183,7 +183,7 @@ $jsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APO
        la classe pj-tronque (posée après rendu), le curseur et le chevron. */
     #pj-panel .pj-tronque { cursor:pointer; position:relative; padding-right:18px; }
     #pj-panel .pj-tronque::after {
-        content:'\25BE'; position:absolute; right:2px; top:7px; opacity:.5; transition:transform .2s;
+        content:'▾'; position:absolute; right:2px; top:7px; opacity:.5; transition:transform .2s;
     }
     #pj-panel .pj-tronque.pj-ouvert::after { transform:rotate(180deg); }
     #pj-panel .pj-tronque:focus-visible { outline:2px solid var(--pj-green); outline-offset:2px; }
