@@ -460,21 +460,12 @@
        à la ligne, les derniers onglets sortaient simplement du cadre — ni
        visibles, ni défilables, donc inatteignables. Mesuré sur une tuile de
        368 px : cinq onglets sur onze hors d'atteinte, dont les compétences.
-       v1.8.0 : avec treize onglets, le retour à la ligne donnait deux
-       rangées, voire trois, qui mangeaient la hauteur de la tuile. La barre
-       tient de nouveau sur une ligne et défile horizontalement. Pour que
-       les onglets cachés ne soient pas perdus, un ascenseur dessiné par le
-       widget (.tab-ascenseur) remplace celui du navigateur : ce dernier
-       sortait gris pâle sur fond gris, et Android comme iOS le masquent
-       tant qu'on ne fait pas défiler. La molette fait défiler la barre, et
-       l'onglet actif est ramené dans le cadre. */
+       Le défilement horizontal aurait aussi marché, mais il cache la moitié
+       de la navigation derrière un geste que rien n'annonce. */
     .pjw-#id# .tab-btns {
         display: flex;
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        overflow-y: hidden;
-        overscroll-behavior-x: contain;
-        scrollbar-width: none;
+        flex-wrap: wrap;
+        row-gap: 2px;
         margin-bottom: 10px;
         background: rgba(var(--contrast-color), .07);
         border-radius: 8px;
@@ -500,54 +491,9 @@
         align-items: center;
         gap: 3px;
         transition: opacity .15s, background .15s;
-        /* Occupe la place libre sur une tuile large, sans jamais rétrécir
-           sous sa largeur naturelle : au-delà, la barre défile. */
-        flex: 1 0 auto;
+        flex: 1;
         justify-content: center;
         white-space: nowrap;
-    }
-
-    .pjw-#id# .tab-btns::-webkit-scrollbar {
-        display: none;
-    }
-
-    /* Ascenseur de la barre d'onglets, affiché seulement quand elle déborde.
-       La piste garde une hauteur de 12 px pour viser au doigt ; le trait
-       visible n'en fait que 4. */
-    .pjw-#id# .tab-ascenseur {
-        position: relative;
-        height: 12px;
-        margin: -8px 2px 4px;
-        cursor: pointer;
-        touch-action: none;
-    }
-
-    .pjw-#id# .tab-ascenseur[hidden] {
-        display: none;
-    }
-
-    .pjw-#id# .tab-ascenseur::before {
-        content: '';
-        position: absolute;
-        left: 0;
-        right: 0;
-        top: 4px;
-        height: 4px;
-        border-radius: 2px;
-        background: rgba(var(--contrast-color), .10);
-    }
-
-    .pjw-#id# .tab-curseur {
-        position: absolute;
-        top: 4px;
-        height: 4px;
-        border-radius: 2px;
-        background: var(--pjw-a);
-        opacity: .75;
-    }
-
-    .pjw-#id# .tab-ascenseur:hover .tab-curseur {
-        opacity: 1;
     }
 
     /* .tab-btn i hérite du parent (.tab-btn = 0.83em) → 0.9em donne ~9px */
@@ -1293,7 +1239,6 @@
             <button class="tab-btn" data-tab="alertes#id#"><i class="fas fa-bell"></i> Évèn.<span class="tab-badge"
                     id="pjwbalertes#id#"></span></button>
         </div>
-        <div class="tab-ascenseur" aria-hidden="true" hidden><div class="tab-curseur"></div></div>
 
         <!-- Devoirs (défaut) -->
         <div class="tab-pane active" id="dv#id#">
@@ -2466,73 +2411,9 @@
                 if (defPane) defPane.classList.add('active');
             }
 
-            /* Barre d'onglets défilante : ramener un onglet dans le cadre sans
-               scrollIntoView, qui ferait aussi défiler la page entière. */
-            var barre = tabsEl.querySelector('.tab-btns');
-            function montrerOnglet(btn) {
-                if (!barre || !btn) return;
-                var g = btn.offsetLeft - barre.offsetLeft;
-                var d = g + btn.offsetWidth;
-                if (g < barre.scrollLeft) barre.scrollLeft = g - 8;
-                else if (d > barre.scrollLeft + barre.clientWidth) barre.scrollLeft = d - barre.clientWidth + 8;
-            }
-            setTimeout(function () { montrerOnglet(tabsEl.querySelector('.tab-btn.active')); }, 0);
-            /* À la souris, la molette verticale fait défiler la barre — sinon
-               les onglets cachés ne s'atteignent qu'en visant l'ascenseur. La
-               page ne défile pas tant que la barre peut encore avancer. */
-            if (barre) barre.addEventListener('wheel', function (e) {
-                if (barre.scrollWidth <= barre.clientWidth || Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
-                var max = barre.scrollWidth - barre.clientWidth;
-                if ((e.deltaY < 0 && barre.scrollLeft <= 0) || (e.deltaY > 0 && barre.scrollLeft >= max - 1)) return;
-                e.preventDefault();
-                barre.scrollLeft += e.deltaY;
-            }, { passive: false });
-
-            /* Ascenseur dessiné : suit le défilement, et se manipule — un appui
-               sur la piste y amène la barre, un glissé la fait suivre. */
-            var piste = tabsEl.querySelector('.tab-ascenseur');
-            var curseur = piste && piste.querySelector('.tab-curseur');
-            function majAscenseur() {
-                if (!barre || !piste || !curseur) return;
-                var total = barre.scrollWidth, vu = barre.clientWidth;
-                if (total <= vu + 1) { piste.hidden = true; return; }
-                piste.hidden = false;
-                var l = piste.clientWidth;
-                var w = Math.max(24, l * vu / total);
-                curseur.style.width = w + 'px';
-                curseur.style.left = ((l - w) * barre.scrollLeft / (total - vu)) + 'px';
-            }
-            function allerA(x) {
-                var r = piste.getBoundingClientRect();
-                var w = curseur.offsetWidth;
-                var f = Math.min(1, Math.max(0, (x - r.left - w / 2) / Math.max(1, r.width - w)));
-                barre.scrollLeft = f * (barre.scrollWidth - barre.clientWidth);
-            }
-            if (barre && piste) {
-                barre.addEventListener('scroll', majAscenseur, { passive: true });
-                if (window.ResizeObserver) new ResizeObserver(majAscenseur).observe(barre);
-                else window.addEventListener('resize', majAscenseur);
-                piste.addEventListener('pointerdown', function (e) {
-                    e.preventDefault();
-                    allerA(e.clientX);
-                    try { piste.setPointerCapture(e.pointerId); } catch (_) { }
-                    function suivre(ev) { allerA(ev.clientX); }
-                    function lacher() {
-                        piste.removeEventListener('pointermove', suivre);
-                        piste.removeEventListener('pointerup', lacher);
-                        piste.removeEventListener('pointercancel', lacher);
-                    }
-                    piste.addEventListener('pointermove', suivre);
-                    piste.addEventListener('pointerup', lacher);
-                    piste.addEventListener('pointercancel', lacher);
-                });
-                setTimeout(majAscenseur, 0);
-            }
-
             tabsEl.addEventListener('click', function (e) {
                 var btn = e.target.closest('.tab-btn');
                 if (!btn) return;
-                montrerOnglet(btn);
                 var target = btn.getAttribute('data-tab');
                 tabsEl.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('active'); });
                 tabsEl.querySelectorAll('.tab-pane').forEach(function (p) { p.classList.remove('active'); });
@@ -2652,9 +2533,6 @@
                         btn.style.display = 'none';
                     }
                 });
-                // Des onglets masqués changent la longueur de la barre : l'ascenseur se recalcule
-                var barreOnglets = tabsEl.querySelector('.tab-btns');
-                if (barreOnglets) barreOnglets.dispatchEvent(new Event('scroll'));
             }
             // Badges sur les onglets
             setBadge('pjwbabs' + ID, d.nb_absences);
