@@ -469,6 +469,8 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
             <tr><td>Évènements de vie scolaire <span class="badge badge-new">v1.7.0</span></td><td>info</td><td>Observations, défauts de carnet et mesures conservatoires — les entrées du Carnet que Pronote ne classe pas comme punitions. Trois commandes : la liste, le dernier en date, et le compteur.</td></tr>
             <tr><td>Nb devoirs (fait / non fait)</td><td>info</td><td>Devoirs de la semaine, ventilés par statut</td></tr>
             <tr><td>Nb devoirs demain (fait / non fait)</td><td>info</td><td>Devoirs pour le prochain jour de cours</td></tr>
+            <tr><td>contenu_cours</td><td>info</td><td><em>(v1.8.0)</em> Contenu des séances des 7 derniers jours (cahier de textes), au format JSON : matière, date, heure, titre, description et pièces jointes. Seuls les contenus porteurs d'une description ou d'une pièce jointe sont gardés, 25 au plus.</td></tr>
+            <tr><td>Nb_contenu_cours</td><td>info</td><td><em>(v1.8.0)</em> Nombre de contenus de cours remontés.</td></tr>
             <tr><td>EDT aujourd'hui — début / fin / cours annulés</td><td>info</td><td>Repères horaires de la journée</td></tr>
             <tr><td>EDT prochain jour — date / début / fin / cours annulés</td><td>info</td><td>Informations sur le prochain jour de cours</td></tr>
             <tr><td>EDT J+1 à J+4</td><td>info</td><td>Emploi du temps détaillé sur les 4 prochains jours scolaires</td></tr>
@@ -638,10 +640,11 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
         <li><strong>Vie scolaire</strong> — badges circulaires pour absences, retards, punitions, devoirs non faits</li>
         <li><strong>Emploi du temps</strong> — cours d'aujourd'hui + navigation vers les 4 prochains jours scolaires, nombre de cours annulés depuis la rentrée</li>
         <li><strong>Moyenne générale</strong> — barre dégradée rouge→vert avec tendance (hausse/baisse)</li>
-        <li><strong>Onglets</strong> — Devoirs · Notes · Absences · Retards · Punitions · <strong>Menu cantine</strong> (v1.0.1) · <strong>Messagerie</strong> (v1.0.1) · <strong>Statistiques</strong> (v1.1.0) · <strong>Carnet</strong> · <strong>Notifications</strong> · <strong>Compétences</strong> · <strong>Évènements</strong> (v1.7.1)</li>
+        <li><strong>Onglets</strong> — Devoirs · <strong>Cours</strong> (v1.8.0) · Notes · Absences · Retards · Punitions · <strong>Menu cantine</strong> (v1.0.1) · <strong>Messagerie</strong> (v1.0.1) · <strong>Statistiques</strong> (v1.1.0) · <strong>Carnet</strong> · <strong>Notifications</strong> · <strong>Compétences</strong> · <strong>Évènements</strong> (v1.7.1)</li>
         <li><strong>Onglet Statistiques</strong> <em>(v1.1.0)</em> — courbes d'évolution (sparklines) de la moyenne générale, des absences, retards et devoirs non faits sur ~120 jours, à partir des données historisées par Jeedom. Affiche aussi les éventuelles matières en baisse. L'onglet n'affiche des courbes qu'une fois assez d'historique accumulé.</li>
         <li><strong>Onglet Évènements</strong> <em>(v1.1.0, séparé en v1.7.1)</em> — ce que <em>ProJote</em> repère lui-même : nouvelle absence, nouveau retard, nouvelle punition, nouveau message non lu, contrôle détecté, matière en baisse. Historique des 50 derniers. À ne pas confondre avec l'onglet <em>Carnet</em>, qui vient de Pronote.</li>
         <li><strong>Onglet Notifications</strong> <em>(v1.7.1)</em> — les <strong>actualités publiées par l'établissement</strong> (informations et sondages Pronote), avec leurs pièces jointes. Un badge indique le nombre d'actualités non lues. Jusqu'à la v1.7.0, ces deux contenus partageaient un onglet nommé <em>Alertes</em>, ce qui prêtait à confusion.</li>
+        <li><strong>Onglet Cours</strong> <em>(v1.8.0)</em> — le <strong>contenu des séances</strong> saisi par les professeurs dans le cahier de textes, de la plus récente à la plus ancienne : matière, date et heure, titre, texte et pièces jointes. Chaque contenu tient sur trois lignes ; un appui déplie ceux qui sont coupés. Badge = nombre de contenus des séances du jour. Masquer la commande <code>contenu_cours</code> masque l'onglet.</li>
         <li><strong>Onglet Compétences</strong> — évaluations par compétences (acquis / niveaux de maîtrise) : par évaluation, matière, date et puces de niveau par acquisition. Badge = nombre d'évaluations par compétences.</li>
         <li><strong>Allergènes / labels du menu</strong> <em>(v1.1.0)</em> — l'onglet Menu cantine affiche les labels Pronote (Bio, Local, Porc, allergènes…) sous forme de puces discrètes, lorsqu'ils sont renseignés par l'établissement.</li>
         <li><strong>Badge "Prochain DS"</strong> <em>(v1.0.1)</em> — en-tête, libellé adaptatif <em>aujourd'hui</em> / <em>demain</em> / <em>J-X</em>. Visible uniquement si un DS est à venir. Un clic ouvre l'onglet Devoirs.</li>
@@ -915,6 +918,25 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
 
     <!-- ── Historique ─────────────────────── -->
     <h1 id="version">Historique des versions</h1>
+
+    <h2>1.8.0 — Novembre 2026</h2>
+    <table>
+        <thead><tr><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><span class="badge badge-new">Nouveau</span></td>
+                <td><strong>Le contenu des cours, dans son propre onglet</strong> — certains professeurs ne mettent pas leurs consignes dans « Travail à faire » mais dans le <em>Contenu</em> de la séance, dans le cahier de textes. Le plugin ne relevait pas ce champ : un élève qui suivait ses devoirs sur la tablette passait à côté. Le contenu des séances des sept derniers jours est désormais relevé, en <strong>une seule requête</strong> à Pronote pour toute la période, avec les devoirs. Seuls les contenus porteurs d'une description ou d'une pièce jointe sont gardés, 25 au plus : un titre seul, souvent un objectif de programme, n'apprend rien. Ils s'affichent dans un onglet <em>Cours</em> du widget, placé juste après Devoirs, de la séance la plus récente à la plus ancienne. Chaque contenu tient sur trois lignes, et ceux qui sont coupés se déplient d'un appui — le survol n'existe pas sur tablette. Le badge compte les contenus des séances du jour. Le panneau reçoit une carte <em>Contenu des cours</em> pour chaque enfant.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-new">Nouveau</span></td>
+                <td><strong>Deux commandes</strong> — <code>contenu_cours</code> (liste au format JSON) et <code>Nb_contenu_cours</code>. Elles se créent d'elles-mêmes à la sauvegarde de l'équipement ou au redémarrage du démon, et se remplissent au relevé suivant. Masquer <code>contenu_cours</code> masque l'onglet du widget. <em>Contenu des cours</em> peut aussi être choisi comme onglet d'ouverture.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-fix">Amélioration</span></td>
+                <td><strong>Pièces jointes et textes longs dans le widget et le panneau</strong> — les pièces jointes des devoirs prennent les couleurs du thème, avec une hauteur de 24 px adaptée au doigt. Dans le panneau, les devoirs et contenus trop longs sont coupés à trois lignes et se déplient d'un clic ou au clavier.</td>
+            </tr>
+        </tbody>
+    </table>
 
     <h2>1.7.2 — Octobre 2026</h2>
     <table>

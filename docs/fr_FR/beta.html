@@ -296,6 +296,32 @@
 </div>
 
 
+<h2>Le contenu des cours, dans un onglet « Cours » <span class="badge badge-new">1.8.0</span></h2>
+<p>Signalé sur le forum : un professeur avait mis le travail à faire dans le <em>Contenu</em> de
+la séance plutôt que dans « Travail à faire ». Le plugin ne relevait pas ce champ, et l'élève, qui
+suivait ses devoirs sur la tablette, ne l'a jamais vu.</p>
+<ul>
+    <li><strong>Une requête pour toute la semaine.</strong> Pronote livre le contenu séance par
+    séance si on le lui demande cours par cours. Le plugin demande d'un coup le cahier de textes
+    des semaines couvrant les sept derniers jours, et le relève avec les devoirs.</li>
+    <li><strong>Seulement ce qui apprend quelque chose.</strong> Sur les comptes d'essai, la
+    plupart des entrées sans description ni pièce jointe sont des objectifs de programme
+    (« Appliquer des principes simples »). Elles sont écartées, et la liste s'arrête à 25 entrées,
+    environ une semaine.</li>
+    <li><strong>Un onglet à part.</strong> Une première version rangeait ces contenus dans une
+    section repliée sous les devoirs : elle se voyait mal sur une tablette, et mêlait des résumés de
+    séance au travail à faire. Ils ont maintenant leur onglet, avec un badge qui compte les séances
+    du jour.</li>
+    <li><strong>Trois lignes, puis un appui.</strong> Certains contenus font plusieurs milliers de
+    caractères. Chacun est coupé à trois lignes ; seuls ceux qui le sont vraiment portent un
+    chevron ▾ et se déplient, au doigt comme au clavier.</li>
+    <li><strong>Le panneau suit</strong>, avec une carte <em>Contenu des cours</em> par enfant.</li>
+</ul>
+<p>Deux commandes s'ajoutent, <code>contenu_cours</code> et <code>Nb_contenu_cours</code>. Elles
+se remplissent au relevé qui suit la mise à jour. Si Pronote refuse le cahier de textes, les
+devoirs ne sont pas perdus pour autant : seul le contenu reste vide.</p>
+
+
 <h2>Une panne réseau n'est plus une session expirée <span class="badge badge-fix">1.7.2</span></h2>
 <p>Le 20 octobre, le journal d'un équipement raconte une panne de Pronote, et le centre de
 messages une tout autre histoire :</p>
