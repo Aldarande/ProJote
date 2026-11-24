@@ -643,6 +643,11 @@
         margin-top: 1px;
     }
 
+    /* Titre et catégorie d'un contenu de séance */
+    .pjw-#id# .dv-ctitre {
+        font-style: italic;
+    }
+
     /* 10px */
     .pjw-#id# .dv-files {
         margin-top: 3px;
@@ -1949,6 +1954,17 @@
                 return { texte: PJ_JOURS[d.getDay()].slice(0, 3) + '. ' + jj + '/' + mm, retard: false };
             }
 
+            function fichiersHtml(fichiers) {
+                if (!fichiers || !fichiers.length) return '';
+                return '<div class="dv-files">' +
+                    fichiers.map(function (f) {
+                        var icon = f.type === 0 ? '🔗' : '📎';
+                        return '<a class="dv-file-link" href="' + escAttr(f.url) + '" target="_blank" title="' + escAttr(f.nom) + '">' +
+                            icon + ' ' + esc(f.nom) + '</a>';
+                    }).join('') +
+                    '</div>';
+            }
+
             function devoirHtml(list) {
                 return list.map(function (dv) {
                     var done = !!dv.done;
@@ -1959,16 +1975,7 @@
                     var echHtml = ech.texte
                         ? '<span class="dv-echeance' + (ech.retard ? ' dv-retard' : '') + '">' + esc(ech.texte) + '</span>'
                         : '';
-                    var filesHtml = '';
-                    if (dv.fichiers && dv.fichiers.length) {
-                        filesHtml = '<div class="dv-files">' +
-                            dv.fichiers.map(function (f) {
-                                var icon = f.type === 0 ? '🔗' : '📎';
-                                return '<a class="dv-file-link" href="' + escAttr(f.url) + '" target="_blank" title="' + escAttr(f.nom) + '">' +
-                                    icon + ' ' + esc(f.nom) + '</a>';
-                            }).join('') +
-                            '</div>';
-                    }
+                    var filesHtml = fichiersHtml(dv.fichiers);
                     return (
                         '<div class="dv-item' + (done ? ' dv-done' : '') + '" title="' + tooltip + '">' +
                         '<div class="dv-bar" style="background:' + esc(color) + '"></div>' +
@@ -1990,9 +1997,36 @@
                alors que du travail attend pour le prochain jour. */
             var liste = (d.devoirs || []);
             if (!liste.length) liste = (d.devoirs_demain || []);
-            dvEl.innerHTML = liste.length
+            var html = liste.length
                 ? devoirHtml(liste)
                 : '<div class="p-empty">Aucun devoir</div>';
+
+            /* Contenu des séances (cahier de textes) : le professeur y glisse
+               parfois des consignes qui ne figurent pas dans « Travail à faire ».
+               Séances passées, de la plus récente à la plus ancienne. */
+            var contenus = (VIS.contenu_cours === false) ? [] : (d.contenus_cours || []);
+            if (contenus.length) {
+                html += '<div class="dv-section-title">Contenu des cours</div>' +
+                    contenus.map(function (c) {
+                        var color = c.color || subjectColor(c.title);
+                        var quand = (c.date || '') + (c.heure ? ' · ' + c.heure : '');
+                        var titre = [c.titre, c.categorie].filter(function (s) { return s; }).join(' — ');
+                        var tooltip = escAttr((c.title || '') + (titre ? ' — ' + titre : '') + (c.description ? ' — ' + c.description : ''));
+                        return (
+                            '<div class="dv-item" title="' + tooltip + '">' +
+                            '<div class="dv-bar" style="background:' + esc(color) + '"></div>' +
+                            '<div class="dv-content">' +
+                            '<div class="dv-subject-row"><div class="dv-subject">' + esc(c.title || '–') + '</div>' +
+                            (quand ? '<span class="dv-echeance">' + esc(quand) + '</span>' : '') + '</div>' +
+                            (titre ? '<div class="dv-desc dv-ctitre">' + esc(titre) + '</div>' : '') +
+                            (c.description ? '<div class="dv-desc">' + esc(c.description) + '</div>' : '') +
+                            fichiersHtml(c.fichiers) +
+                            '</div>' +
+                            '</div>'
+                        );
+                    }).join('');
+            }
+            dvEl.innerHTML = html;
         }
 
         /* ─── MENU CANTINE (v1.0.1) ───────────────────────── */

@@ -265,6 +265,22 @@ $jsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APO
         return h + '</ul>';
     }
 
+    // Contenu des séances (cahier de textes) : consignes parfois absentes des devoirs
+    function contenusList(list) {
+        list = asArray(list);
+        if (!list.length) return '';
+        var h = '<ul class="pj-list">';
+        list.slice(0, 10).forEach(function (c) {
+            var titre = [c.titre, c.categorie].filter(function (s) { return s; }).join(' — ');
+            h += '<li><strong>' + esc(c.title || '–') + '</strong>' +
+                 (c.date ? ' <small class="meta">(' + esc(c.date) + ')</small>' : '') +
+                 (titre ? '<div class="meta" style="font-size:.8em;font-style:italic">' + esc(titre) + '</div>' : '') +
+                 (c.description ? '<div class="meta" style="font-size:.8em;opacity:.7">' + esc(c.description) + '</div>' : '') +
+                 '</li>';
+        });
+        return h + '</ul>';
+    }
+
     function punitionsList(list) {
         list = asArray(list);
         if (!list.length) return '';
@@ -394,6 +410,7 @@ $jsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APO
         h += '<div class="pj-grid">';
         h += carte('fa-star', '{{Dernières notes}}', notesList(d.notes), '{{Aucune note}}');
         h += carte('fa-book', '{{Devoirs}}', homeworkList(d), '{{Aucun devoir}}');
+        h += carte('fa-book-open', '{{Contenu des cours}}', contenusList(d.contenus_cours), '{{Aucun contenu de cours}}');
         h += carte('fa-exclamation-triangle', '{{Punitions}}', punitionsList(d.punitions), '{{Aucune punition}}');
         h += carte('fa-clipboard-list', '{{Carnet}}', carnetList(d.evenements), '{{Aucun évènement}}');
         h += carte('fa-bullhorn', '{{Notifications}}',

@@ -939,6 +939,8 @@ def devoirs(client, fenetre_jours=DEVOIRS_FENETRE_DEFAUT):
                 data[key] = []
             # Fusionne agrégats DS vides pour cohérence des cmd Jeedom
             data.update(detect_next_evaluations([]))
+            # Une séance peut porter des consignes sans aucun « travail à faire »
+            data.update(contenus_cours(client))
             return data
 
         today = datetime.date.today()
@@ -1001,6 +1003,9 @@ def devoirs(client, fenetre_jours=DEVOIRS_FENETRE_DEFAUT):
             logging.error("Erreur detect_next_evaluations : %s", e)
             data.update(detect_next_evaluations([]))
 
+        # Contenu des séances, présenté avec les devoirs (n'échoue jamais)
+        data.update(contenus_cours(client))
+
         return data
     except Exception as e:
         line_number = e.__traceback__.tb_lineno if e.__traceback__ else "?"
@@ -1012,6 +1017,138 @@ def devoirs(client, fenetre_jours=DEVOIRS_FENETRE_DEFAUT):
         )
         logging.debug("Devoirs — trace complète : %s", traceback.format_exc())
         return data
+
+
+# ── Contenu des cours (cahier de textes) ────────────────────────────────────
+# Le « contenu » d'une séance est saisi par le professeur dans le cahier de
+# textes, à côté du « travail à faire ». Certains y glissent des consignes : on
+# le remonte pour qu'il ne passe pas inaperçu. pronotepy n'expose ce contenu que
+# par `Lesson.content`, qui envoie une requête PAR cours ; or la page Pronote
+# `PageCahierDeTexte` (onglet 89) renvoie toutes les séances d'une plage de
+# semaines en un seul appel. On fait donc un seul appel pour la plage entière.
+#
+# Un échec ici ne pose jamais de clé « error » : il ferait passer toute la
+# collecte des devoirs pour ratée et rejouer l'ancien relevé.
+CONTENU_COURS_JOURS_PASSES = 7  # séances passées prises en compte
+CONTENU_COURS_MAX = 15  # nombre maximum d'entrées remontées
+
+
+def _val(d, *keys, default=None):
+    """Descend dans un dict Pronote ({"V": …}) sans lever d'exception."""
+    cur = d
+    for k in keys:
+        if not isinstance(cur, dict) or k not in cur:
+            return default
+        cur = cur[k]
+    return cur
+
+
+def _html_parse(texte):
+    """Util.html_parse de pronotepy (patché par le démon pour garder les espaces)."""
+    try:
+        import pronotepy.dataClasses
+
+        return pronotepy.dataClasses.Util.html_parse(texte)
+    except Exception:
+        return texte or ""
+
+
+def parse_contenus_cours(entries, lessons_by_id, date_min, date_max, make_files=None):
+    """Extrait les contenus de séance de la réponse brute de PageCahierDeTexte.
+
+    Args:
+        entries: liste `ListeCahierDeTextes.V` renvoyée par Pronote.
+        lessons_by_id: {id de cours: Lesson pronotepy} pour la plage demandée,
+            source de la matière, de l'horaire et de la couleur.
+        date_min, date_max (datetime.date): bornes incluses sur la date du cours.
+        make_files: callable(liste brute ListePieceJointe) -> [{nom, url, type}].
+    Returns:
+        list[dict]: entrées triées de la plus récente à la plus ancienne.
+    """
+    out = []
+    for entry in entries or []:
+        lesson = lessons_by_id.get(_val(entry, "cours", "V", "N"))
+        if lesson is None or getattr(lesson, "start", None) is None:
+            continue
+        if not (date_min <= lesson.start.date() <= date_max):
+            continue
+        try:
+            subject = lesson.subject.name if lesson.subject else "Inconnu"
+        except Exception:
+            subject = "Inconnu"
+        for contenu in _val(entry, "listeContenus", "V", default=[]) or []:
+            if not isinstance(contenu, dict):
+                continue
+            titre = (contenu.get("L") or "").strip()
+            description = _html_parse(_val(contenu, "descriptif", "V", default="") or "")
+            categorie = _val(contenu, "categorie", "V", "L", default="") or ""
+            fichiers = []
+            pieces = _val(contenu, "ListePieceJointe", "V", default=[]) or []
+            if pieces and make_files:
+                try:
+                    fichiers = make_files(pieces)
+                except Exception as e:
+                    logging.debug("Pièces jointes du contenu illisibles : %s", e)
+            if not (titre or description or fichiers):
+                continue
+            out.append(
+                {
+                    "date": lesson.start.strftime("%d/%m"),
+                    "date_iso": lesson.start.strftime("%Y-%m-%d"),
+                    "heure": lesson.start.strftime("%H:%M"),
+                    "_tri": lesson.start.strftime("%Y%m%d%H%M"),
+                    "title": subject,
+                    "titre": titre,
+                    "categorie": categorie,
+                    "description": description,
+                    "color": getattr(lesson, "background_color", None),
+                    "fichiers": fichiers,
+                }
+            )
+    out.sort(key=lambda c: c["_tri"], reverse=True)
+    for c in out:
+        del c["_tri"]
+    return out[:CONTENU_COURS_MAX]
+
+
+def contenus_cours(client):
+    """Contenu des séances des 7 derniers jours (et du jour), en 2 requêtes."""
+    data = {"contenu_cours": [], "Nb_contenu_cours": 0}
+    try:
+        today = datetime.date.today()
+        date_min = today - datetime.timedelta(days=CONTENU_COURS_JOURS_PASSES)
+        lessons = client.lessons(date_min, today) or []
+        lessons_by_id = {l.id: l for l in lessons}
+        if not lessons_by_id:
+            return data
+
+        semaines = "[%s..%s]" % (client.get_week(date_min), client.get_week(today))
+        response = client.post(
+            "PageCahierDeTexte", 89, {"domaine": {"_T": 8, "V": semaines}}
+        )
+        entries = _val(
+            response, "dataSec", "data", "ListeCahierDeTextes", "V", default=[]
+        )
+
+        def make_files(pieces):
+            import pronotepy.dataClasses
+
+            files = []
+            for jsn in pieces:
+                f = pronotepy.dataClasses.Attachment(client, jsn)
+                files.append({"nom": f.name, "url": f.url, "type": f.type})
+            return files
+
+        data["contenu_cours"] = parse_contenus_cours(
+            entries, lessons_by_id, date_min, today, make_files
+        )
+        data["Nb_contenu_cours"] = len(data["contenu_cours"])
+        logging.info("Contenus de cours récupérés : %s", data["Nb_contenu_cours"])
+    except Exception as e:
+        # SuspensionIP hérite de BaseException : elle traverse, comme ailleurs.
+        logging.warning("Contenu des cours illisible : %s", e)
+        logging.debug("Contenu des cours — trace : %s", traceback.format_exc())
+    return data
 
 
 def _pieces_de_l_actualite(notif, options, dossier):

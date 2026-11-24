@@ -509,6 +509,10 @@ try {
     if (is_array($result["Devoirs"])) {
         // Parcourt toutes les clés possibles
         foreach ($result["Devoirs"] as $key => $value) {
+            // Liste traitée plus bas (encodée en JSON)
+            if ($key === 'contenu_cours') {
+                continue;
+            }
             // Vérifie si la clé existe et met à jour la commande correspondante
             if (isset($value) && $eqLogic->getCmd(null, $key)) {
                 log::add('ProJote', 'debug', 'Champ reçu : ' . $key . ' - Valeur reçue : ' . print_r($value, true));
@@ -604,6 +608,11 @@ try {
         $eqLogic->checkAndUpdateCmd('devoir_Demain', json_encode($result['Devoirs']['devoir_Demain'],));
     } elseif (isset($result["Devoirs"])) {
         $eqLogic->checkAndUpdateCmd('devoir_Demain', "Pas de devoir pour demain retourné");
+    }
+    // Contenu des séances (cahier de textes) — seulement si l'onglet Devoirs a été relevé
+    if (isset($result['Devoirs']['contenu_cours']) && is_array($result['Devoirs']['contenu_cours'])
+        && $eqLogic->getCmd(null, 'contenu_cours')) {
+        $eqLogic->checkAndUpdateCmd('contenu_cours', json_encode($result['Devoirs']['contenu_cours']));
     }
     // Je recherche les absences
     if (isset($result['Absences']['absence']) && $eqLogic->getCmd(null, 'absence')) {
@@ -740,6 +749,7 @@ try {
         'nb_evenements'         => isset($result['Evenements']['Nb_Evenements'])               ? $result['Evenements']['Nb_Evenements']               : 0,
         'devoirs'               => isset($result['Devoirs']['devoir'])                        ? $result['Devoirs']['devoir']                        : array(),
         'devoirs_demain'        => isset($result['Devoirs']['devoir_Demain'])                 ? $result['Devoirs']['devoir_Demain']                 : array(),
+        'contenus_cours'        => isset($result['Devoirs']['contenu_cours'])                 ? $result['Devoirs']['contenu_cours']                 : array(),
         'nb_devoirs_f'          => isset($result['Devoirs']['Nb_devoir_F'])                   ? $result['Devoirs']['Nb_devoir_F']                   : 0,
         'edt_next_days'         => isset($result['Emploi_du_temps']['edt_next_days'])          ? $result['Emploi_du_temps']['edt_next_days']          : array(),
         'photo'                 => $resolvedPhoto,
@@ -788,7 +798,7 @@ try {
         'Punitions'       => array('nb_punitions', 'punitions'),
         'Evenements'      => array('nb_evenements', 'evenements'),
         'Notes'           => array('notes', 'moyennes_periodes', 'moyenne_generale'),
-        'Devoirs'         => array('devoirs', 'devoirs_demain', 'nb_devoirs_f', 'nb_devoirs_nf'),
+        'Devoirs'         => array('devoirs', 'devoirs_demain', 'nb_devoirs_f', 'nb_devoirs_nf', 'contenus_cours'),
         'Competences'     => array('competences'),
         'Messages'        => array('Nb_messages', 'Nb_messages_non_lus'),
     );
