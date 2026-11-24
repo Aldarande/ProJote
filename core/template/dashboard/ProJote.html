@@ -311,7 +311,7 @@
     }
 
     .pjw-#id# .edt-pill.edt-pill-annule {
-        opacity: .45;
+        opacity: .75;
     }
 
     .pjw-#id# .edt-pill.edt-pill-gap {
@@ -326,7 +326,7 @@
     }
 
     .pjw-#id# .edt-pill.edt-pill-retenue .edt-t-name {
-        color: #e74c3c;
+        color: var(--pjw-bad);
         font-weight: 800;
         font-size: 0.83em;
         letter-spacing: .2px;
@@ -335,7 +335,7 @@
 
     .pjw-#id# .edt-pill.edt-pill-retenue .edt-t-start,
     .pjw-#id# .edt-pill.edt-pill-retenue .edt-t-end {
-        color: #e74c3c;
+        color: var(--pjw-bad);
         opacity: .9;
         font-weight: 700;
     }
@@ -357,7 +357,7 @@
         text-align: center;
         font-size: 0.75em;
         font-weight: 700;
-        color: #e74c3c;
+        color: var(--pjw-bad);
         /* 9px */
         white-space: nowrap;
         overflow: hidden;
@@ -494,13 +494,14 @@
         border: none;
         background: transparent;
         cursor: pointer;
-        color: inherit;
-        opacity: .75;
+        /* Atténué par sa couleur et non par son opacité : une opacité
+           s'appliquerait aussi au badge rouge qu'il contient. */
+        color: rgba(var(--contrast-color), .78);
         border-radius: 6px;
         display: flex;
         align-items: center;
         gap: 3px;
-        transition: opacity .15s, background .15s;
+        transition: color .15s, background .15s;
         flex: 1;
         justify-content: center;
         white-space: nowrap;
@@ -512,11 +513,10 @@
     }
 
     .pjw-#id# .tab-btn:hover {
-        opacity: .9;
+        color: rgb(var(--contrast-color));
     }
 
     .pjw-#id# .tab-btn.active {
-        opacity: 1;
         background: color-mix(in srgb, var(--pjw-a) 18%, transparent);
         color: var(--pjw-a);
         box-shadow: 0 1px 3px rgba(0, 0, 0, .1);
@@ -662,14 +662,6 @@
         opacity: .9;
     }
 
-    body[data-theme*="Dark"] .pjw-#id# .tab-btn,
-    body[data-theme*="Dark"] .pjw-#id# .tab-btn:hover {
-        opacity: .9;
-    }
-
-    body[data-theme*="Dark"] .pjw-#id# .tab-btn.active {
-        opacity: 1;
-    }
 
     /* Titre et catégorie d'un contenu de séance */
     .pjw-#id# .dv-ctitre {
