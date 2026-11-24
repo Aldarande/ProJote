@@ -83,23 +83,42 @@ $jsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APO
     /* Sections d'un élève (notes, devoirs, contenu des cours, punitions…) :
        une seule rangée qui défile horizontalement, l'ascenseur en haut. En
        grille, elles passaient sur deux ou trois rangées et poussaient les
-       dernières loin sous l'emploi du temps. L'ascenseur est placé au-dessus
-       en retournant la rangée (rotateX), puis chaque carte dans l'autre sens :
-       c'est le seul moyen de déplacer celui du navigateur sans le redessiner,
-       et il garde ainsi le style que Jeedom lui donne. */
+       dernières loin sous l'emploi du temps.
+       L'ascenseur est dessiné par la page (.pj-ascenseur), au-dessus des
+       cartes : celui du navigateur ne s'affiche que sous la rangée, et sur
+       tablette Android comme iOS il disparaît dès qu'on cesse de défiler. */
     #pj-panel .pj-defile {
-        /* Retournée, la rangée a son haut en bas : flex-end aligne donc les
-           cartes en haut à l'écran, et le padding-bottom espace l'ascenseur
-           des cartes. */
-        display:flex; gap:16px; align-items:flex-end;
-        overflow-x:auto; overflow-y:hidden; padding-bottom:8px; margin-bottom:16px;
-        transform:rotateX(180deg);
+        display:flex; gap:16px; align-items:flex-start;
+        overflow-x:auto; overflow-y:hidden; margin-bottom:16px;
+        scrollbar-width:none;
         scroll-snap-type:x proximity; overscroll-behavior-x:contain;
     }
+    #pj-panel .pj-defile::-webkit-scrollbar { display:none; }
     #pj-panel .pj-defile > .pj-card {
-        transform:rotateX(180deg);
         flex:0 0 340px; max-width:85vw; scroll-snap-align:start;
     }
+    /* Piste de 16 px pour viser au doigt ; le trait visible en fait 6. */
+    #pj-panel .pj-ascenseur {
+        position:relative; height:16px; margin-bottom:6px; cursor:pointer; touch-action:none;
+    }
+    #pj-panel .pj-ascenseur[hidden] { display:none; }
+    #pj-panel .pj-ascenseur::before {
+        content:''; position:absolute; left:0; right:0; top:5px; height:6px; border-radius:3px;
+        background:rgba(128,128,128,.22);
+    }
+    #pj-panel .pj-curseur {
+        position:absolute; top:5px; height:6px; border-radius:3px;
+        background:var(--pj-green); min-width:32px;
+    }
+    #pj-panel .pj-ascenseur:hover .pj-curseur { background:var(--pj-green-d); }
+
+    /* Thème sombre de Jeedom : son texte est déjà un gris clair, et les
+       transparences qui hiérarchisent les textes secondaires le faisaient
+       tomber sous le seuil de lisibilité (4,33 pour le texte d'un devoir,
+       3,89 pour « Aucune punition »). */
+    body[data-theme*="Dark"] #pj-panel .pj-txt { opacity:.85; }
+    body[data-theme*="Dark"] #pj-panel .pj-vide { opacity:.9; }
+
     #pj-panel .pj-card {
         border:1px solid rgba(128,128,128,.22); border-radius:12px; overflow:hidden;
         background:rgba(127,127,127,.04); box-shadow:0 2px 6px rgba(0,0,0,.06);
@@ -469,6 +488,7 @@ $jsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APO
                    edtTable(d.edt_prochainjour), '{{Pas de cours}}', quand) + '</div>';
 
         // Notes / Devoirs / Contenu des cours / Punitions / Carnet… : rangée défilante
+        h += '<div class="pj-ascenseur" aria-hidden="true" hidden><div class="pj-curseur"></div></div>';
         h += '<div class="pj-defile">';
         h += carte('fa-star', '{{Dernières notes}}', notesList(d.notes), '{{Aucune note}}');
         h += carte('fa-book', '{{Devoirs}}', homeworkList(d), '{{Aucun devoir}}');
@@ -533,6 +553,46 @@ $jsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APO
     var actif = panes.querySelector('.pj-student.active');
     if (actif) marquerTronques(actif);
 
+    /* Ascenseur dessiné de chaque rangée : suit le défilement, et se manipule
+       — un appui sur la piste y amène la rangée, un glissé la fait suivre. */
+    function majAscenseur(piste) {
+        var rangee = piste.nextElementSibling, curseur = piste.firstElementChild;
+        var total = rangee.scrollWidth, vu = rangee.clientWidth;
+        if (!vu || total <= vu + 1) { piste.hidden = true; return; }
+        piste.hidden = false;
+        var l = piste.clientWidth, w = Math.max(32, l * vu / total);
+        curseur.style.width = w + 'px';
+        curseur.style.left = ((l - w) * rangee.scrollLeft / (total - vu)) + 'px';
+    }
+    function majAscenseurs() {
+        panes.querySelectorAll('.pj-student.active .pj-ascenseur').forEach(majAscenseur);
+    }
+    panes.querySelectorAll('.pj-ascenseur').forEach(function (piste) {
+        var rangee = piste.nextElementSibling;
+        rangee.addEventListener('scroll', function () { majAscenseur(piste); }, { passive: true });
+        function allerA(x) {
+            var r = piste.getBoundingClientRect(), w = piste.firstElementChild.offsetWidth;
+            var f = Math.min(1, Math.max(0, (x - r.left - w / 2) / Math.max(1, r.width - w)));
+            rangee.scrollLeft = f * (rangee.scrollWidth - rangee.clientWidth);
+        }
+        piste.addEventListener('pointerdown', function (e) {
+            e.preventDefault();
+            allerA(e.clientX);
+            try { piste.setPointerCapture(e.pointerId); } catch (_) { }
+            function suivre(ev) { allerA(ev.clientX); }
+            function lacher() {
+                piste.removeEventListener('pointermove', suivre);
+                piste.removeEventListener('pointerup', lacher);
+                piste.removeEventListener('pointercancel', lacher);
+            }
+            piste.addEventListener('pointermove', suivre);
+            piste.addEventListener('pointerup', lacher);
+            piste.addEventListener('pointercancel', lacher);
+        });
+    });
+    majAscenseurs();
+    window.addEventListener('resize', majAscenseurs);
+
     // Clic ou Entrée/Espace sur une entrée coupée : déplie ou replie (hors liens)
     panes.addEventListener('click', function (e) {
         if (e.target.closest('a')) return;
@@ -555,6 +615,7 @@ $jsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APO
         var pane = panes.querySelector('.pj-student[data-i="' + i + '"]');
         pane.classList.add('active');
         marquerTronques(pane);
+        majAscenseurs();
     });
 
     // Actualiser : déclenche la commande refresh de chaque élève (si jeedom dispo), puis recharge.

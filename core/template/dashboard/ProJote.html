@@ -643,6 +643,24 @@
         margin-top: 1px;
     }
 
+    /* Thème sombre de Jeedom : son texte est déjà un gris clair, et les
+       transparences ci-dessus, réglées sur le thème clair, le faisaient
+       tomber sous le seuil de lisibilité — 3,31 pour le texte d'un devoir
+       ou d'un contenu, 2,79 pour sa date, 3,15 pour un onglet inactif. */
+    body[data-theme*="Dark"] .pjw-#id# .dv-desc,
+    body[data-theme*="Dark"] .pjw-#id# .dv-echeance {
+        opacity: .9;
+    }
+
+    body[data-theme*="Dark"] .pjw-#id# .tab-btn,
+    body[data-theme*="Dark"] .pjw-#id# .tab-btn:hover {
+        opacity: .9;
+    }
+
+    body[data-theme*="Dark"] .pjw-#id# .tab-btn.active {
+        opacity: 1;
+    }
+
     /* Titre et catégorie d'un contenu de séance */
     .pjw-#id# .dv-ctitre {
         font-style: italic;
