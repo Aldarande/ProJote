@@ -648,6 +648,36 @@
         font-style: italic;
     }
 
+    /* Contenu de séance replié : titre sur 2 lignes, texte sur 3. Un clic
+       sur l'entrée la déplie (classe dv-ouvert). */
+    .pjw-#id# .dv-contenu {
+        cursor: pointer;
+    }
+
+    .pjw-#id# .dv-contenu .dv-ctitre,
+    .pjw-#id# .dv-contenu .dv-clamp {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .pjw-#id# .dv-contenu .dv-ctitre {
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+    }
+
+    .pjw-#id# .dv-contenu .dv-clamp {
+        -webkit-line-clamp: 3;
+        line-clamp: 3;
+    }
+
+    .pjw-#id# .dv-contenu.dv-ouvert .dv-ctitre,
+    .pjw-#id# .dv-contenu.dv-ouvert .dv-clamp {
+        display: block;
+        -webkit-line-clamp: unset;
+        line-clamp: unset;
+    }
+
     /* 10px */
     .pjw-#id# .dv-files {
         margin-top: 3px;
@@ -2013,13 +2043,13 @@
                         var titre = [c.titre, c.categorie].filter(function (s) { return s; }).join(' — ');
                         var tooltip = escAttr((c.title || '') + (titre ? ' — ' + titre : '') + (c.description ? ' — ' + c.description : ''));
                         return (
-                            '<div class="dv-item" title="' + tooltip + '">' +
+                            '<div class="dv-item dv-contenu" title="' + tooltip + '">' +
                             '<div class="dv-bar" style="background:' + esc(color) + '"></div>' +
                             '<div class="dv-content">' +
                             '<div class="dv-subject-row"><div class="dv-subject">' + esc(c.title || '–') + '</div>' +
                             (quand ? '<span class="dv-echeance">' + esc(quand) + '</span>' : '') + '</div>' +
                             (titre ? '<div class="dv-desc dv-ctitre">' + esc(titre) + '</div>' : '') +
-                            (c.description ? '<div class="dv-desc">' + esc(c.description) + '</div>' : '') +
+                            (c.description ? '<div class="dv-desc dv-clamp">' + esc(c.description) + '</div>' : '') +
                             fichiersHtml(c.fichiers) +
                             '</div>' +
                             '</div>'
@@ -2027,6 +2057,15 @@
                     }).join('');
             }
             dvEl.innerHTML = html;
+
+            /* Texte limité à 3 lignes : un clic déplie ou replie le contenu.
+               Le survol ne suffit pas, la tablette n'en a pas. Les liens des
+               pièces jointes gardent leur comportement. */
+            dvEl.onclick = function (ev) {
+                if (ev.target.closest('a')) return;
+                var item = ev.target.closest('.dv-contenu');
+                if (item) item.classList.toggle('dv-ouvert');
+            };
         }
 
         /* ─── MENU CANTINE (v1.0.1) ───────────────────────── */

@@ -170,6 +170,22 @@ $jsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APO
     #pj-panel .pj-hw-done { color:#27ae60; }
     #pj-panel .pj-hw-todo { color:#e08e00; }
 
+    /* Devoirs et contenus de cours : texte replié sur 3 lignes (titre sur 2),
+       déplié d'un clic — le survol n'existe pas sur tablette. */
+    #pj-panel .pj-txt { font-size:.8em; opacity:.7; word-break:break-word; margin-top:2px; }
+    #pj-panel .pj-li-tete { display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
+    #pj-panel .pj-li-tete .meta { white-space:nowrap; opacity:.6; }
+    #pj-panel .pj-depliable { cursor:pointer; }
+    #pj-panel .pj-clamp { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3; line-clamp:3; overflow:hidden; }
+    #pj-panel .pj-clamp.pj-clamp-2 { -webkit-line-clamp:2; line-clamp:2; }
+    #pj-panel .pj-ouvert .pj-clamp { display:block; -webkit-line-clamp:unset; line-clamp:unset; }
+    #pj-panel .pj-pj { display:flex; flex-wrap:wrap; gap:4px; margin-top:4px; }
+    #pj-panel .pj-pj a {
+        font-size:.75em; padding:1px 7px; border-radius:9px; text-decoration:none;
+        background:rgba(52,152,219,.12); color:#3498db;
+        max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    }
+
     #pj-panel .pj-ical {
         display:inline-flex; align-items:center; gap:7px; padding:8px 14px;
         background:var(--pj-green); color:#fff; border-radius:6px; text-decoration:none; font-size:.88em;
@@ -257,12 +273,23 @@ $jsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APO
         var h = '<ul class="pj-list">';
         list.slice(0, 15).forEach(function (dv) {
             var done = !!dv.done;
-            h += '<li><i class="fas ' + (done ? 'fa-check-circle pj-hw-done' : 'fa-circle pj-hw-todo') + '"></i> ' +
+            h += '<li class="pj-depliable"><i class="fas ' + (done ? 'fa-check-circle pj-hw-done' : 'fa-circle pj-hw-todo') + '"></i> ' +
                  '<strong>' + esc(dv.title || '–') + '</strong>' +
-                 (dv.description ? '<div class="meta" style="font-size:.8em;opacity:.7">' + esc(dv.description) + '</div>' : '') +
+                 (dv.description ? '<div class="pj-txt pj-clamp">' + esc(dv.description) + '</div>' : '') +
+                 piecesJointes(dv.fichiers) +
                  '</li>';
         });
         return h + '</ul>';
+    }
+
+    /* Pièces jointes d'un devoir ou d'un contenu : 🔗 lien externe, 📎 fichier. */
+    function piecesJointes(fichiers) {
+        fichiers = asArray(fichiers);
+        if (!fichiers.length) return '';
+        return '<div class="pj-pj">' + fichiers.map(function (f) {
+            return '<a href="' + esc(f.url) + '" target="_blank" rel="noopener" title="' + esc(f.nom) + '">' +
+                   (f.type === 0 ? '🔗' : '📎') + ' ' + esc(f.nom) + '</a>';
+        }).join('') + '</div>';
     }
 
     // Contenu des séances (cahier de textes) : consignes parfois absentes des devoirs
@@ -272,10 +299,12 @@ $jsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APO
         var h = '<ul class="pj-list">';
         list.slice(0, 10).forEach(function (c) {
             var titre = [c.titre, c.categorie].filter(function (s) { return s; }).join(' — ');
-            h += '<li><strong>' + esc(c.title || '–') + '</strong>' +
-                 (c.date ? ' <small class="meta">(' + esc(c.date) + ')</small>' : '') +
-                 (titre ? '<div class="meta" style="font-size:.8em;font-style:italic">' + esc(titre) + '</div>' : '') +
-                 (c.description ? '<div class="meta" style="font-size:.8em;opacity:.7">' + esc(c.description) + '</div>' : '') +
+            var quand = (c.date || '') + (c.heure ? ' · ' + c.heure : '');
+            h += '<li class="pj-depliable"><div class="pj-li-tete"><strong>' + esc(c.title || '–') + '</strong>' +
+                 (quand ? '<small class="meta">' + esc(quand) + '</small>' : '') + '</div>' +
+                 (titre ? '<div class="pj-txt pj-clamp pj-clamp-2" style="font-style:italic">' + esc(titre) + '</div>' : '') +
+                 (c.description ? '<div class="pj-txt pj-clamp">' + esc(c.description) + '</div>' : '') +
+                 piecesJointes(c.fichiers) +
                  '</li>';
         });
         return h + '</ul>';
@@ -447,6 +476,13 @@ $jsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APO
     });
     tabs.innerHTML = tabsHtml;
     panes.innerHTML = panesHtml;
+
+    // Un clic sur un devoir ou un contenu de cours déplie son texte (hors liens)
+    panes.addEventListener('click', function (e) {
+        if (e.target.closest('a')) return;
+        var li = e.target.closest('.pj-depliable');
+        if (li) li.classList.toggle('pj-ouvert');
+    });
 
     tabs.addEventListener('click', function (e) {
         var t = e.target.closest('.pj-tab'); if (!t) return;
