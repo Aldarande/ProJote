@@ -93,7 +93,7 @@ class ProJote extends eqLogic
    * Injectées dans ProJote.html via str_replace() dans toHtml() :
    *   #accent_color# — couleur CSS d'accentuation (défaut #94C904)
    *   #font_size#    — taille de police de base (défaut 12px)
-   *   #default_tab#  — onglet ouvert au chargement : dv|notes|abs|ret|pun (défaut dv)
+   *   #default_tab#  — onglet ouvert au chargement : dv|cours|notes|abs|ret|pun… (défaut dv)
    *   #edt_nav_mode# — navigation EDT : next_day (J+1 fixe) | arrows (flèches J+1→J+4)
    */
   public static $_widgetPossibility = [
@@ -121,7 +121,7 @@ class ProJote extends eqLogic
         // Doit rester d'accord avec les onglets du gabarit et avec le sélecteur
         // de desktop/php/ProJote.php : un onglet absent d'ici ne peut pas être
         // choisi comme onglet d'ouverture.
-        'values'            => ['dv' => 'Devoirs', 'notes' => 'Notes', 'abs' => 'Absences', 'ret' => 'Retards', 'pun' => 'Punitions', 'evt' => 'Carnet', 'menu' => 'Menu cantine', 'msg' => 'Messagerie', 'stats' => 'Statistiques', 'notif' => 'Notifications', 'comp' => 'Compétences', 'alertes' => 'Évènements ProJote'],
+        'values'            => ['dv' => 'Devoirs', 'cours' => 'Contenu des cours', 'notes' => 'Notes', 'abs' => 'Absences', 'ret' => 'Retards', 'pun' => 'Punitions', 'evt' => 'Carnet', 'menu' => 'Menu cantine', 'msg' => 'Messagerie', 'stats' => 'Statistiques', 'notif' => 'Notifications', 'comp' => 'Compétences', 'alertes' => 'Évènements ProJote'],
       ],
       'edt_nav_mode' => [
         'allow_displayType' => ['dashboard', 'mobile'],

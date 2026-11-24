@@ -648,17 +648,6 @@
         font-style: italic;
     }
 
-    /* Contenu de séance : information passée, pas du travail à faire. La
-       tuile est donc plus discrète que celle d'un devoir, qui reste dominant. */
-    .pjw-#id# .dv-contenu {
-        background: transparent;
-        border: 1px solid rgba(var(--contrast-color), .08);
-    }
-
-    .pjw-#id# .dv-contenu .dv-bar {
-        opacity: .5;
-    }
-
     /* Replié : titre sur 2 lignes, texte sur 3. Seules les entrées réellement
        coupées (classe dv-tronque, posée après rendu) se déplient, d'un clic ou
        au clavier, et portent le chevron. */
@@ -677,47 +666,9 @@
         transform: rotate(180deg);
     }
 
-    .pjw-#id# .dv-contenu:focus-visible,
-    .pjw-#id# .dv-section-toggle:focus-visible {
+    .pjw-#id# .dv-contenu:focus-visible {
         outline: 2px solid var(--pjw-a);
         outline-offset: 1px;
-    }
-
-    /* Section « Contenu des cours » : repliée par défaut, avec son compteur,
-       pour ne pas noyer les devoirs sous une longue liste. */
-    .pjw-#id# .dv-section-toggle {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        width: 100%;
-        margin: 10px 0 4px;
-        padding: 8px 2px 4px;
-        border: 0;
-        border-top: 1px solid rgba(var(--contrast-color), .12);
-        background: transparent;
-        color: inherit;
-        font: inherit;
-        cursor: pointer;
-        text-align: left;
-    }
-
-    .pjw-#id# .dv-section-toggle .dv-section-title {
-        margin: 0;
-    }
-
-    .pjw-#id# .dv-section-toggle::after {
-        content: '▾';
-        opacity: .5;
-        margin-left: auto;
-        transition: transform .2s;
-    }
-
-    .pjw-#id# .dv-section-toggle[aria-expanded="true"]::after {
-        transform: rotate(180deg);
-    }
-
-    .pjw-#id# .dv-contenus[hidden] {
-        display: none;
     }
 
     .pjw-#id# .dv-contenu .dv-ctitre,
@@ -1254,6 +1205,10 @@
         <div class="tab-btns">
             <button class="tab-btn active" data-tab="dv#id#"><i class="fas fa-book"></i> Dev.<span class="tab-badge"
                     id="pjwbdv#id#"></span></button>
+            <!-- Contenu des séances (cahier de textes), à côté des devoirs :
+                 des consignes s'y glissent parfois hors « Travail à faire ». -->
+            <button class="tab-btn" data-tab="cours#id#"><i class="fas fa-book-open"></i> Cours<span class="tab-badge"
+                    id="pjwbcours#id#"></span></button>
             <button class="tab-btn" data-tab="notes#id#"><i class="fas fa-star"></i> Notes</button>
             <button class="tab-btn" data-tab="abs#id#"><i class="fas fa-user-times"></i> Abs.<span class="tab-badge"
                     id="pjwbabs#id#"></span></button>
@@ -1289,6 +1244,13 @@
         <div class="tab-pane active" id="dv#id#">
             <div id="pjwdv#id#">
                 <div class="p-empty">Aucun devoir</div>
+            </div>
+        </div>
+
+        <!-- Contenu des cours -->
+        <div class="tab-pane" id="cours#id#">
+            <div id="pjwcours#id#">
+                <div class="p-empty">Aucun contenu de cours</div>
             </div>
         </div>
 
@@ -2023,13 +1985,19 @@
             container.innerHTML = summary + items;
         }
 
-        /* ─── DEVOIRS (onglet) ────────────────────────────── */
-        /* État d'affichage des contenus de cours, conservé d'un rendu à l'autre :
-           une mise à jour du widget ne doit pas replier le texte qu'un enfant
-           est en train de lire, ni refermer la section qu'il a ouverte. */
-        var DV_OUVERTS = {};
-        var DV_SECTION_OUVERTE = false;
+        /* Pièces jointes d'un devoir ou d'un contenu de cours */
+        function fichiersHtml(fichiers) {
+            if (!fichiers || !fichiers.length) return '';
+            return '<div class="dv-files">' +
+                fichiers.map(function (f) {
+                    var icon = f.type === 0 ? '🔗' : '📎';
+                    return '<a class="dv-file-link" href="' + escAttr(f.url) + '" target="_blank" rel="noopener" title="' + escAttr(f.nom) + '">' +
+                        icon + ' ' + esc(f.nom) + '</a>';
+                }).join('') +
+                '</div>';
+        }
 
+        /* ─── DEVOIRS (onglet) ────────────────────────────── */
         function renderDevoirs(d) {
             var dvEl = el('pjwdv' + ID);
             if (!dvEl) return;
@@ -2058,17 +2026,6 @@
                 /* Au-delà d'une semaine, le seul nom du jour redeviendrait ambigu. */
                 if (jours <= 6) return { texte: PJ_JOURS[d.getDay()], retard: false };
                 return { texte: PJ_JOURS[d.getDay()].slice(0, 3) + '. ' + jj + '/' + mm, retard: false };
-            }
-
-            function fichiersHtml(fichiers) {
-                if (!fichiers || !fichiers.length) return '';
-                return '<div class="dv-files">' +
-                    fichiers.map(function (f) {
-                        var icon = f.type === 0 ? '🔗' : '📎';
-                        return '<a class="dv-file-link" href="' + escAttr(f.url) + '" target="_blank" rel="noopener" title="' + escAttr(f.nom) + '">' +
-                            icon + ' ' + esc(f.nom) + '</a>';
-                    }).join('') +
-                    '</div>';
             }
 
             function devoirHtml(list) {
@@ -2103,48 +2060,57 @@
                alors que du travail attend pour le prochain jour. */
             var liste = (d.devoirs || []);
             if (!liste.length) liste = (d.devoirs_demain || []);
-            var html = liste.length
+            dvEl.innerHTML = liste.length
                 ? devoirHtml(liste)
                 : '<div class="p-empty">Aucun devoir</div>';
+        }
 
-            /* Contenu des séances (cahier de textes) : le professeur y glisse
-               parfois des consignes qui ne figurent pas dans « Travail à faire ».
-               Séances passées, de la plus récente à la plus ancienne. */
-            var contenus = (VIS.contenu_cours === false) ? [] : (d.contenus_cours || []);
-            if (contenus.length) {
-                var items = contenus.map(function (c) {
-                    var color = c.color || subjectColor(c.title);
-                    var quand = (c.date || '') + (c.heure ? ' · ' + c.heure : '');
-                    var titre = [c.titre, c.categorie].filter(function (s) { return s; }).join(' — ');
-                    var tooltip = escAttr((c.title || '') + (titre ? ' — ' + titre : '') + (c.description ? ' — ' + c.description : ''));
-                    // Clé stable d'une entrée, pour retrouver son état déplié
-                    var cle = escAttr([c.title, c.date, c.heure, c.titre, (c.description || '').slice(0, 40)].join('|'));
-                    var ouvert = !!DV_OUVERTS[cle];
-                    return (
-                        '<div class="dv-item dv-contenu' + (ouvert ? ' dv-ouvert' : '') + '" data-k="' + cle + '" title="' + tooltip + '">' +
-                        '<div class="dv-bar" style="background:' + esc(color) + '"></div>' +
-                        '<div class="dv-content">' +
-                        '<div class="dv-subject-row"><div class="dv-subject">' + esc(c.title || '–') + '</div>' +
-                        (quand ? '<span class="dv-echeance">' + esc(quand) + '</span>' : '') + '</div>' +
-                        (titre ? '<div class="dv-desc dv-ctitre">' + esc(titre) + '</div>' : '') +
-                        (c.description ? '<div class="dv-desc dv-clamp">' + esc(c.description) + '</div>' : '') +
-                        fichiersHtml(c.fichiers) +
-                        '</div>' +
-                        '</div>'
-                    );
-                }).join('');
-                html += '<button type="button" class="dv-section-toggle" aria-expanded="' + DV_SECTION_OUVERTE + '">' +
-                    '<span class="dv-section-title">Contenu des cours (' + contenus.length + ')</span></button>' +
-                    '<div class="dv-contenus"' + (DV_SECTION_OUVERTE ? '' : ' hidden') + '>' + items + '</div>';
+        /* ─── CONTENU DES COURS (onglet) ──────────────────── */
+        /* Contenu des séances (cahier de textes) : le professeur y glisse
+           parfois des consignes qui ne figurent pas dans « Travail à faire ».
+           Séances passées, de la plus récente à la plus ancienne.
+           L'état déplié est conservé d'un rendu à l'autre : une mise à jour du
+           widget ne doit pas replier le texte qu'un enfant est en train de lire. */
+        var COURS_OUVERTS = {};
+
+        function renderCours(d) {
+            var coursEl = el('pjwcours' + ID);
+            if (!coursEl) return;
+            if (VIS.contenu_cours === false) { var pane = el('cours' + ID); if (pane) pane.style.display = 'none'; return; }
+
+            var contenus = d.contenus_cours || [];
+            if (!contenus.length) {
+                coursEl.innerHTML = '<div class="p-empty">Aucun contenu de cours</div>';
+                return;
             }
-            dvEl.innerHTML = html;
+            coursEl.innerHTML = contenus.map(function (c) {
+                var color = c.color || subjectColor(c.title);
+                var quand = (c.date || '') + (c.heure ? ' · ' + c.heure : '');
+                var titre = [c.titre, c.categorie].filter(function (s) { return s; }).join(' — ');
+                var tooltip = escAttr((c.title || '') + (titre ? ' — ' + titre : '') + (c.description ? ' — ' + c.description : ''));
+                // Clé stable d'une entrée, pour retrouver son état déplié
+                var cle = escAttr([c.title, c.date, c.heure, c.titre, (c.description || '').slice(0, 40)].join('|'));
+                var ouvert = !!COURS_OUVERTS[cle];
+                return (
+                    '<div class="dv-item dv-contenu' + (ouvert ? ' dv-ouvert' : '') + '" data-k="' + cle + '" title="' + tooltip + '">' +
+                    '<div class="dv-bar" style="background:' + esc(color) + '"></div>' +
+                    '<div class="dv-content">' +
+                    '<div class="dv-subject-row"><div class="dv-subject">' + esc(c.title || '–') + '</div>' +
+                    (quand ? '<span class="dv-echeance">' + esc(quand) + '</span>' : '') + '</div>' +
+                    (titre ? '<div class="dv-desc dv-ctitre">' + esc(titre) + '</div>' : '') +
+                    (c.description ? '<div class="dv-desc dv-clamp">' + esc(c.description) + '</div>' : '') +
+                    fichiersHtml(c.fichiers) +
+                    '</div>' +
+                    '</div>'
+                );
+            }).join('');
             marquerTronques();
 
             /* Seules les entrées réellement coupées deviennent dépliables. La
-               mesure n'a de sens que si la liste est affichée : elle est refaite
-               à l'ouverture de la section et à l'affichage de l'onglet. */
+               mesure n'a de sens que si l'onglet est affiché : elle est refaite
+               quand il s'ouvre. */
             function marquerTronques() {
-                dvEl.querySelectorAll('.dv-contenu').forEach(function (item) {
+                coursEl.querySelectorAll('.dv-contenu').forEach(function (item) {
                     if (item.classList.contains('dv-tronque')) return;
                     var coupe = item.classList.contains('dv-ouvert') ||
                         [].some.call(item.querySelectorAll('.dv-clamp, .dv-ctitre'), function (t) {
@@ -2161,39 +2127,28 @@
             function basculerContenu(item) {
                 var ouvert = item.classList.toggle('dv-ouvert');
                 item.setAttribute('aria-expanded', ouvert ? 'true' : 'false');
-                if (ouvert) DV_OUVERTS[item.getAttribute('data-k')] = true;
-                else delete DV_OUVERTS[item.getAttribute('data-k')];
+                if (ouvert) COURS_OUVERTS[item.getAttribute('data-k')] = true;
+                else delete COURS_OUVERTS[item.getAttribute('data-k')];
             }
 
-            function basculerSection(btn) {
-                DV_SECTION_OUVERTE = btn.getAttribute('aria-expanded') !== 'true';
-                btn.setAttribute('aria-expanded', DV_SECTION_OUVERTE ? 'true' : 'false');
-                var liste = btn.nextElementSibling;
-                if (liste) liste.hidden = !DV_SECTION_OUVERTE;
-                if (DV_SECTION_OUVERTE) marquerTronques();
-            }
-
-            /* Clic : la section s'ouvre ou se ferme ; une entrée coupée se déplie
-               ou se replie. Le survol ne suffit pas, la tablette n'en a pas. Les
-               liens des pièces jointes gardent leur comportement. Affecter
-               onclick (et non addEventListener) évite d'empiler un gestionnaire
-               à chaque rendu. */
-            dvEl.onclick = function (ev) {
-                var btn = ev.target.closest('.dv-section-toggle');
-                if (btn) { basculerSection(btn); return; }
+            /* Une entrée coupée se déplie ou se replie au clic : le survol ne
+               suffit pas, la tablette n'en a pas. Les liens des pièces jointes
+               gardent leur comportement. Affecter onclick (et non
+               addEventListener) évite d'empiler un gestionnaire à chaque rendu. */
+            coursEl.onclick = function (ev) {
                 if (ev.target.closest('a')) return;
                 var item = ev.target.closest('.dv-contenu.dv-tronque');
                 if (item) basculerContenu(item);
             };
-            dvEl.onkeydown = function (ev) {
+            coursEl.onkeydown = function (ev) {
                 if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.classList.contains('dv-tronque')) {
                     ev.preventDefault();
                     basculerContenu(ev.target);
                 }
             };
-            // L'onglet Devoirs masqué au rendu : mesurer quand il s'affiche
-            var ongletDv = document.querySelector('[data-tab="dv' + ID + '"]');
-            if (ongletDv) ongletDv.onclick = function () { setTimeout(marquerTronques, 0); };
+            // L'onglet masqué au rendu : mesurer quand il s'affiche
+            var onglet = document.querySelector('[data-tab="cours' + ID + '"]');
+            if (onglet) onglet.onclick = function () { setTimeout(marquerTronques, 0); };
         }
 
         /* ─── MENU CANTINE (v1.0.1) ───────────────────────── */
@@ -2551,6 +2506,7 @@
             renderPunitions(d);
             renderEvenements(d);
             renderDevoirs(d);
+            renderCours(d);
             // v1.0.1
             renderMenu(d);
             renderMessages(d);
@@ -2566,7 +2522,7 @@
             if (tabsEl) {
                 var btnMap = {
                     'abs': VIS.absences, 'ret': VIS.retards, 'pun': VIS.punitions,
-                    'notes': VIS.notes, 'dv': VIS.devoirs,
+                    'notes': VIS.notes, 'dv': VIS.devoirs, 'cours': VIS.contenu_cours !== false,
                     'menu': VIS.menu !== false, 'msg': VIS.messages !== false,
                     'stats': VIS.stats !== false, 'alertes': VIS.alertes !== false,
                     'comp': VIS.competences !== false
@@ -2586,6 +2542,11 @@
             setBadge('pjwbevt' + ID, d.nb_evenements);
             var dvCount = ((d.devoirs || []).concat(d.devoirs_demain || [])).filter(function (dv) { return !dv.done; }).length;
             setBadge('pjwbdv' + ID, dvCount);
+            // Contenus des séances du jour : ce qu'il y a de neuf à lire en
+            // rentrant. Toute la semaine ferait un badge toujours allumé.
+            var now = new Date();
+            var auj = now.getFullYear() + '-' + ('0' + (now.getMonth() + 1)).slice(-2) + '-' + ('0' + now.getDate()).slice(-2);
+            setBadge('pjwbcours' + ID, (d.contenus_cours || []).filter(function (c) { return c.date_iso === auj; }).length);
             // v1.0.1 : badges menus et messages non lus
             setBadge('pjwbmenu' + ID, d.Nb_menus_semaine);
             setBadge('pjwbmsg' + ID, d.Nb_messages_non_lus);

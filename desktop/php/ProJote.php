@@ -612,6 +612,7 @@ sendVarToJS('eqLogicId', $eqLogic);
 									     choix d'ouverture. La liste s'était arrêtée aux punitions. -->
 									<select class="eqLogicAttr form-control" data-l1key="display" data-l2key="parameters_default_tab">
 										<option value="dv" selected>{{Devoirs}}</option>
+										<option value="cours">{{Contenu des cours}}</option>
 										<option value="notes">{{Notes}}</option>
 										<option value="abs">{{Absences}}</option>
 										<option value="ret">{{Retards}}</option>
