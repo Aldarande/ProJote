@@ -303,11 +303,15 @@ suivait ses devoirs sur la tablette, ne l'a jamais vu.</p>
 <ul>
     <li><strong>Une requête pour toute la semaine.</strong> Pronote livre le contenu séance par
     séance si on le lui demande cours par cours. Le plugin demande d'un coup le cahier de textes
-    des semaines couvrant les sept derniers jours, et le relève avec les devoirs.</li>
+    de la semaine en cours, et le relève avec les devoirs.</li>
+    <li><strong>La semaine en cours, cours du jour compris.</strong> Retour d'un bêta-testeur :
+    les contenus du jour, ceux que l'application Pronote range sous « Aujourd'hui », manquaient,
+    et la liste remontait jusqu'à la semaine précédente. pronotepy arrête la plage demandée à
+    minuit le dernier jour, ce qui écartait tous les cours du jour ; la plage va maintenant du
+    lundi jusqu'aux cours d'aujourd'hui inclus. Le week-end, c'est la semaine qui s'achève.</li>
     <li><strong>Seulement ce qui apprend quelque chose.</strong> Sur les comptes d'essai, la
     plupart des entrées sans description ni pièce jointe sont des objectifs de programme
-    (« Appliquer des principes simples »). Elles sont écartées, et la liste s'arrête à 25 entrées,
-    environ une semaine.</li>
+    (« Appliquer des principes simples »). Elles sont écartées, et la liste s'arrête à 25 entrées.</li>
     <li><strong>Un onglet à part.</strong> Une première version rangeait ces contenus dans une
     section repliée sous les devoirs : elle se voyait mal sur une tablette, et mêlait des résumés de
     séance au travail à faire. Ils ont maintenant leur onglet, avec un badge qui compte les séances

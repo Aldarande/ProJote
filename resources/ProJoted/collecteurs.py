@@ -1033,8 +1033,10 @@ def devoirs(client, fenetre_jours=DEVOIRS_FENETRE_DEFAUT):
 # Seuls les contenus qui portent une description ou une pièce jointe sont
 # retenus : un titre seul est le plus souvent un objectif de programme
 # (« Appliquer des principes… ») recopié à chaque séance, sans consigne.
-CONTENU_COURS_JOURS_PASSES = 7  # séances passées prises en compte
-CONTENU_COURS_MAX = 25  # nombre maximum d'entrées remontées (≈ une semaine)
+#
+# Plage : la semaine en cours, du lundi jusqu'à aujourd'hui inclus (le week-end,
+# la semaine qui s'achève).
+CONTENU_COURS_MAX = 25  # nombre maximum d'entrées remontées
 
 
 def _val(d, *keys, default=None):
@@ -1118,12 +1120,15 @@ def parse_contenus_cours(entries, lessons_by_id, date_min, date_max, make_files=
 
 
 def contenus_cours(client):
-    """Contenu des séances des 7 derniers jours (et du jour), en 2 requêtes."""
+    """Contenu des séances de la semaine en cours, jusqu'à aujourd'hui, en 2 requêtes."""
     data = {"contenu_cours": [], "Nb_contenu_cours": 0}
     try:
         today = datetime.date.today()
-        date_min = today - datetime.timedelta(days=CONTENU_COURS_JOURS_PASSES)
-        lessons = client.lessons(date_min, today) or []
+        date_min = today - datetime.timedelta(days=today.weekday())  # lundi
+        # pronotepy ramène la borne de fin à minuit (même un datetime) et écarte
+        # les cours qui commencent après : on lui passe demain pour garder ceux
+        # du jour, et parse_contenus_cours borne ensuite à aujourd'hui.
+        lessons = client.lessons(date_min, today + datetime.timedelta(days=1)) or []
         lessons_by_id = {l.id: l for l in lessons}
         if not lessons_by_id:
             return data

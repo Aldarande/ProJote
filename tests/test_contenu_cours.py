@@ -122,12 +122,12 @@ class TestParseContenusCours:
 class TestContenusCours:
     def test_un_seul_appel_au_cahier_de_textes(self, collecteurs):
         today = datetime.date.today()
-        hier = datetime.datetime.combine(today, datetime.time(9, 0)) - datetime.timedelta(days=1)
+        ce_matin = datetime.datetime.combine(today, datetime.time(9, 0))
         appels = []
 
         class _Client:
             def lessons(self, d1, d2):
-                return [_lesson("x", hier, "SVT")]
+                return [_lesson("x", ce_matin, "SVT")]
 
             def get_week(self, d):
                 return 10
@@ -143,6 +143,42 @@ class TestContenusCours:
         assert data["contenu_cours"][0]["title"] == "SVT"
         assert appels == [("PageCahierDeTexte", 89, {"domaine": {"_T": 8, "V": "[10..10]"}})]
         assert "error" not in data
+
+    def test_semaine_en_cours_cours_du_jour_compris(self, collecteurs, monkeypatch):
+        """Du lundi à aujourd'hui inclus : pronotepy coupe la plage à minuit le
+        dernier jour, il faut donc lui demander jusqu'à demain."""
+        mercredi = datetime.date(2026, 11, 25)
+
+        class _Date(datetime.date):
+            @classmethod
+            def today(cls):
+                return mercredi
+
+        monkeypatch.setattr(collecteurs.datetime, "date", _Date)
+        demandes = []
+        a = lambda j, h: datetime.datetime(2026, 11, j, h, 0)
+
+        class _Client:
+            def lessons(self, d1, d2):
+                demandes.append((d1, d2))
+                return [
+                    _lesson("dim", a(22, 9), "Avant"),
+                    _lesson("lun", a(23, 8), "Lundi"),
+                    _lesson("auj", a(25, 16), "Aujourd'hui"),
+                    _lesson("dem", a(26, 8), "Demain"),
+                ]
+
+            def get_week(self, d):
+                return 12
+
+            def post(self, page, onglet, data):
+                return {"dataSec": {"data": {"ListeCahierDeTextes": {"V": [
+                    _entry(k, [_contenu("", "Consigne")]) for k in ("dim", "lun", "auj", "dem")
+                ]}}}}
+
+        data = collecteurs.contenus_cours(_Client())
+        assert demandes == [(datetime.date(2026, 11, 23), datetime.date(2026, 11, 26))]
+        assert [c["title"] for c in data["contenu_cours"]] == ["Aujourd'hui", "Lundi"]
 
     def test_echec_sans_cle_error(self, collecteurs):
         """Un échec ne doit pas faire passer toute la collecte des devoirs pour ratée."""

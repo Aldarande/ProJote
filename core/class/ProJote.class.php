@@ -1044,7 +1044,7 @@ class ProJote extends eqLogic
       "edt_aujourdhui"        => array("Emploi du temps Aujourd'hui",                      'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::edt',         'ProJote::edt'),
       "devoir"                => array("Liste des devoirs",                                 'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::devoir',      'ProJote::devoir'),
       "devoir_Demain"         => array("Liste des devoirs pour demain",                    'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::devoir',      'ProJote::devoir'),
-      // Contenu des séances (cahier de textes) des 7 derniers jours
+      // Contenu des séances (cahier de textes) de la semaine en cours, jusqu'à aujourd'hui
       "contenu_cours"         => array("Contenu des cours",                                'info',   'string',  "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
       "Nb_contenu_cours"      => array("Nombre de contenus de cours",                      'info',   'numeric', "",      0, 1, "GENERIC_INFO",    'core::badge',          'core::badge'),
       "absence"               => array("Liste des absences",                               'info',   'string',  "",      0, 1, "GENERIC_INFO",    'ProJote::absence',     'ProJote::absence'),
