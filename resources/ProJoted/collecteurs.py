@@ -1040,7 +1040,7 @@ def devoirs(client, fenetre_jours=DEVOIRS_FENETRE_DEFAUT):
 # CONTENU_COURS_PLAFOND jours du calendrier (retour de vacances).
 CONTENU_COURS_JOURS = 5  # jours de cours couverts
 CONTENU_COURS_PLAFOND = 21  # jours du calendrier, au plus
-CONTENU_COURS_MAX = 25  # nombre maximum d'entrées remontées
+CONTENU_COURS_MAX = 40  # garde-fou : 5 jours chargés en comptent près de 30
 
 
 def _val(d, *keys, default=None):

@@ -112,9 +112,9 @@ class TestParseContenusCours:
         start = datetime.datetime(2026, 11, 18, 8, 0)
         lessons = {
             str(i): _lesson(str(i), start + datetime.timedelta(minutes=i))
-            for i in range(30)
+            for i in range(50)
         }
-        entries = [_entry(str(i), [_contenu("t", "d")]) for i in range(30)]
+        entries = [_entry(str(i), [_contenu("t", "d")]) for i in range(50)]
         out = collecteurs.parse_contenus_cours(entries, lessons, D_MIN, D_MAX)
         assert len(out) == collecteurs.CONTENU_COURS_MAX
 
