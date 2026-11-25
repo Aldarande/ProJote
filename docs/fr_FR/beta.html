@@ -303,12 +303,15 @@ suivait ses devoirs sur la tablette, ne l'a jamais vu.</p>
 <ul>
     <li><strong>Une requête pour toute la semaine.</strong> Pronote livre le contenu séance par
     séance si on le lui demande cours par cours. Le plugin demande d'un coup le cahier de textes
-    de la semaine en cours, et le relève avec les devoirs.</li>
-    <li><strong>La semaine en cours, cours du jour compris.</strong> Retour d'un bêta-testeur :
-    les contenus du jour, ceux que l'application Pronote range sous « Aujourd'hui », manquaient,
-    et la liste remontait jusqu'à la semaine précédente. pronotepy arrête la plage demandée à
-    minuit le dernier jour, ce qui écartait tous les cours du jour ; la plage va maintenant du
-    lundi jusqu'aux cours d'aujourd'hui inclus. Le week-end, c'est la semaine qui s'achève.</li>
+    de la période, et le relève avec les devoirs.</li>
+    <li><strong>Les 5 derniers jours de cours, cours du jour compris.</strong> Retour d'un
+    bêta-testeur : les contenus du jour, ceux que l'application Pronote range sous
+    « Aujourd'hui », manquaient, et la liste remontait trop loin. pronotepy arrête la plage
+    demandée à minuit le dernier jour, ce qui écartait tous les cours du jour : c'est corrigé.
+    La fenêtre couvre maintenant les 5 derniers jours où l'élève avait cours selon l'emploi du
+    temps. Un mercredi, elle va du jeudi précédent à aujourd'hui ; le lundi matin, elle n'est
+    pas vide. Un jour entièrement annulé ne compte pas, et au retour des vacances elle ne remonte
+    pas au-delà de 21 jours.</li>
     <li><strong>Seulement ce qui apprend quelque chose.</strong> Sur les comptes d'essai, la
     plupart des entrées sans description ni pièce jointe sont des objectifs de programme
     (« Appliquer des principes simples »). Elles sont écartées, et la liste s'arrête à 25 entrées.</li>

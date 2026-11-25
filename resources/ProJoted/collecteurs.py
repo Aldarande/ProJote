@@ -1034,8 +1034,12 @@ def devoirs(client, fenetre_jours=DEVOIRS_FENETRE_DEFAUT):
 # retenus : un titre seul est le plus souvent un objectif de programme
 # (« Appliquer des principes… ») recopié à chaque séance, sans consigne.
 #
-# Plage : la semaine en cours, du lundi jusqu'à aujourd'hui inclus (le week-end,
-# la semaine qui s'achève).
+# Plage : les CONTENU_COURS_JOURS derniers jours de cours selon l'emploi du
+# temps, aujourd'hui compris s'il y a cours. Un jour dont tous les cours sont
+# annulés ne compte pas. La fenêtre ne remonte jamais au-delà de
+# CONTENU_COURS_PLAFOND jours du calendrier (retour de vacances).
+CONTENU_COURS_JOURS = 5  # jours de cours couverts
+CONTENU_COURS_PLAFOND = 21  # jours du calendrier, au plus
 CONTENU_COURS_MAX = 25  # nombre maximum d'entrées remontées
 
 
@@ -1119,16 +1123,55 @@ def parse_contenus_cours(entries, lessons_by_id, date_min, date_max, make_files=
     return out[:CONTENU_COURS_MAX]
 
 
+def debut_jours_de_cours(lessons, today, nb=CONTENU_COURS_JOURS):
+    """Date du nb-ième jour de cours en remontant depuis aujourd'hui (inclus).
+
+    Un jour de cours est un jour qui a au moins un cours non annulé. Renvoie
+    None s'il y en a moins de nb dans `lessons`.
+    """
+    jours = sorted(
+        {
+            l.start.date()
+            for l in lessons
+            if getattr(l, "start", None) is not None
+            and l.start.date() <= today
+            and getattr(l, "canceled", False) is not True
+        },
+        reverse=True,
+    )
+    return jours[nb - 1] if len(jours) >= nb else None
+
+
 def contenus_cours(client):
-    """Contenu des séances de la semaine en cours, jusqu'à aujourd'hui, en 2 requêtes."""
+    """Contenu des séances des 5 derniers jours de cours.
+
+    Une requête Pronote par semaine d'emploi du temps lue (2 en temps normal,
+    2 de plus au retour de vacances), puis une seule pour le cahier de textes.
+    """
     data = {"contenu_cours": [], "Nb_contenu_cours": 0}
     try:
         today = datetime.date.today()
-        date_min = today - datetime.timedelta(days=today.weekday())  # lundi
         # pronotepy ramène la borne de fin à minuit (même un datetime) et écarte
         # les cours qui commencent après : on lui passe demain pour garder ceux
         # du jour, et parse_contenus_cours borne ensuite à aujourd'hui.
-        lessons = client.lessons(date_min, today + datetime.timedelta(days=1)) or []
+        demain = today + datetime.timedelta(days=1)
+        # Depuis le lundi de la semaine précédente : 5 jours de cours au moins
+        # en temps normal. Sinon (vacances, fériés), on élargit au plafond.
+        # Jamais avant la rentrée : Pronote refuse les semaines négatives.
+        rentree = getattr(client, "start_day", None)
+        borne = lambda d: max(d, rentree) if isinstance(rentree, datetime.date) else d
+        lundi_prec = borne(today - datetime.timedelta(days=today.weekday() + 7))
+        lessons = client.lessons(lundi_prec, demain) or []
+        date_min = debut_jours_de_cours(lessons, today)
+        if date_min is None:
+            plafond = borne(today - datetime.timedelta(days=CONTENU_COURS_PLAFOND))
+            if plafond < lundi_prec:
+                anciens = client.lessons(plafond, lundi_prec) or []
+                connus = {l.id for l in lessons}
+                lessons = lessons + [l for l in anciens if l.id not in connus]
+            date_min = debut_jours_de_cours(lessons, today)
+            if date_min is None:  # moins de 5 jours de cours : tout le plafond
+                date_min = plafond
         lessons_by_id = {l.id: l for l in lessons}
         if not lessons_by_id:
             return data
