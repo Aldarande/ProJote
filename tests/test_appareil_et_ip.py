@@ -72,15 +72,10 @@ class TestNomAppareil:
         compat.ClientBase()._do_2fa(False, True, None, None)
         assert compat.appels == [(False, True, None, "Domotique")]
 
-    def test_nom_configure(self, compat):
-        compat.definir_nom_appareil("  Box   du salon ")
-        compat.ClientBase()._do_2fa(False, True, None, None)
-        assert compat.appels[-1][3] == "Box du salon"
-
-    def test_nom_vide_ou_trop_long(self, compat):
-        assert compat.definir_nom_appareil("") == "Domotique"
-        assert compat.definir_nom_appareil(None) == "Domotique"
-        assert len(compat.definir_nom_appareil("x" * 80)) == 40
+    def test_nom_neutre_et_fixe(self, compat):
+        """En dur : ni Jeedom ni le plugin, et jamais réglable."""
+        assert compat.NOM_APPAREIL == "Domotique"
+        assert not hasattr(compat, "definir_nom_appareil")
 
     def test_nom_explicite_respecte_et_rien_sans_enregistrement(self, compat):
         compat.ClientBase()._do_2fa(False, True, None, "Choisi")

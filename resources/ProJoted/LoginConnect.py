@@ -564,7 +564,6 @@ try:
         parser.add_argument("--Eqid", help="ID de l'équipement", type=str)
         parser.add_argument("--Loglevel", help="Niveau de log", type=str)
         parser.add_argument("--Uuid", help="UUID unique de l'équipement", type=str)
-        parser.add_argument("--NomAppareil", help="Nom d'appareil donné à Pronote", type=str)
         parser.add_argument(
             "--Pin", help="Code PIN pour la génération du jeton", type=str
         )
@@ -575,7 +574,6 @@ try:
             "--datadir", help="Chemin du dossier data du plugin", type=str
         )
         args = parser.parse_args()
-        pronote_compat.definir_nom_appareil(args.NomAppareil)
 
         if args.URL:
             Pronote_url = args.URL

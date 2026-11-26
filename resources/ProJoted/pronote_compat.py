@@ -82,27 +82,12 @@ _applied = False
 #
 # Ce nom n'est qu'une étiquette, celle que le compte voit dans « Mes
 # appareils » ; l'identité de l'appareil reste l'UUID et le jeton, auxquels on
-# ne touche pas. Il est réglé dans la configuration du plugin et reste fixe,
-# pour ne pas faire apparaître un second appareil. Le défaut est neutre, comme
-# le nom qu'un utilisateur donnerait lui-même à son appareil.
+# ne touche pas. Il est fixe, en dur, pour ne jamais faire apparaître un second
+# appareil, et neutre : il ne nomme ni Jeedom ni le plugin.
 #
 # Plutôt que de le passer aux vingt appels de connexion, on le fournit à
 # l'unique endroit où pronotepy en a besoin : ClientBase._do_2fa.
-NOM_APPAREIL_DEFAUT = "Domotique"
-NOM_APPAREIL_LONGUEUR_MAX = 40
-_nom_appareil = NOM_APPAREIL_DEFAUT
-
-
-def definir_nom_appareil(nom):
-    """Fixe le nom d'appareil envoyé à PRONOTE ; vide → le nom par défaut."""
-    global _nom_appareil
-    nom = " ".join(str(nom or "").split())[:NOM_APPAREIL_LONGUEUR_MAX].strip()
-    _nom_appareil = nom or NOM_APPAREIL_DEFAUT
-    return _nom_appareil
-
-
-def nom_appareil():
-    return _nom_appareil
+NOM_APPAREIL = "Domotique"
 
 
 def _installer_nom_appareil():
@@ -114,7 +99,7 @@ def _installer_nom_appareil():
 
     def _do_2fa(self, doVerifyPin=False, doRegisterDevice=False, pin=None, identifier=None):
         if doRegisterDevice and not identifier:
-            identifier = _nom_appareil
+            identifier = NOM_APPAREIL
             logging.info(
                 "pronote_compat :: l'établissement demande d'enregistrer "
                 "l'appareil, sous le nom « %s ».",

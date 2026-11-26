@@ -925,7 +925,7 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
         <tbody>
             <tr>
                 <td><span class="badge badge-fix">Correctif</span></td>
-                <td><strong>Connexion impossible quand l'établissement impose l'enregistrement des appareils</strong> — Pronote demande alors un nom d'appareil à la connexion, et pronotepy s'arrête si on ne lui en donne pas (« A device identifier is required for this account »). ProJote n'en transmettait aucun. Il envoie désormais un nom neutre, <em>Domotique</em> par défaut, réglable dans <strong>Plugins → Gestion des plugins → ProJote → Configuration</strong>, champ <em>Nom de l'appareil</em>. Ce nom n'est qu'une étiquette, celle qui apparaît dans « Mes appareils » du compte Pronote : l'identité de l'appareil reste son identifiant et son jeton, inchangés. Gardez-le fixe, le changer peut faire apparaître un second appareil. Signalé par un utilisateur.</td>
+                <td><strong>Connexion impossible quand l'établissement impose l'enregistrement des appareils</strong> — Pronote demande alors un nom d'appareil à la connexion, et pronotepy s'arrête si on ne lui en donne pas (« A device identifier is required for this account »). ProJote n'en transmettait aucun. Il envoie désormais un nom neutre et fixe, <em>Domotique</em>. Ce nom n'est qu'une étiquette, celle qui apparaît dans « Mes appareils » du compte Pronote : l'identité de l'appareil reste son identifiant et son jeton, inchangés. Il n'est pas réglable, pour ne jamais faire apparaître un second appareil. Signalé par un utilisateur.</td>
             </tr>
             <tr>
                 <td><span class="badge badge-fix">Correctif</span></td>
@@ -1714,11 +1714,9 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
 
     <h2>Sous quel nom Pronote voit-il ma box ?</h2>
     <p>Quand l'établissement impose l'enregistrement des appareils, Pronote demande un nom à la première
-    connexion. ProJote envoie <em>Domotique</em>, ou le nom saisi dans
-    <strong>Plugins → Gestion des plugins → ProJote → Configuration</strong>, champ <em>Nom de l'appareil</em>
-    (40 caractères au plus). C'est ce nom qui apparaît dans « Mes appareils » du compte Pronote.
-    Il est pris en compte au prochain redémarrage du démon et à la prochaine validation de compte.
-    Gardez-le fixe : le changer peut faire apparaître un second appareil dans la liste.</p>
+    connexion. ProJote envoie <em>Domotique</em> : c'est ce nom qui apparaît dans « Mes appareils » du
+    compte Pronote. Il est fixe et ne se règle pas, pour ne jamais faire apparaître un second appareil
+    dans la liste.</p>
 
     <h2>Mon QR Code ne fonctionne pas, pourquoi ?</h2>
     <p>Chaque QR Code Pronote est à <strong>usage unique</strong>. Si la connexion a échoué ou si vous avez

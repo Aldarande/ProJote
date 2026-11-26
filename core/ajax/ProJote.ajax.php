@@ -189,7 +189,6 @@ try {
     }
     $command .= ' --Eqid ' . escapeshellarg($eqLogicId);
     $command .= ' --Uuid ' . escapeshellarg($uuid);
-    $command .= ' --NomAppareil ' . escapeshellarg(ProJote::nomAppareil());
     $command .= ' --apikey ' . escapeshellarg(jeedom::getApiKey('ProJote'));
     $command .= ' --Loglevel ' . (log::convertLogLevel(log::getLogLevel("ProJote")));
     $command .= ' --datadir ' . escapeshellarg(dirname(dirname(dirname(__FILE__))) . '/data');
@@ -373,7 +372,6 @@ try {
     $command .= ' --Pin ' . escapeshellarg($pin);
     $command .= ' --Eqid ' . escapeshellarg($eqLogicId);
     $command .= ' --Uuid ' . escapeshellarg($uuid);
-    $command .= ' --NomAppareil ' . escapeshellarg(ProJote::nomAppareil());
     $command .= ' --apikey ' . escapeshellarg(jeedom::getApiKey('ProJote'));
     $command .= ' --Loglevel ' . escapeshellarg(log::convertLogLevel(log::getLogLevel("ProJote")));
     $command .= ' --datadir ' . escapeshellarg(dirname(dirname(dirname(__FILE__))) . '/data');

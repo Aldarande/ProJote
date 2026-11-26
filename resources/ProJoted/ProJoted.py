@@ -2552,9 +2552,7 @@ def _run_daemon():
     parser.add_argument("--pid", help="Pid file", type=str)
     parser.add_argument("--socketport", help="Port for Projote Deamon", type=str)
     parser.add_argument("--datadir", help="Path to plugin data directory", type=str)
-    parser.add_argument("--nomappareil", help="Nom d'appareil donné à Pronote", type=str)
     args = parser.parse_args()
-    pronote_compat.definir_nom_appareil(args.nomappareil)
 
     _log_level = args.loglevel or "error"
     _callback = args.callback or ""

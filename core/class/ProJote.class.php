@@ -305,7 +305,6 @@ class ProJote extends eqLogic
     $cmd .= ' --callback ' . $callback . '/plugins/ProJote/core/php/jeeProJote.php';
     $cmd .= ' --apikey ' . $apikey;
     $cmd .= ' --cycle 3'; // Inutilisé actuellement, pourrait servir pour le rafraîchissement
-    $cmd .= ' --nomappareil ' . escapeshellarg(self::nomAppareil());
     $cmd .= ' --pid ' . $pid_file;
 
     log::add(__CLASS__, 'info', 'Lancement du démon ' . __CLASS__);
@@ -597,22 +596,6 @@ class ProJote extends eqLogic
    * @param int $_defaut valeur retenue si la configuration est vide ou aberrante.
    * @return int une heure entre 0 et 23.
    */
-  /**
-   * Nom d'appareil donné à Pronote quand l'établissement impose
-   * l'enregistrement des appareils (voir pronote_compat.py).
-   *
-   * Une simple étiquette, celle que le compte voit dans « Mes appareils » :
-   * l'identité de l'appareil reste l'UUID et le jeton. Le défaut est neutre.
-   *
-   * @return string nom nettoyé, 40 caractères au plus.
-   */
-  public static function nomAppareil()
-  {
-    $nom = trim(preg_replace('/\s+/u', ' ', (string) config::byKey('nom_appareil', __CLASS__, '')));
-    $nom = trim(mb_substr($nom, 0, 40));
-    return ($nom === '') ? 'Domotique' : $nom;
-  }
-
   private static function heureCollecte($_cle, $_defaut)
   {
     $valeur = config::byKey($_cle, __CLASS__, '');
