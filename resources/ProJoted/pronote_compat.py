@@ -67,8 +67,116 @@ de requirements.txt devra alors être relevé).
 """
 
 import logging
+import re
 
 _applied = False
+
+
+# Nom d'appareil (enregistrement d'appareil exigé par l'établissement)
+# ---------------------------------------------------------------------
+# Quand l'établissement impose l'enregistrement des appareils, PRONOTE le
+# demande à la connexion (« actionsDoubleAuth » contenant 3 ou 5) et pronotepy
+# lève MFAError(« A device identifier is required for this account ») si aucun
+# nom ne lui a été transmis. ProJote n'en transmettait aucun : ces comptes ne
+# pouvaient pas se connecter (retour d'un utilisateur, novembre 2026).
+#
+# Ce nom n'est qu'une étiquette, celle que le compte voit dans « Mes
+# appareils » ; l'identité de l'appareil reste l'UUID et le jeton, auxquels on
+# ne touche pas. Il est réglé dans la configuration du plugin et reste fixe,
+# pour ne pas faire apparaître un second appareil. Le défaut est neutre, comme
+# le nom qu'un utilisateur donnerait lui-même à son appareil.
+#
+# Plutôt que de le passer aux vingt appels de connexion, on le fournit à
+# l'unique endroit où pronotepy en a besoin : ClientBase._do_2fa.
+NOM_APPAREIL_DEFAUT = "Domotique"
+NOM_APPAREIL_LONGUEUR_MAX = 40
+_nom_appareil = NOM_APPAREIL_DEFAUT
+
+
+def definir_nom_appareil(nom):
+    """Fixe le nom d'appareil envoyé à PRONOTE ; vide → le nom par défaut."""
+    global _nom_appareil
+    nom = " ".join(str(nom or "").split())[:NOM_APPAREIL_LONGUEUR_MAX].strip()
+    _nom_appareil = nom or NOM_APPAREIL_DEFAUT
+    return _nom_appareil
+
+
+def nom_appareil():
+    return _nom_appareil
+
+
+def _installer_nom_appareil():
+    from pronotepy import clients
+
+    origine = clients.ClientBase._do_2fa
+    if getattr(origine, "_projote_nom_appareil", False):
+        return
+
+    def _do_2fa(self, doVerifyPin=False, doRegisterDevice=False, pin=None, identifier=None):
+        if doRegisterDevice and not identifier:
+            identifier = _nom_appareil
+            logging.info(
+                "pronote_compat :: l'établissement demande d'enregistrer "
+                "l'appareil, sous le nom « %s ».",
+                identifier,
+            )
+        return origine(self, doVerifyPin, doRegisterDevice, pin, identifier)
+
+    _do_2fa._projote_nom_appareil = True
+    clients.ClientBase._do_2fa = _do_2fa
+
+
+# Fausse détection « adresse IP suspendue »
+# -----------------------------------------
+# pronotepy conclut à une suspension dès que la page de connexion contient les
+# lettres « IP », n'importe où (``if "IP" in html``). Or cette page porte le nom
+# de l'établissement en majuscules dans son titre : un établissement SAINT-PHILIPPE
+# ou SAINT-HIPPOLYTE était déclaré suspendu à chaque
+# connexion (retour d'un utilisateur, novembre 2026).
+#
+# Chercher le message anglais de pronotepy, comme proposé alors, désactiverait
+# la détection : cette phrase est celle de l'exception, jamais celle de la page.
+# On ne conclut donc à une suspension que si la page de connexion normale est
+# absente (pas d'appel « Start({…}) » exploitable) ET que la page contient
+# « IP » comme mot entier ou un texte de suspension. Le message levé reste
+# celui de pronotepy, que pronote_errors reconnaît.
+_PAGE_CONNEXION = re.compile(r"Start ?\({(?P<param>[^}]*)}\)")
+_SIGNE_SUSPENSION = re.compile(r"\bIP\b|(?i:suspendu)")
+
+
+def page_signale_suspension(html):
+    """Vrai si ``html`` est une page de suspension et non la page de connexion."""
+    return bool(_SIGNE_SUSPENSION.search(html or ""))
+
+
+def _installer_detection_ip():
+    from pronotepy import pronoteAPI
+    from pronotepy.exceptions import PronoteAPIError
+
+    if getattr(pronoteAPI._Communication._parse_html, "_projote_detection_ip", False):
+        return
+
+    def _parse_html(self, html):
+        match = _PAGE_CONNEXION.search(html)
+        if not match:
+            if page_signale_suspension(html):
+                raise PronoteAPIError("Your IP address is suspended.")
+            raise PronoteAPIError(
+                "Page html is different than expected. Be sure that pronote_url "
+                "is the direct url to your pronote page."
+            )
+        attributes = {}
+        for attr in match.group("param").split(","):
+            key, value = attr.split(":")
+            attributes[key.strip().strip("'\"")] = value.strip().strip("'\"")
+        if "h" not in attributes:
+            if page_signale_suspension(html):
+                raise PronoteAPIError("Your IP address is suspended.")
+            raise ValueError("internal exception to retry -> cannot prase html")
+        return attributes
+
+    _parse_html._projote_detection_ip = True
+    pronoteAPI._Communication._parse_html = _parse_html
 
 
 # Listes que pronotepy lit sans précaution dans la réponse de ListeMessagerie.
@@ -131,6 +239,22 @@ def apply() -> None:
     global _applied
     if _applied:
         return
+
+    # Deux correctifs indépendants du challenge : chacun s'installe à part, pour
+    # que l'échec de l'un ne prive pas la connexion des autres.
+    for installer, nom in (
+        (_installer_nom_appareil, "nom d'appareil"),
+        (_installer_detection_ip, "détection d'IP suspendue"),
+    ):
+        try:
+            installer()
+        except Exception as e:
+            logging.warning(
+                "pronote_compat :: correctif « %s » non installé (%s: %s).",
+                nom,
+                type(e).__name__,
+                e,
+            )
 
     try:
         _install()

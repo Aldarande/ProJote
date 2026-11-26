@@ -924,6 +924,14 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
         <thead><tr><th>Type</th><th>Description</th></tr></thead>
         <tbody>
             <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>Connexion impossible quand l'établissement impose l'enregistrement des appareils</strong> — Pronote demande alors un nom d'appareil à la connexion, et pronotepy s'arrête si on ne lui en donne pas (« A device identifier is required for this account »). ProJote n'en transmettait aucun. Il envoie désormais un nom neutre, <em>Domotique</em> par défaut, réglable dans <strong>Plugins → Gestion des plugins → ProJote → Configuration</strong>, champ <em>Nom de l'appareil</em>. Ce nom n'est qu'une étiquette, celle qui apparaît dans « Mes appareils » du compte Pronote : l'identité de l'appareil reste son identifiant et son jeton, inchangés. Gardez-le fixe, le changer peut faire apparaître un second appareil. Signalé par un utilisateur.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-fix">Correctif</span></td>
+                <td><strong>« Adresse IP suspendue » sans suspension</strong> — pronotepy concluait à une IP suspendue dès que la page de connexion contenait les lettres « IP », n'importe où. Or cette page porte le nom de l'établissement en majuscules : un collège SAINT-PHIL<strong>IP</strong>PE ou SAINT-H<strong>IP</strong>POLYTE ne pouvait jamais se connecter. La suspension n'est plus retenue que si la page de connexion normale est absente et que la page parle d'« IP » comme d'un mot, ou de suspension. Une vraie suspension reste détectée, et la pause de toutes les requêtes qui la suit reste en place. Signalé par un utilisateur.</td>
+            </tr>
+            <tr>
                 <td><span class="badge badge-new">Nouveau</span></td>
                 <td><strong>Le contenu des cours, dans son propre onglet</strong> — certains professeurs ne mettent pas leurs consignes dans « Travail à faire » mais dans le <em>Contenu</em> de la séance, dans le cahier de textes. Le plugin ne relevait pas ce champ : un élève qui suivait ses devoirs sur la tablette passait à côté. Le contenu des séances des <strong>5 derniers jours de cours</strong>, cours du jour compris, est désormais relevé : les jours sont comptés sur l'emploi du temps, un jour entièrement annulé ne compte pas, et la fenêtre ne remonte jamais au-delà de 21 jours, au retour des vacances. Il est relevé en <strong>une seule requête</strong> à Pronote pour toute la période, avec les devoirs. Seuls les contenus porteurs d'une description ou d'une pièce jointe sont gardés, 40 au plus : un titre seul, souvent un objectif de programme, n'apprend rien. Ils s'affichent dans un onglet <em>Cours</em> du widget, placé juste après Devoirs, de la séance la plus récente à la plus ancienne. Chaque contenu tient sur trois lignes, et ceux qui sont coupés se déplient d'un appui — le survol n'existe pas sur tablette. Le badge compte les contenus des séances du jour. Le panneau reçoit une carte <em>Contenu des cours</em> pour chaque enfant.</td>
             </tr>
@@ -1703,6 +1711,14 @@ https://xxxxx.index-education.net/pronote/parent.html</code></pre>
         Un rafraîchissement manuel (bouton <em>Rafraîchir</em> ou clic sur l'avatar du widget) est toujours
         exécuté immédiatement, quelle que soit l'heure.
     </div>
+
+    <h2>Sous quel nom Pronote voit-il ma box ?</h2>
+    <p>Quand l'établissement impose l'enregistrement des appareils, Pronote demande un nom à la première
+    connexion. ProJote envoie <em>Domotique</em>, ou le nom saisi dans
+    <strong>Plugins → Gestion des plugins → ProJote → Configuration</strong>, champ <em>Nom de l'appareil</em>
+    (40 caractères au plus). C'est ce nom qui apparaît dans « Mes appareils » du compte Pronote.
+    Il est pris en compte au prochain redémarrage du démon et à la prochaine validation de compte.
+    Gardez-le fixe : le changer peut faire apparaître un second appareil dans la liste.</p>
 
     <h2>Mon QR Code ne fonctionne pas, pourquoi ?</h2>
     <p>Chaque QR Code Pronote est à <strong>usage unique</strong>. Si la connexion a échoué ou si vous avez

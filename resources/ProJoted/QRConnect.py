@@ -111,6 +111,7 @@ try:
         parser.add_argument("--Eqid", help="ID de l'équipement", type=str)
         parser.add_argument("--Loglevel", help="Niveau de log", type=str)
         parser.add_argument("--Uuid", help="UUID unique de l'équipement", type=str)
+        parser.add_argument("--NomAppareil", help="Nom d'appareil donné à Pronote", type=str)
         parser.add_argument("--datadir", help="Chemin du dossier data du plugin", type=str)
         # --apikey est passé par le PHP (cohérence avec LoginConnect.py). Les données du
         # QR Code transitent en clair (non chiffrées par la clé API), donc l'argument est
@@ -118,6 +119,7 @@ try:
         # ("unrecognized arguments: --apikey") et la validation du QR échoue (code 2).
         parser.add_argument("--apikey", help="Clé API Jeedom (non utilisée ici)", type=str)
         args = parser.parse_args()
+        pronote_compat.definir_nom_appareil(args.NomAppareil)
 
         QRUrl   = args.QRUrl   or ''
         QRLogin = args.QRLogin or ''

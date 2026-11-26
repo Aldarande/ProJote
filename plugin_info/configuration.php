@@ -71,6 +71,15 @@ $_pluginVersion = $_pluginInfo['pluginVersion'] ?? '?';
       </div>
     </div>
 
+    <div class="form-group">
+      <label class="col-md-4 control-label">{{Nom de l'appareil}}
+        <sup><i class="fas fa-question-circle tooltips" title="{{Nom sous lequel Pronote enregistre cette box quand l'établissement impose l'enregistrement des appareils. Il apparaît dans « Mes appareils » du compte Pronote. Gardez-le fixe : le changer peut faire apparaître un second appareil. Pris en compte au prochain redémarrage du démon et à la prochaine validation de compte.}}"></i></sup>
+      </label>
+      <div class="col-md-4">
+        <input class="configKey form-control" data-l1key="nom_appareil" placeholder="Domotique" maxlength="40" />
+      </div>
+    </div>
+
     <!--
     <div class="form-group">
       <label class="col-md-4 control-label">{{Global param 2}}
